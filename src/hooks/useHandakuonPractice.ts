@@ -43,25 +43,19 @@ export default function useHandakuonPractice({
       }
   }, [side, kb]);
 
-  // side と kb に応じたキーコードを取得 (TW-20V は仮)
+  // side と kb に応じたキーコードを取得
   const hGyouKeyCode = useMemo(() => {
-      if (kb === 'tw-20v') {
-          // TW-20V の「は行」コード (仮 - 正確な値に要修正)
-          // usePracticeCommons.ts の仮マッピングに合わせる
-          return side === 'left' ? 0x0B : 0x0B; // Left: 0x0B, Right: 0x0B と仮定
-      } else { // TW-20H
-          // TW-20H の「は行」コードは Left: 0x0E, Right: 0x0E
-          return 0x0E;
-      }
-  }, [kb, side]);
+      // MODIFIED: hid2Gyou は既に side と kb に応じて選択されているため、直接使用する
+      // const gyouMap = side === 'left' ? hid2Gyou.left : hid2Gyou.right; // <- 削除
+      const entry = Object.entries(hid2Gyou).find(([_, name]) => name === 'は行');
+      return entry ? parseInt(entry[0]) : null; // 見つからない場合は null
+  // MODIFIED: 依存配列から side を削除
+  }, [hid2Gyou]);
 
   const dakuonKeyCode = useMemo(() => {
       if (kb === 'tw-20v') {
-          // TW-20V の濁音コード (仮 - 正確な値に要修正)
-          // usePracticeCommons.ts の仮マッピングに合わせる
-          return side === 'left' ? 0x04 : 0x03; // Left: 0x04, Right: 0x03
+          return side === 'left' ? 0x04 : 0x03; // TW-20V 仮
       } else { // TW-20H
-          // TW-20H は Left/Right ともに 0x04
           return 0x04;
       }
   }, [kb, side]);
@@ -123,8 +117,8 @@ export default function useHandakuonPractice({
       console.log("Expected H-Gyou Key Code:", hGyouKeyCode);
       console.log("Expected Dakuon Key Code:", dakuonKeyCode);
 
-      if (!isActive || okVisible || !currentDan) {
-          console.log("Handakuon Input Ignored: Inactive, OK visible, or keys invalid");
+      if (!isActive || okVisible || !currentDan || hGyouKeyCode === null) { // hGyouKeyCode のチェック追加
+          console.log("Handakuon Input Ignored: Inactive, OK visible, keys invalid, or hGyouKeyCode not found");
           return { isExpected: false, shouldGoToNext: false };
       }
       if (input.type !== 'release') {
@@ -141,13 +135,15 @@ export default function useHandakuonPractice({
         case 'gyouInput':
           console.log("Stage: gyouInput, Input Gyou:", inputGyou, "Expected Gyou:", currentGyouKey, "Input Code:", pressCode, "Expected Code:", hGyouKeyCode);
           // 期待するキーコード (hGyouKeyCode) と比較
-          if (inputGyou === currentGyouKey && pressCode === hGyouKeyCode) {
+          // MODIFIED: inputGyou のチェックは不要 (pressCode の一致で十分)
+          if (pressCode === hGyouKeyCode) {
             setStage('handakuonInput');
             inputCount.current = 0;
             isExpected = true;
             console.log("Transition to handakuonInput stage");
           } else {
             console.log("Incorrect gyou input");
+            isExpected = false;
           }
           break;
         case 'handakuonInput':
@@ -163,52 +159,61 @@ export default function useHandakuonPractice({
                 blinkTimeoutRef.current = null;
                 console.log("Blinking finished"); // 点滅終了ログ
               }, 500);
-              isExpected = true;
+              isExpected = true; // 1回目の濁音キーは期待通り
               console.log("First dakuon key press, start blinking");
             } else if (inputCount.current === 1 && !isBlinking) { // 点滅が終わった後の2打目
               inputCount.current = 0; // カウントリセット
               setStage('danInput');
-              isExpected = true;
+              isExpected = true; // 2回目の濁音キーも期待通り
               console.log("Second dakuon key press after blink, transition to danInput");
-            } else if (inputCount.current === 1 && isBlinking) { // 点滅中の2打目 (無視またはエラー)
-                console.log("Second dakuon key press during blink, ignored or error");
-                // isExpected = false; // 不正解とする場合
-                isExpected = true; // 期待通りとして次の入力を待つ場合 (現状維持)
+            } else if (inputCount.current === 1 && isBlinking) { // 点滅中の2打目
+                console.log("Second dakuon key press during blink, ignored");
+                isExpected = true; // 点滅中の入力も期待通りとして扱う（無視されるだけ）
             }
           } else {
               console.log("Incorrect dakuon key input");
+              isExpected = false;
           }
           break;
         case 'danInput':
-          console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", currentDan);
-          if (inputDan === currentDan) {
+          // 期待するキーコードを取得 (hid2Dan の逆引き)
+          const expectedDanKeyCodes = Object.entries(hid2Dan)
+              .filter(([_, name]) => name === currentDan)
+              .map(([codeStr, _]) => parseInt(codeStr));
+          console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", currentDan, "Input Code:", pressCode, "Expected Codes:", expectedDanKeyCodes);
+          // 押されたキーコードが期待される段キーコードのいずれかと一致するか
+          if (expectedDanKeyCodes.includes(pressCode)) {
             isExpected = true;
             shouldGoToNext = true;
             console.log("Correct dan input, should go next");
           } else {
               console.log("Incorrect dan input");
+              isExpected = false;
           }
           break;
       }
 
-      // 不正解だった場合、最初のステージに戻し、点滅状態もリセット
-      if (!isExpected && stage !== 'handakuonInput') { // handakuonInput中の不正解はリセットしない場合がある
-           console.log("Incorrect input, resetting to gyouInput stage");
-           setStage('gyouInput');
-           resetBlinkingState(); // 点滅状態をリセット
-           isExpected = false;
-      } else if (!isExpected && stage === 'handakuonInput') {
-          // handakuonInput 中の不正解 (dakuonKeyCode 以外が押された場合)
-          console.log("Incorrect input during handakuonInput, resetting to gyouInput stage");
-          setStage('gyouInput');
-          resetBlinkingState();
-          isExpected = false;
+      // 不正解だった場合のステージリセットロジック
+      if (!isExpected) {
+          if (stage === 'handakuonInput') {
+              // handakuonInput 中の不正解 (dakuonKeyCode 以外が押された場合)
+              console.log("Incorrect input during handakuonInput, resetting to gyouInput stage");
+              setStage('gyouInput');
+              resetBlinkingState(); // 点滅状態もリセット
+          } else if (stage === 'danInput') {
+              console.log("Incorrect input in danInput, stage remains danInput");
+              // danInput で不正解の場合、ステージはリセットしない
+          } else { // stage === 'gyouInput'
+              console.log("Incorrect input in gyouInput, stage remains gyouInput");
+              // gyouInput で不正解の場合もステージはリセットしない
+          }
+          isExpected = false; // 念のため false を設定
       }
 
       console.log("Handakuon Result:", { isExpected, shouldGoToNext });
       return { isExpected, shouldGoToNext };
     },
-    [isActive, okVisible, stage, currentGyouKey, currentDan, isBlinking, hid2Gyou, hid2Dan, hGyouKeyCode, dakuonKeyCode, resetBlinkingState] // kb, side は不要
+    [isActive, okVisible, stage, currentGyouKey, currentDan, isBlinking, hid2Gyou, hid2Dan, hGyouKeyCode, dakuonKeyCode, resetBlinkingState]
   );
 
   const getHighlightClassName = (key: string, layoutIndex: number): string | null => {
@@ -228,15 +233,15 @@ export default function useHandakuonPractice({
       switch (currentStageForHighlight) {
         case 'gyouInput':
           expectedKeyName = 'は行';
-          targetLayoutIndex = 2;
+          targetLayoutIndex = 2; // スタートレイヤー
           break;
         case 'handakuonInput':
           expectedKeyName = '濁音';
-          targetLayoutIndex = 2;
+          targetLayoutIndex = 2; // スタートレイヤー
           break;
         case 'danInput':
           expectedKeyName = currentDan;
-          targetLayoutIndex = 3;
+          targetLayoutIndex = 3; // エンドレイヤー
           break;
       }
 
@@ -258,14 +263,31 @@ export default function useHandakuonPractice({
     isInitialMount.current = true;
   }, [resetBlinkingState]);
 
+  // isInvalidInputTarget をステージに応じて修正
   const isInvalidInputTarget = useCallback((keyCode: number, layoutIndex: number, keyIndex: number): boolean => {
       if (!isActive) return false;
-      // HIDコードが1始まりと仮定
-      const targetKeyIndex = keyCode - 1;
-      // layoutIndex や stage による絞り込みを行わない
-      const isTarget = keyIndex === targetKeyIndex;
+      // TW-20H/V の最大キーコード (0x14 or 0x10) に応じて調整
+      const maxStartLayoutKeyCode = kb === 'tw-20v' ? 0x10 : 0x14; // TW-20V は 16キー (0x10) と仮定
+      const isStartLayoutInput = keyCode <= maxStartLayoutKeyCode;
+      // HIDコードは1始まりと仮定してキーインデックスを計算
+      const pressCode = isStartLayoutInput ? keyCode : keyCode - maxStartLayoutKeyCode;
+      const targetKeyIndex = pressCode - 1; // 0-origin index
+
+      let expectedLayoutIndex: number | null = null;
+      switch (stage) {
+          case 'gyouInput':
+          case 'handakuonInput': // 半濁音(濁音)キーもスタートレイヤーにあるため
+              expectedLayoutIndex = 2; // スタートレイヤー
+              break;
+          case 'danInput':
+              expectedLayoutIndex = 3; // エンドレイヤー
+              break;
+      }
+
+      // 期待されるレイヤーの、押されたキーコードに対応するキーであるか？
+      const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
       return isTarget;
-    }, [isActive]);
+  }, [isActive, stage, kb]);
 
   return {
     headingChars,

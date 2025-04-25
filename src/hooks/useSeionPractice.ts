@@ -7,7 +7,7 @@ import {
     PracticeHookResult,
     gyouList,
     danOrder,
-    KeyboardModel, // MODIFIED: ESLint Warning 対応のためコメント解除 (実際には未使用だが型定義として必要)
+    KeyboardModel,
     hid2GyouHRight_Kana,
     hid2GyouHLeft_Kana,
     hid2DanHRight_Kana,
@@ -74,18 +74,13 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
             console.log("Seion Input Ignored: Inactive, OK visible, or keys invalid");
             return { isExpected: false, shouldGoToNext: false };
         }
-        // MODIFIED: 押下イベントも処理するように変更 (ただし判定は離上で行う)
-        // if (info.type !== 'release') {
-        //     console.log("Seion Input Ignored: Not a release event");
-        //     return { isExpected: false, shouldGoToNext: false };
-        // }
 
         const inputGyou = hid2Gyou[info.pressCode] ?? null;
         const inputDan = hid2Dan[info.pressCode] ?? null;
         let isExpected = false;
         let shouldGoToNext = false;
 
-        // MODIFIED: 離上イベントでのみ判定と状態遷移を行う
+        // 離上イベントでのみ判定と状態遷移を行う
         if (info.type === 'release') {
             if (stage === "line") {
                 // 期待するキーコードを取得 (hid2Gyou の逆引き)
@@ -103,8 +98,7 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
                 } else {
                     console.log("Incorrect gyou input");
                     isExpected = false;
-                    // 行入力で間違えた場合もステージはリセットしない（次の入力を待つ）
-                    // setStage("line"); // 削除
+                    // 行入力で間違えた場合もステージはリセットしない
                 }
             } else if (stage === "dan") {
                  // 期待するキーコードを取得 (hid2Dan の逆引き)
@@ -118,26 +112,22 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
                 if (expectedDanKeyCodes.includes(info.pressCode)) {
                     isExpected = true;
                     shouldGoToNext = true;
-                    // setStage("line"); // 次の問題に行くのでここでリセット不要
                     console.log("Correct dan input, should go next");
                 } else {
-                    // 段入力で間違えた場合は、行入力からやり直し
-                    setStage("line");
+                    // 段入力で間違えた場合
+                    // setStage("line"); // <<<--- この行を削除またはコメントアウト
                     isExpected = false;
-                    console.log("Incorrect dan input, reset to line stage");
+                    console.log("Incorrect dan input, stage remains dan"); // ログ変更
                 }
             }
         } else { // 押下イベントの場合
             // 押下イベントでは状態遷移や正誤判定は行わない
-            // ただし、将来的に押下中のハイライトなどを行う場合はここにロジックを追加可能
-            isExpected = false; // 押下だけでは完了ではない
+            isExpected = false;
             shouldGoToNext = false;
         }
 
-
         console.log("Seion Result:", { isExpected, shouldGoToNext });
         return { isExpected, shouldGoToNext };
-    // MODIFIED: ESLint Warning 対応: kb, side は hid2Gyou, hid2Dan の生成に使われているため不要
     }, [isActive, okVisible, stage, currentGyouKey, currentDanKey, hid2Gyou, hid2Dan]);
 
     const getHighlightClassName = (key: string, layoutIndex: number): string | null => {
@@ -148,7 +138,6 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
             return null;
         }
 
-        // 問題切り替え直後は強制的に "line" として扱う
         const currentStageForHighlight = isProblemSwitch ? "line" : stage;
 
         let expectedKeyName: string | null = null;
@@ -180,23 +169,22 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
         isInitialMount.current = true;
     }, []);
 
+    // isInvalidInputTarget は以前の修正のままでOK
     const isInvalidInputTarget = useCallback((keyCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
-        // HIDコードが1始まりと仮定
-        const targetKeyIndex = keyCode - 1;
+        const isStartLayoutInput = keyCode <= 0x14;
+        const pressCode = isStartLayoutInput ? keyCode : keyCode - 0x14;
+        const targetKeyIndex = pressCode - 1;
 
-        // MODIFIED: ステージに応じて期待されるレイアウトを判定
         let expectedLayoutIndex: number | null = null;
         if (stage === "line") {
-            expectedLayoutIndex = 2; // スタートレイヤー
+            expectedLayoutIndex = 2;
         } else if (stage === "dan") {
-            expectedLayoutIndex = 3; // エンドレイヤー
+            expectedLayoutIndex = 3;
         }
 
-        // 期待されるレイヤーでの入力か、かつキーインデックスが一致するか
         const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
         return isTarget;
-    // MODIFIED: stage を依存配列に追加
     }, [isActive, stage]);
 
     return {

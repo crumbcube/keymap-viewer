@@ -137,6 +137,7 @@ export default function useSokuonKomojiPractice({
           console.log("Correct tsu input, should go next");
         } else {
             console.log("Incorrect tsu input");
+            isExpected = false; // MODIFIED: 明示的に false を設定
         }
       } else if (currentInputInfo) { // 小文字の場合
         const expectedGyouKey = currentInputInfo.gyouKey;
@@ -148,12 +149,14 @@ export default function useSokuonKomojiPractice({
               .filter(([_, name]) => name === expectedGyouKey)
               .map(([codeStr, _]) => parseInt(codeStr));
             console.log("Stage: gyouInput, Input Gyou:", inputGyou, "Expected Gyou:", expectedGyouKey, "Input Code:", pressCode, "Expected Codes:", expectedGyouKeyCodes);
-            if (inputGyou === expectedGyouKey && expectedGyouKeyCodes.includes(pressCode)) {
+            // MODIFIED: inputGyou のチェックは不要 (pressCode の一致で十分)
+            if (expectedGyouKeyCodes.includes(pressCode)) {
               setStage('sokuonInput'); // 小文字なので次は濁音キー入力へ
               isExpected = true;
               console.log("Transition to sokuonInput stage (for komoji)");
             } else {
                 console.log("Incorrect gyou input");
+                isExpected = false; // MODIFIED: 明示的に false を設定
             }
             break;
           case 'sokuonInput': // 小文字入力のための濁音キー入力ステージ
@@ -164,37 +167,61 @@ export default function useSokuonKomojiPractice({
               console.log("Transition to danInput stage (for komoji)");
             } else {
                 console.log("Incorrect dakuon key input for komoji");
+                isExpected = false; // MODIFIED: 明示的に false を設定
             }
             break;
           case 'danInput':
-            console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", expectedDan);
-            if (inputDan === expectedDan) {
+             // 期待するキーコードを取得 (hid2Dan の逆引き)
+            const expectedDanKeyCodes = Object.entries(hid2Dan)
+                .filter(([_, name]) => name === expectedDan)
+                .map(([codeStr, _]) => parseInt(codeStr));
+            console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", expectedDan, "Input Code:", pressCode, "Expected Codes:", expectedDanKeyCodes);
+            // 押されたキーコードが期待される段キーコードのいずれかと一致するか
+            if (expectedDanKeyCodes.includes(pressCode)) {
               isExpected = true;
               shouldGoToNext = true;
               console.log("Correct dan input for komoji, should go next");
             } else {
                 console.log("Incorrect dan input for komoji");
+                isExpected = false; // MODIFIED: 明示的に false を設定
             }
             break;
           case 'tsuInput':
             // isTsu=false の場合はここに来ないはず
             console.error("Invalid state: stage is tsuInput but isTsu is false");
+            isExpected = false;
             break;
         }
+      } else {
+          // currentInputInfo がない場合 (データエラーなど)
+          console.error("Invalid state: currentInputInfo is null when not isTsu");
+          isExpected = false;
       }
 
-      // 不正解だった場合、最初のステージに戻す
+      // MODIFIED: 不正解だった場合のステージリセットロジックを修正
       if (!isExpected) {
-           console.log("Incorrect input, resetting to initial stage");
-           const initialStage = getInitialStage(isTsu);
-           setStage(initialStage);
-           isExpected = false;
+          if (isTsu) {
+              // 促音入力で不正解の場合、ステージはリセットしない (単打なので)
+              console.log("Incorrect input in tsuInput, stage remains tsuInput");
+          } else { // 小文字入力の場合
+              if (stage === 'sokuonInput') {
+                  console.log("Incorrect input in sokuonInput, resetting to gyouInput stage");
+                  setStage('gyouInput');
+              } else if (stage === 'danInput') {
+                  console.log("Incorrect input in danInput, stage remains danInput");
+                  // danInput で不正解の場合、ステージはリセットしない
+              } else { // stage === 'gyouInput'
+                  console.log("Incorrect input in gyouInput, stage remains gyouInput");
+                  // gyouInput で不正解の場合もステージはリセットしない
+              }
+          }
+          isExpected = false; // 念のため false を設定
       }
 
       console.log("SokuonKomoji Result:", { isExpected, shouldGoToNext });
       return { isExpected, shouldGoToNext };
     },
-    [isActive, okVisible, stage, currentSet, currentInputInfo, isTsu, isKomoji, hid2Gyou, hid2Dan, sokuonKeyCode, dakuonKeyCode, getInitialStage, currentChar] // kb, side は不要
+    [isActive, okVisible, stage, currentSet, currentInputInfo, isTsu, isKomoji, hid2Gyou, hid2Dan, sokuonKeyCode, dakuonKeyCode, getInitialStage, currentChar]
   );
 
   const getHighlightClassName = (key: string, layoutIndex: number): string | null => {
@@ -213,7 +240,7 @@ export default function useSokuonKomojiPractice({
       if (isTsu) {
         if (currentStageForHighlight === 'tsuInput') {
             expectedKeyName = '促音';
-            targetLayoutIndex = 2;
+            targetLayoutIndex = 2; // スタートレイヤー
         }
       } else if (currentInputInfo) { // 小文字の場合
         const expectedGyouKey = currentInputInfo.gyouKey;
@@ -222,17 +249,17 @@ export default function useSokuonKomojiPractice({
         switch (currentStageForHighlight) {
             case 'gyouInput':
                 expectedKeyName = expectedGyouKey;
-                targetLayoutIndex = 2;
+                targetLayoutIndex = 2; // スタートレイヤー
                 break;
             case 'sokuonInput': // 小文字入力のための濁音キー
                 expectedKeyName = '濁音';
-                targetLayoutIndex = 2;
+                targetLayoutIndex = 2; // スタートレイヤー
                 break;
             case 'danInput':
                 expectedKeyName = expectedDan;
-                targetLayoutIndex = 3;
+                targetLayoutIndex = 3; // エンドレイヤー
                 break;
-            case 'tsuInput':
+            case 'tsuInput': // isTsu=false の場合はここに来ない
                  break;
         }
       }
@@ -251,20 +278,39 @@ export default function useSokuonKomojiPractice({
     isInitialMount.current = true;
   }, [isTsu, getInitialStage]);
 
+  // MODIFIED: isInvalidInputTarget をステージに応じて修正
   const isInvalidInputTarget = useCallback((keyCode: number, layoutIndex: number, keyIndex: number): boolean => {
       if (!isActive) return false;
-      // HIDコードが1始まりと仮定
-      const targetKeyIndex = keyCode - 1;
-      // layoutIndex や stage による絞り込みを行わない
-      const isTarget = keyIndex === targetKeyIndex;
+      // TW-20H/V の最大キーコード (0x14 or 0x10) に応じて調整
+      const maxStartLayoutKeyCode = kb === 'tw-20v' ? 0x10 : 0x14; // TW-20V は 16キー (0x10) と仮定
+      const isStartLayoutInput = keyCode <= maxStartLayoutKeyCode;
+      // HIDコードは1始まりと仮定してキーインデックスを計算
+      const pressCode = isStartLayoutInput ? keyCode : keyCode - maxStartLayoutKeyCode;
+      const targetKeyIndex = pressCode - 1; // 0-origin index
+
+      let expectedLayoutIndex: number | null = null;
+      switch (stage) {
+          case 'gyouInput':
+          case 'sokuonInput': // 小文字入力のための濁音キーもスタートレイヤー
+          case 'tsuInput':    // 促音キーもスタートレイヤー
+              expectedLayoutIndex = 2; // スタートレイヤー
+              break;
+          case 'danInput':
+              expectedLayoutIndex = 3; // エンドレイヤー
+              break;
+      }
+
+      // 期待されるレイヤーの、押されたキーコードに対応するキーであるか？
+      const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
       return isTarget;
-    }, [isActive]);
+  // MODIFIED: stage と kb を依存配列に追加
+  }, [isActive, stage, kb]);
 
   return {
     headingChars,
     handleInput,
     getHighlightClassName,
     reset,
-    isInvalidInputTarget,
+    isInvalidInputTarget, // 修正された関数を返す
   };
 }

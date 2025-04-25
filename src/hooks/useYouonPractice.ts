@@ -7,7 +7,7 @@ import {
     PracticeHookResult,
     youonGyouList,
     youonGyouChars,
-    KeyboardModel, // MODIFIED: ESLint Warning 対応のためコメント解除 (実際には未使用だが型定義として必要)
+    KeyboardModel,
     hid2GyouHRight_Kana,
     hid2GyouHLeft_Kana,
     hid2DanHRight_Kana,
@@ -107,6 +107,7 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
                     console.log("Transition to youonInput stage"); // ログ
                 } else {
                     console.log("Incorrect gyou input"); // ログ
+                    isExpected = false; // MODIFIED: 明示的に false を設定
                 }
                 break;
             case 'youonInput':
@@ -117,6 +118,7 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
                     console.log("Transition to danInput stage"); // ログ
                 } else {
                     console.log("Incorrect youon key input"); // ログ
+                    isExpected = false; // MODIFIED: 明示的に false を設定
                 }
                 break;
             case 'danInput':
@@ -127,23 +129,26 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
                     console.log("Correct dan input, should go next"); // ログ
                 } else {
                     console.log("Incorrect dan input"); // ログ
+                    isExpected = false; // MODIFIED: 明示的に false を設定
                 }
                 break;
         }
 
-        // 不正解だった場合、最初のステージに戻す
-        if (!isExpected && (stage === 'youonInput' || stage === 'danInput')) {
-             console.log("Incorrect input, resetting to gyouInput stage"); // ログ
-             setStage('gyouInput');
-             isExpected = false;
-        } else if (!isExpected && stage === 'gyouInput') {
-            // gyouInput での不正解は何もしない
+        // MODIFIED: 不正解だった場合でも stage はリセットしない
+        // if (!isExpected && (stage === 'youonInput' || stage === 'danInput')) {
+        //      console.log("Incorrect input, resetting to gyouInput stage"); // ログ
+        //      setStage('gyouInput');
+        //      isExpected = false;
+        // } else if (!isExpected && stage === 'gyouInput') {
+        //     // gyouInput での不正解は何もしない
+        // }
+        if (!isExpected) {
+            console.log("Incorrect input, stage remains:", stage); // ログ変更
         }
+
 
         console.log("Youon Result:", { isExpected, shouldGoToNext }); // ログ
         return { isExpected, shouldGoToNext };
-    // 依存配列から kb, side を削除 (ESLint Warning 対応)
-    // MODIFIED: youonKeyCode を依存配列に追加
     }, [isActive, okVisible, stage, currentGyouKey, currentDanKey, hid2Gyou, hid2Dan, youonKeyCode]);
 
     const getHighlightClassName = (key: string, layoutIndex: number): string | null => {
@@ -163,15 +168,15 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
         switch (currentStageForHighlight) {
             case 'gyouInput':
                 expectedKeyName = currentGyouKey;
-                targetLayoutIndex = 2;
+                targetLayoutIndex = 2; // スタートレイヤー
                 break;
             case 'youonInput':
                 expectedKeyName = '拗音';
-                targetLayoutIndex = 2;
+                targetLayoutIndex = 2; // スタートレイヤー
                 break;
             case 'danInput':
                 expectedKeyName = currentDanKey;
-                targetLayoutIndex = 3;
+                targetLayoutIndex = 3; // エンドレイヤー
                 break;
         }
 
@@ -193,20 +198,34 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
         isInitialMount.current = true;
     }, []);
 
+    // MODIFIED: isInvalidInputTarget を stage に応じて修正
     const isInvalidInputTarget = useCallback((keyCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
-        // HIDコードが1始まりと仮定
-        const targetKeyIndex = keyCode - 1;
-        // layoutIndex や stage による絞り込みを行わない
-        const isTarget = keyIndex === targetKeyIndex;
+        const isStartLayoutInput = keyCode <= 0x14;
+        const pressCode = isStartLayoutInput ? keyCode : keyCode - 0x14;
+        const targetKeyIndex = pressCode - 1;
+
+        let expectedLayoutIndex: number | null = null;
+        switch (stage) {
+            case 'gyouInput':
+            case 'youonInput': // 拗音キーもスタートレイヤーにあるため
+                expectedLayoutIndex = 2; // スタートレイヤー
+                break;
+            case 'danInput':
+                expectedLayoutIndex = 3; // エンドレイヤー
+                break;
+        }
+
+        const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
         return isTarget;
-    }, [isActive]);
+    // MODIFIED: stage を依存配列に追加
+    }, [isActive, stage]);
 
     return {
         handleInput,
         getHighlightClassName,
         headingChars,
         reset,
-        isInvalidInputTarget,
+        isInvalidInputTarget, // 修正された関数を返す
     };
 }
