@@ -44,7 +44,8 @@ export default function useDakuonPractice({
   const dakuonKeyCode = useMemo(() => {
       if (kb === 'tw-20v') {
           // TW-20V の濁音コード (仮 - 正確な値に要修正)
-          return side === 'left' ? 0x02 : 0x04;
+          // MODIFIED: usePracticeCommons.ts の仮マッピングに合わせる
+          return side === 'left' ? 0x04 : 0x03; // Left: 0x04, Right: 0x03
       } else { // TW-20H
           // TW-20H は Left/Right ともに 0x04
           return 0x04;
@@ -90,7 +91,12 @@ export default function useDakuonPractice({
 
   const handleInput = useCallback(
     (input: PracticeInputInfo): PracticeInputResult => {
+      // デバッグログ追加
+      console.log("Dakuon Input:", input, "Stage:", stage, "Gyou:", currentGyouKey, "Dan:", currentDan);
+      console.log("Expected Dakuon Key Code:", dakuonKeyCode); // 期待される濁音キーコード
+
       if (!isActive || okVisible || !currentGyouKey || !currentDan) {
+          console.log("Dakuon Input Ignored: Inactive, OK visible, or keys invalid");
           return { isExpected: false, shouldGoToNext: false };
       }
       if (input.type !== 'release') {
@@ -105,36 +111,52 @@ export default function useDakuonPractice({
 
       switch (stage) {
         case 'gyouInput':
+          console.log("Stage: gyouInput, Input Gyou:", inputGyou, "Expected Gyou:", currentGyouKey);
           if (inputGyou === currentGyouKey) {
               setStage('dakuonInput');
               isExpected = true;
+              console.log("Transition to dakuonInput stage");
+          } else {
+              console.log("Incorrect gyou input");
           }
           break;
         case 'dakuonInput':
+          console.log("Stage: dakuonInput, Input Code:", pressCode, "Expected Code (dakuonKeyCode):", dakuonKeyCode);
           // 期待するキーコード (dakuonKeyCode) と比較
           if (pressCode === dakuonKeyCode) {
             setStage('danInput');
             isExpected = true;
+            console.log("Transition to danInput stage");
+          } else {
+              console.log("Incorrect dakuon key input");
           }
           break;
         case 'danInput':
+          console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", currentDan);
           if (inputDan === currentDan) {
             isExpected = true;
             shouldGoToNext = true;
+            console.log("Correct dan input, should go next");
+          } else {
+              console.log("Incorrect dan input");
           }
           break;
       }
 
       // 不正解だった場合、最初のステージに戻す
       if (!isExpected && (stage === 'dakuonInput' || stage === 'danInput')) {
+           console.log("Incorrect input, resetting to gyouInput stage");
            setStage('gyouInput');
            isExpected = false;
       } else if (!isExpected && stage === 'gyouInput') {
           // gyouInput での不正解は何もしない (stage はそのまま)
       }
 
+      console.log("Dakuon Result:", { isExpected, shouldGoToNext });
       return { isExpected, shouldGoToNext };
-    }, [isActive, okVisible, stage, currentGyouKey, currentDan, hid2Gyou, hid2Dan, dakuonKeyCode, kb, side]
+    // MODIFIED: dakuonKeyCode を依存配列に追加
+    // MODIFIED: kb, side は dakuonKeyCode の計算に使われているため不要
+    }, [isActive, okVisible, stage, currentGyouKey, currentDan, hid2Gyou, hid2Dan, dakuonKeyCode]
   );
 
   const getHighlightClassName = (key: string, layoutIndex: number): string | null => {

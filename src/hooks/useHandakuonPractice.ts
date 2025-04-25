@@ -47,7 +47,8 @@ export default function useHandakuonPractice({
   const hGyouKeyCode = useMemo(() => {
       if (kb === 'tw-20v') {
           // TW-20V の「は行」コード (仮 - 正確な値に要修正)
-          return side === 'left' ? 0x0C : 0x0E;
+          // usePracticeCommons.ts の仮マッピングに合わせる
+          return side === 'left' ? 0x0B : 0x0B; // Left: 0x0B, Right: 0x0B と仮定
       } else { // TW-20H
           // TW-20H の「は行」コードは Left: 0x0E, Right: 0x0E
           return 0x0E;
@@ -55,9 +56,14 @@ export default function useHandakuonPractice({
   }, [kb, side]);
 
   const dakuonKeyCode = useMemo(() => {
-      if (kb === 'tw-20v') return side === 'left' ? 0x02 : 0x04; // TW-20V (仮)
-      // TW-20H は Left/Right ともに 0x04
-      return 0x04;
+      if (kb === 'tw-20v') {
+          // TW-20V の濁音コード (仮 - 正確な値に要修正)
+          // usePracticeCommons.ts の仮マッピングに合わせる
+          return side === 'left' ? 0x04 : 0x03; // Left: 0x04, Right: 0x03
+      } else { // TW-20H
+          // TW-20H は Left/Right ともに 0x04
+          return 0x04;
+      }
   }, [kb, side]);
 
   const prevGIdxRef = useRef(gIdx);
@@ -112,7 +118,13 @@ export default function useHandakuonPractice({
 
   const handleInput = useCallback(
     (input: PracticeInputInfo): PracticeInputResult => {
+      // デバッグログ追加
+      console.log("Handakuon Input:", input, "Stage:", stage, "Gyou:", currentGyouKey, "Dan:", currentDan);
+      console.log("Expected H-Gyou Key Code:", hGyouKeyCode);
+      console.log("Expected Dakuon Key Code:", dakuonKeyCode);
+
       if (!isActive || okVisible || !currentDan) {
+          console.log("Handakuon Input Ignored: Inactive, OK visible, or keys invalid");
           return { isExpected: false, shouldGoToNext: false };
       }
       if (input.type !== 'release') {
@@ -127,14 +139,19 @@ export default function useHandakuonPractice({
 
       switch (stage) {
         case 'gyouInput':
+          console.log("Stage: gyouInput, Input Gyou:", inputGyou, "Expected Gyou:", currentGyouKey, "Input Code:", pressCode, "Expected Code:", hGyouKeyCode);
           // 期待するキーコード (hGyouKeyCode) と比較
           if (inputGyou === currentGyouKey && pressCode === hGyouKeyCode) {
             setStage('handakuonInput');
             inputCount.current = 0;
             isExpected = true;
+            console.log("Transition to handakuonInput stage");
+          } else {
+            console.log("Incorrect gyou input");
           }
           break;
         case 'handakuonInput':
+          console.log("Stage: handakuonInput, Input Code:", pressCode, "Expected Code:", dakuonKeyCode, "Input Count:", inputCount.current, "Is Blinking:", isBlinking);
           // 期待するキーコード (dakuonKeyCode) と比較
           if (pressCode === dakuonKeyCode) {
             if (inputCount.current === 0) {
@@ -144,33 +161,54 @@ export default function useHandakuonPractice({
               blinkTimeoutRef.current = window.setTimeout(() => {
                 setIsBlinking(false);
                 blinkTimeoutRef.current = null;
+                console.log("Blinking finished"); // 点滅終了ログ
               }, 500);
               isExpected = true;
+              console.log("First dakuon key press, start blinking");
             } else if (inputCount.current === 1 && !isBlinking) { // 点滅が終わった後の2打目
-              inputCount.current = 0;
+              inputCount.current = 0; // カウントリセット
               setStage('danInput');
               isExpected = true;
+              console.log("Second dakuon key press after blink, transition to danInput");
+            } else if (inputCount.current === 1 && isBlinking) { // 点滅中の2打目 (無視またはエラー)
+                console.log("Second dakuon key press during blink, ignored or error");
+                // isExpected = false; // 不正解とする場合
+                isExpected = true; // 期待通りとして次の入力を待つ場合 (現状維持)
             }
+          } else {
+              console.log("Incorrect dakuon key input");
           }
           break;
         case 'danInput':
+          console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", currentDan);
           if (inputDan === currentDan) {
             isExpected = true;
             shouldGoToNext = true;
+            console.log("Correct dan input, should go next");
+          } else {
+              console.log("Incorrect dan input");
           }
           break;
       }
 
       // 不正解だった場合、最初のステージに戻し、点滅状態もリセット
-      if (!isExpected) {
+      if (!isExpected && stage !== 'handakuonInput') { // handakuonInput中の不正解はリセットしない場合がある
+           console.log("Incorrect input, resetting to gyouInput stage");
            setStage('gyouInput');
            resetBlinkingState(); // 点滅状態をリセット
            isExpected = false;
+      } else if (!isExpected && stage === 'handakuonInput') {
+          // handakuonInput 中の不正解 (dakuonKeyCode 以外が押された場合)
+          console.log("Incorrect input during handakuonInput, resetting to gyouInput stage");
+          setStage('gyouInput');
+          resetBlinkingState();
+          isExpected = false;
       }
 
+      console.log("Handakuon Result:", { isExpected, shouldGoToNext });
       return { isExpected, shouldGoToNext };
     },
-    [isActive, okVisible, stage, currentGyouKey, currentDan, isBlinking, hid2Gyou, hid2Dan, hGyouKeyCode, dakuonKeyCode, resetBlinkingState, kb, side]
+    [isActive, okVisible, stage, currentGyouKey, currentDan, isBlinking, hid2Gyou, hid2Dan, hGyouKeyCode, dakuonKeyCode, resetBlinkingState] // kb, side は不要
   );
 
   const getHighlightClassName = (key: string, layoutIndex: number): string | null => {
