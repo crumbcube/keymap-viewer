@@ -7,7 +7,6 @@ import {
     PracticeHookResult,
     gyouList,
     danOrder,
-    KeyboardModel,
     hid2GyouHRight_Kana,
     hid2GyouHLeft_Kana,
     hid2DanHRight_Kana,
@@ -16,12 +15,14 @@ import {
     hid2GyouVLeft_Kana,
     hid2DanVRight_Kana,
     hid2DanVLeft_Kana,
+    CharInfoSeion,
+    allSeionCharInfos,
+    gyouChars,
 } from './usePracticeCommons';
-import { gyouChars } from '../data/keymapData';
 
 type SeionStage = "line" | "dan";
 
-export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side, kb }: PracticeHookProps): PracticeHookResult {
+export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult {
     const [stage, setStage] = useState<SeionStage>("line");
     const { hid2Gyou, hid2Dan } = useMemo(() => {
         if (kb === 'tw-20v') {
@@ -34,45 +35,104 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
                 : { hid2Gyou: hid2GyouHRight_Kana, hid2Dan: hid2DanHRight_Kana };
         }
     }, [side, kb]);
+
+    const [randomTarget, setRandomTarget] = useState<CharInfoSeion | null>(null);
+
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsRandomModeRef = useRef(isRandomMode);
+
+    const selectNextRandomTarget = useCallback(() => {
+        if (allSeionCharInfos.length > 0) {
+            const randomIndex = Math.floor(Math.random() * allSeionCharInfos.length);
+            console.log(">>> Selecting new random target (Seion):", allSeionCharInfos[randomIndex]);
+            setRandomTarget(allSeionCharInfos[randomIndex]);
+            setStage("line");
+        } else {
+            setRandomTarget(null);
+        }
+    }, [setRandomTarget, setStage]);
 
     useEffect(() => {
+        console.log("Seion useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
+
         if (isActive) {
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
-            if (isInitialMount.current || indicesChanged) {
+            const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
+            const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
+
+            if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
+                console.log("Resetting to normal mode or index changed");
                 setStage("line");
+                setRandomTarget(null);
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
             }
+
+            if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
+                 selectNextRandomTarget();
+                 isInitialMount.current = false;
+                 prevGIdxRef.current = gIdx;
+                 prevDIdxRef.current = dIdx;
+            } else if (!isRandomMode && isInitialMount.current) {
+                 isInitialMount.current = false;
+                 prevGIdxRef.current = gIdx;
+                 prevDIdxRef.current = dIdx;
+            }
+
+            prevIsRandomModeRef.current = isRandomMode;
+
         } else {
-             prevGIdxRef.current = -1;
-             prevDIdxRef.current = -1;
-             isInitialMount.current = true;
+            setStage("line");
+            setRandomTarget(null);
+            prevGIdxRef.current = -1;
+            prevDIdxRef.current = -1;
+            isInitialMount.current = true;
+            prevIsRandomModeRef.current = isRandomMode;
         }
-    }, [isActive, gIdx, dIdx]);
+
+    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, selectNextRandomTarget]);
 
     const currentGyouKey = useMemo(() => {
-        if (!isActive || gIdx < 0 || gIdx >= gyouList.length) return null;
+        if (!isActive || isRandomMode || gIdx < 0 || gIdx >= gyouList.length) return null;
         return gyouList[gIdx];
-    }, [isActive, gIdx]);
+    }, [isActive, isRandomMode, gIdx]);
 
     const currentDanKey = useMemo(() => {
-        if (!isActive || !currentGyouKey || !danOrder[currentGyouKey]) return null;
+        if (!isActive || isRandomMode || !currentGyouKey || !danOrder[currentGyouKey]) return null;
         const danList = danOrder[currentGyouKey];
         if (dIdx < 0 || dIdx >= danList.length) return null;
         return danList[dIdx];
-    }, [isActive, currentGyouKey, dIdx]);
+    }, [isActive, isRandomMode, currentGyouKey, dIdx]);
+
+    const headingChars = useMemo(() => {
+        console.log("Calculating headingChars. isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
+        if (!isActive) return [];
+        if (isRandomMode) {
+            return randomTarget ? [randomTarget.char] : [];
+        } else {
+            if (!currentGyouKey || !gyouChars[currentGyouKey]) return [];
+            return gyouChars[currentGyouKey] || [];
+        }
+    }, [isActive, isRandomMode, randomTarget, currentGyouKey]);
+
+    const expectedGyouKey = useMemo(() => (isRandomMode ? randomTarget?.gyouKey : currentGyouKey) ?? null, [isRandomMode, randomTarget, currentGyouKey]);
+    const expectedDanKey = useMemo(() => (isRandomMode ? randomTarget?.danKey : currentDanKey) ?? null, [isRandomMode, randomTarget, currentDanKey]);
+
+    const currentOkVisible = okVisible;
 
     const handleInput = useCallback((info: PracticeInputInfo): PracticeInputResult => {
-        // デバッグログ
-        console.log("Seion Input:", info, "Current Stage:", stage, "Gyou:", currentGyouKey, "Dan:", currentDanKey);
+        console.log("Seion Input:", info, "Stage:", stage, "Expected Gyou:", expectedGyouKey, "Expected Dan:", expectedDanKey, "RandomMode:", isRandomMode, "PropOK:", okVisible);
 
-        if (!isActive || okVisible || !currentGyouKey || !currentDanKey) {
-            console.log("Seion Input Ignored: Inactive, OK visible, or keys invalid");
+        if (!isActive || okVisible) {
+            console.log("Seion Input Ignored: Inactive or Prop OK visible");
             return { isExpected: false, shouldGoToNext: false };
+        }
+        if (!expectedGyouKey || !expectedDanKey) {
+             console.log("Seion Input Ignored: Expected keys invalid");
+             return { isExpected: false, shouldGoToNext: false };
         }
 
         const inputGyou = hid2Gyou[info.pressCode] ?? null;
@@ -80,74 +140,70 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
         let isExpected = false;
         let shouldGoToNext = false;
 
-        // 離上イベントでのみ判定と状態遷移を行う
         if (info.type === 'release') {
             if (stage === "line") {
-                // 期待するキーコードを取得 (hid2Gyou の逆引き)
                 const expectedGyouKeyCodes = Object.entries(hid2Gyou)
-                    .filter(([_, name]) => name === currentGyouKey)
+                    .filter(([_, name]) => name === expectedGyouKey)
                     .map(([codeStr, _]) => parseInt(codeStr));
-
-                console.log("Stage: line, Input Gyou:", inputGyou, "Expected Gyou:", currentGyouKey, "Input Code:", info.pressCode, "Expected Codes:", expectedGyouKeyCodes);
-
-                // 押されたキーコードが期待される行キーコードのいずれかと一致するか
+                console.log("Stage: line, Input Gyou:", inputGyou, "Expected Gyou:", expectedGyouKey, "Input Code:", info.pressCode, "Expected Codes:", expectedGyouKeyCodes);
                 if (expectedGyouKeyCodes.includes(info.pressCode)) {
                     setStage("dan");
                     isExpected = true;
                     console.log("Transition to dan stage");
                 } else {
-                    console.log("Incorrect gyou input");
                     isExpected = false;
-                    // 行入力で間違えた場合もステージはリセットしない
+                    console.log("Incorrect gyou input");
                 }
             } else if (stage === "dan") {
-                 // 期待するキーコードを取得 (hid2Dan の逆引き)
                 const expectedDanKeyCodes = Object.entries(hid2Dan)
-                    .filter(([_, name]) => name === currentDanKey)
+                    .filter(([_, name]) => name === expectedDanKey)
                     .map(([codeStr, _]) => parseInt(codeStr));
-
-                console.log("Stage: dan, Input Dan:", inputDan, "Expected Dan:", currentDanKey, "Input Code:", info.pressCode, "Expected Codes:", expectedDanKeyCodes);
-
-                // 押されたキーコードが期待される段キーコードのいずれかと一致するか
+                console.log("Stage: dan, Input Dan:", inputDan, "Expected Dan:", expectedDanKey, "Input Code:", info.pressCode, "Expected Codes:", expectedDanKeyCodes);
                 if (expectedDanKeyCodes.includes(info.pressCode)) {
                     isExpected = true;
-                    shouldGoToNext = true;
-                    console.log("Correct dan input, should go next");
+                    if (isRandomMode) {
+                        selectNextRandomTarget();
+                        shouldGoToNext = false;
+                    } else {
+                        shouldGoToNext = true;
+                    }
+                    console.log("Correct dan input");
                 } else {
-                    // 段入力で間違えた場合
-                    // setStage("line"); // <<<--- この行を削除またはコメントアウト
                     isExpected = false;
-                    console.log("Incorrect dan input, stage remains dan"); // ログ変更
+                    console.log("Incorrect dan input");
+                    setStage("line");
                 }
             }
-        } else { // 押下イベントの場合
-            // 押下イベントでは状態遷移や正誤判定は行わない
-            isExpected = false;
-            shouldGoToNext = false;
+
         }
 
         console.log("Seion Result:", { isExpected, shouldGoToNext });
         return { isExpected, shouldGoToNext };
-    }, [isActive, okVisible, stage, currentGyouKey, currentDanKey, hid2Gyou, hid2Dan]);
+    }, [
+        isActive, okVisible, stage, expectedGyouKey, expectedDanKey,
+        hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage
+    ]);
 
-    const getHighlightClassName = (key: string, layoutIndex: number): string | null => {
-        const indicesJustChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
-        const isProblemSwitch = indicesJustChanged && !okVisible;
-
-        if (!isActive || okVisible || !currentGyouKey || !currentDanKey) {
+    const getHighlightClassName = useCallback((key: string, layoutIndex: number): string | null => {
+        if (!isActive || okVisible) {
+            return null;
+        }
+        if (!expectedGyouKey || !expectedDanKey) {
             return null;
         }
 
-        const currentStageForHighlight = isProblemSwitch ? "line" : stage;
+        const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
+
+        const currentStageForHighlight = indicesJustChanged ? 'line' : stage;
 
         let expectedKeyName: string | null = null;
         let targetLayoutIndex: number | null = null;
 
         if (currentStageForHighlight === "line") {
-            expectedKeyName = currentGyouKey;
+            expectedKeyName = expectedGyouKey;
             targetLayoutIndex = 2; // スタートレイヤー
-        } else { // currentStageForHighlight === "dan"
-            expectedKeyName = currentDanKey;
+        } else { // 'dan'
+            expectedKeyName = expectedDanKey;
             targetLayoutIndex = 3; // エンドレイヤー
         }
 
@@ -155,25 +211,20 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
             return 'bg-blue-100';
         }
         return null;
-    };
-
-    const headingChars = useMemo(() => {
-        if (!currentGyouKey || !gyouChars[currentGyouKey]) return [];
-        return gyouChars[currentGyouKey];
-    }, [currentGyouKey]);
+    }, [isActive, okVisible, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
 
     const reset = useCallback(() => {
+        console.log("Resetting Seion Practice Hook");
         setStage("line");
+        setRandomTarget(null);
         prevGIdxRef.current = -1;
         prevDIdxRef.current = -1;
         isInitialMount.current = true;
-    }, []);
+        prevIsRandomModeRef.current = false;
+    }, [setStage, setRandomTarget]);
 
-    // isInvalidInputTarget は以前の修正のままでOK
-    const isInvalidInputTarget = useCallback((keyCode: number, layoutIndex: number, keyIndex: number): boolean => {
+    const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
-        const isStartLayoutInput = keyCode <= 0x14;
-        const pressCode = isStartLayoutInput ? keyCode : keyCode - 0x14;
         const targetKeyIndex = pressCode - 1;
 
         let expectedLayoutIndex: number | null = null;
@@ -185,7 +236,7 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
 
         const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
         return isTarget;
-    }, [isActive, stage]);
+    }, [isActive, stage]); // kb を削除済み
 
     return {
         handleInput,
@@ -193,5 +244,6 @@ export default function useSeionPractice({ gIdx, dIdx, okVisible, isActive, side
         headingChars,
         reset,
         isInvalidInputTarget,
+        isOkVisible: currentOkVisible,
     };
 }

@@ -1,3 +1,5 @@
+// /home/coffee/my-keymap-viewer/src/components/KeymapViewer.tsx
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { HIDDevice, HIDInputReportEvent } from '../types/hid';
@@ -23,7 +25,6 @@ import { getKeyStyle, isLargeSymbol } from '../utils/styleUtils';
 import {
     PracticeMode,
     PracticeInputInfo,
-    // PracticeInputResult, // MODIFIED: 未使用のためコメントアウト (ESLint Warning対応)
     PracticeHookProps,
     PracticeHookResult,
     KeyboardSide,
@@ -50,27 +51,30 @@ export default function KeymapViewer() {
     const [showTrainingButton, setShowTrainingButton] = useState(false);
     const [side, setSide] = useState<KeyboardSide>('right');
     const [kb, setKb] = useState<KeyboardModel>('tw-20v');
-    const [showKeyLabels, setShowKeyLabels] = useState(true); // NEW: キーラベル表示状態 (true: 表示, false: 非表示)
+    const [showKeyLabels, setShowKeyLabels] = useState(true);
+    const [isRandomMode, setIsRandomMode] = useState(false);
 
     /* 現在の行/段/文字インデックス */
     const [gIdx, setGIdx] = useState(0);
     const [dIdx, setDIdx] = useState(0);
 
     /* UIフィードバック */
-    const [okVisible, setOK] = useState(false);
-    const [lastInvalidKeyCode, setLastInvalidKeyCode] = useState<number | null>(null);
+    const [okVisible, setOK] = useState(false); // 通常モード用のOK表示ステート
+    const [lastInvalidKeyCode, setLastInvalidKeyCode] = useState<number | null>(null); // 不正入力されたキーの *押下コード* を保持
 
     /* HID / カウンタ */
     const devRef = useRef<HIDDevice | null>(null);
     const opening = useRef(false);
     const invalidInputTimeoutRef = useRef<number | null>(null);
-    const pressedKeysRef = useRef<Map<number, number>>(new Map());
+    const pressedKeysRef = useRef<Map<number, number>>(new Map()); // キーコード(押下) -> タイムスタンプ
     const lastInvalidInputTime = useRef<number>(0);
 
     // --- カスタムフックの呼び出し ---
     const commonHookProps: Omit<PracticeHookProps, 'isActive'> = useMemo(() => ({
-        gIdx, dIdx, okVisible, side, layers, kb
-    }), [gIdx, dIdx, okVisible, side, layers, kb]);
+        gIdx, dIdx, okVisible, side, layers, kb, isRandomMode
+    }), [gIdx, dIdx, okVisible, side, layers, kb, isRandomMode]);
+
+    // 各練習フックの呼び出し
     const seionPractice = useSeionPractice({ ...commonHookProps, isActive: practice === '清音の基本練習' });
     const youonPractice = useYouonPractice({ ...commonHookProps, isActive: practice === '拗音の基本練習' });
     const dakuonPractice = useDakuonPractice({ ...commonHookProps, isActive: practice === '濁音の基本練習' });
@@ -99,32 +103,44 @@ export default function KeymapViewer() {
     const fixedWidth = `${cols * 5.5}rem`;
 
     // --- 不正入力処理 ---
-    const handleInvalidInput = useCallback((keyCode: number) => {
+    const handleInvalidInput = useCallback((pressCode: number) => {
         const now = Date.now();
         if (now - lastInvalidInputTime.current < 50) {
             return;
         }
         lastInvalidInputTime.current = now;
-        setLastInvalidKeyCode(keyCode);
+        setLastInvalidKeyCode(pressCode);
+        console.log(`Invalid input detected. Setting lastInvalidKeyCode to: 0x${pressCode.toString(16)}`);
 
         if (invalidInputTimeoutRef.current !== null) {
             clearTimeout(invalidInputTimeoutRef.current);
         }
 
         const timerId = window.setTimeout((codeToClear: number) => {
-            setLastInvalidKeyCode(prevCode => (prevCode === codeToClear ? null : prevCode));
+            setLastInvalidKeyCode(prevCode => {
+                if (prevCode === codeToClear) {
+                    console.log(`Clearing lastInvalidKeyCode: 0x${codeToClear.toString(16)}`);
+                    return null;
+                }
+                return prevCode;
+            });
             invalidInputTimeoutRef.current = null;
-        }, 500, keyCode);
+        }, 500, pressCode);
         invalidInputTimeoutRef.current = timerId;
     }, []);
 
-    // --- 次のステージへ ---
+    // --- 次のステージへ --- (通常モード用)
     const nextStage = useCallback(() => {
-        setOK(true);
+        if (isRandomMode) {
+            console.warn("nextStage called in random mode. This should not happen.");
+            return;
+        }
+        setOK(true); // 通常モードのOK表示をON
         setTimeout(() => {
             let nextGIdx = gIdx;
             let nextDIdx = dIdx;
 
+            // ... (各練習モードの次の問題への遷移ロジック - 変更なし) ...
             if (practice === '清音の基本練習') {
                 const currentGyouKey = gyouList[gIdx];
                 if (!currentGyouKey || !gyouList.includes(currentGyouKey)) { console.error("清音練習で無効な gIdx または currentGyouKey"); return; }
@@ -145,8 +161,7 @@ export default function KeymapViewer() {
                 else { nextDIdx = 0; nextGIdx = (gIdx + 1) % dakuonGyouList.length; }
             } else if (practice === '半濁音の基本練習') {
                  if (gIdx < 0 || gIdx >= handakuonGyouList.length) { console.error("半濁音練習で無効な gIdx"); return; }
-                const currentGyouKey = handakuonGyouList[gIdx];
-                const currentChars = handakuonGyouChars[currentGyouKey] || [];
+                const currentChars = handakuonGyouChars['は行'] || [];
                 if (dIdx < currentChars.length - 1) { nextDIdx = dIdx + 1; }
                 else { nextDIdx = 0; nextGIdx = 0; }
             } else if (practice === '小文字(促音)の基本練習') {
@@ -194,11 +209,89 @@ export default function KeymapViewer() {
                     }
                 }
             }
+
             setGIdx(nextGIdx);
             setDIdx(nextDIdx);
-            setOK(false);
+            setOK(false); // 通常モードのOK表示をOFF
         }, 1000);
-    }, [practice, gIdx, dIdx, setOK, setGIdx, setDIdx]);
+    }, [practice, gIdx, dIdx, setOK, setGIdx, setDIdx, isRandomMode]);
+
+    // onInput (releaseOffset と isReleaseEventAdjusted の計算を修正済み)
+    const onInput: (ev: HIDInputReportEvent) => void = useCallback((ev) => {
+        const data = new Uint8Array(ev.data.buffer);
+        const reportId = data[0];
+        const keyCode = data[1];
+        const timestamp = Date.now();
+
+        console.log(`onInput called. kb: ${kb}, reportId: 0x${reportId.toString(16)}, keyCode: 0x${keyCode.toString(16)}`);
+
+        // 練習モード強制開始
+        if (reportId === 0x14 && keyCode === 0x03) {
+            if (!training) {
+                console.log("Forcing training mode ON");
+                setTraining(true);
+                setShowKeyLabels(true);
+                setIsRandomMode(false);
+            }
+            return;
+        }
+
+        // 練習中のキー入力処理
+        if (reportId === 0x15 && training && practice && activePractice) {
+            const releaseOffset = 0x14; // 常に 0x14
+
+            const maxStartLayoutKeyCode = 0x14; // TW-20H も TW-20V も 0x14 まで
+
+            const isPressEventAdjusted = keyCode <= maxStartLayoutKeyCode;
+            const isReleaseEventAdjusted = keyCode >= (releaseOffset + 1); // 離上コードは 0x15 以上
+
+            console.log(`maxStartLayoutKeyCode: 0x${maxStartLayoutKeyCode.toString(16)}, releaseOffset: 0x${releaseOffset.toString(16)}`);
+            console.log(`isPressEventAdjusted: ${isPressEventAdjusted}, isReleaseEventAdjusted: ${isReleaseEventAdjusted}`);
+
+            if (isPressEventAdjusted) {
+                const pressCode = keyCode;
+                console.log(`Press event detected. Recording pressCode: 0x${pressCode.toString(16)}`);
+                pressedKeysRef.current.set(pressCode, timestamp);
+
+                const inputInfo: PracticeInputInfo = {
+                    type: 'press', timestamp, pressCode,
+                };
+                activePractice.handleInput(inputInfo);
+
+            } else if (isReleaseEventAdjusted) {
+                const pressCode = keyCode - releaseOffset; // 常に 0x14 を引く
+                console.log(`Release event detected. Calculated pressCode: 0x${pressCode.toString(16)} (keyCode: 0x${keyCode.toString(16)})`);
+
+                if (pressCode <= 0) {
+                    console.warn(`Invalid calculated pressCode: 0x${pressCode.toString(16)}. Ignoring release event.`);
+                    return;
+                }
+
+                const pressTimestamp = pressedKeysRef.current.get(pressCode);
+                if (pressTimestamp) {
+                    console.log(`Found matching press event for pressCode: 0x${pressCode.toString(16)}`);
+                    pressedKeysRef.current.delete(pressCode);
+
+                    const inputInfo: PracticeInputInfo = {
+                        type: 'release', timestamp, pressCode,
+                    };
+                    const result = activePractice.handleInput(inputInfo);
+
+                    if (result.isExpected) {
+                        if (result.shouldGoToNext) { // 通常モードでのみ true
+                            nextStage();
+                        }
+                        // ランダムモードのOK表示はフック内部で管理され、activePractice.isOkVisible で取得
+                    } else {
+                        handleInvalidInput(pressCode);
+                    }
+                } else {
+                    console.warn(`Matching press event NOT FOUND for calculated pressCode: 0x${pressCode.toString(16)}. Current pressedKeys:`, Array.from(pressedKeysRef.current.keys()).map(k => `0x${k.toString(16)}`));
+                    console.warn(`キーコード 0x${keyCode.toString(16)} (対応する押下コード 0x${pressCode.toString(16)}) の離上イベントがありましたが、対応する押下イベントが見つかりません。`);
+                }
+            }
+        }
+    }, [training, practice, activePractice, handleInvalidInput, nextStage, setTraining, setShowKeyLabels, setIsRandomMode, kb]);
 
     /* HID send (練習 ON/OFF) */
     const sendHid: (on: boolean) => Promise<void> = useCallback(async (on) => {
@@ -215,7 +308,6 @@ export default function KeymapViewer() {
             opening.current = true;
             try {
                 await dev.open();
-                dev.oninputreport = onInput;
             } catch (err) { console.error("HIDデバイスを開けませんでした:", err); opening.current = false; devRef.current = null; return; }
             finally {
                 opening.current = false;
@@ -228,7 +320,10 @@ export default function KeymapViewer() {
         } catch (err) { console.error("HIDレポートの送信に失敗しました:", err); }
 
         setTraining(on);
-        if (!on) {
+        if (on) {
+            setShowKeyLabels(true);
+            setIsRandomMode(false);
+        } else {
             setPractice('');
             setGIdx(0); setDIdx(0);
             setOK(false);
@@ -239,72 +334,21 @@ export default function KeymapViewer() {
             }
             pressedKeysRef.current.clear();
             activePractice?.reset?.();
-            setShowKeyLabels(true); // NEW: 練習モードOFF時にキー表示をリセット
+            setShowKeyLabels(true);
+            setIsRandomMode(false);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [setTraining, setPractice, setGIdx, setDIdx, setOK, setLastInvalidKeyCode, activePractice, setShowKeyLabels /* onInput を依存配列から削除, setShowKeyLabels を追加 */]);
-
-    /* HID input */
-    const onInput: (ev: HIDInputReportEvent) => void = useCallback((ev) => {
-        const data = new Uint8Array(ev.data.buffer);
-        const reportId = data[0];
-        const keyCode = data[1];
-        const timestamp = Date.now();
-
-        if (reportId === 0x14 && keyCode === 0x03) {
-            if (!training) {
-                sendHid(true);
-            }
-            return;
-        }
-
-        if (reportId === 0x15) {
-            const isPressEvent = keyCode <= 0x14;
-            const isReleaseEvent = keyCode >= 0x15;
-
-            if (isPressEvent) {
-                pressedKeysRef.current.set(keyCode, timestamp);
-                if (!training || !practice || !activePractice) return;
-                const pressCode = keyCode;
-                const inputInfo: PracticeInputInfo = {
-                    type: 'press', timestamp, pressCode,
-                };
-                activePractice.handleInput(inputInfo);
-
-            } else if (isReleaseEvent) {
-                const pressCode = keyCode - 0x14;
-                const pressTimestamp = pressedKeysRef.current.get(pressCode);
-                if (pressTimestamp) {
-                    pressedKeysRef.current.delete(pressCode);
-                    if (!training || !practice || !activePractice) return;
-                    const inputInfo: PracticeInputInfo = {
-                        type: 'release', timestamp, pressCode,
-                    };
-                    const result = activePractice.handleInput(inputInfo);
-
-                    if (result.isExpected) {
-                        if (result.shouldGoToNext) {
-                            nextStage();
-                        }
-                    } else {
-                        handleInvalidInput(pressCode);
-                    }
-                } else {
-                    console.warn(`キーコード 0x${keyCode.toString(16)} (対応する押下コード 0x${pressCode.toString(16)}) の離上イベントがありましたが、対応する押下イベントが見つかりません。`);
-                }
-            }
-        }
-    }, [training, practice, activePractice, handleInvalidInput, nextStage, sendHid]);
+    }, [setTraining, setPractice, setGIdx, setDIdx, setOK, setLastInvalidKeyCode, activePractice, setShowKeyLabels, setIsRandomMode]);
 
 
     /* 初期化 */
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const kbRaw = params.get('kb') ?? 'tw-20v';
+        const kbRaw = params.get('kb') ?? 'tw-20h'; // デフォルト 'tw-20h'
         const sideRaw = params.get('side') ?? 'right';
 
         const currentKb: KeyboardModel = kbRaw === 'tw-20h' ? 'tw-20h' : 'tw-20v';
         setKb(currentKb);
+        console.log(`Initialized kb model to: ${currentKb}`);
 
         const currentSide: KeyboardSide = sideRaw === 'left' ? 'left' : 'right';
         setSide(currentSide);
@@ -332,28 +376,44 @@ export default function KeymapViewer() {
             try {
                 const ds = await navigator.hid?.getDevices();
                 if (!ds || !ds.length) {
+                    console.log("No HID devices found on init.");
                     return;
                 }
                 const device = ds[0];
+                console.log("Found existing HID device:", device);
                 if (!opening.current && !(device as any).opened) {
                     opening.current = true;
                     try {
+                        console.log("Opening existing HID device...");
                         await device.open();
+                        console.log("Existing HID device opened.");
                         device.oninputreport = onInput;
                         devRef.current = device;
                     } catch (err) { console.error("既存のHIDデバイスを開けませんでした:", err); }
                     finally { opening.current = false; }
                 } else if ((device as any).opened) {
+                    console.log("Existing HID device already opened. Setting oninputreport.");
                     device.oninputreport = onInput;
                     devRef.current = device;
                 }
             } catch (err) { console.error("HIDデバイスの取得またはオープンに失敗:", err); }
         };
         initHid();
+
+        // クリーンアップ関数
+        return () => {
+            const dev = devRef.current;
+            if (dev && (dev as any).opened) {
+                console.log("Closing HID device on cleanup.");
+                dev.oninputreport = null;
+                // dev.close();
+            }
+        };
     }, [onInput, setTitle, setCols, setLayers, setFW, setSN, setShowTrainingButton, setSide, setKb]);
 
     // 練習モード選択時のリセット処理
     const handlePracticeSelect = (item: PracticeMode) => {
+        console.log(`Practice mode selected: ${item}`);
         activePractice?.reset?.();
         setPractice(item);
         setGIdx(0); setDIdx(0);
@@ -364,8 +424,17 @@ export default function KeymapViewer() {
             invalidInputTimeoutRef.current = null;
         }
         pressedKeysRef.current.clear();
-        setShowKeyLabels(true); // NEW: 練習メニュー変更時にキー表示をリセット
+        setShowKeyLabels(true);
+        setIsRandomMode(false);
     };
+
+    // ランダムモード切り替えハンドラ
+    const toggleRandomMode = useCallback(() => {
+        const nextIsRandomMode = !isRandomMode;
+        console.log(`Toggling random mode to: ${nextIsRandomMode}`);
+        setIsRandomMode(nextIsRandomMode);
+        activePractice?.reset?.();
+    }, [activePractice, setIsRandomMode, isRandomMode]);
 
     /* heading（見出し） */
     const headingChars = activePractice?.headingChars ?? [];
@@ -373,12 +442,14 @@ export default function KeymapViewer() {
       <div className="flex justify-center">
         {headingChars.map((char: string, index: number) => {
           let className = 'text-2xl font-bold';
-          if (practice === '記号の基本練習３') {
-              if (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx) {
-                 className += ' bg-blue-100';
+          if (!isRandomMode) {
+              if (practice === '記号の基本練習３') {
+                  if (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx) {
+                     className += ' bg-blue-100';
+                  }
+              } else if (index === dIdx) {
+                className += ' bg-blue-100';
               }
-          } else if (index === dIdx) {
-            className += ' bg-blue-100';
           }
           return (
             <span key={index} className={className} style={{ padding: '0.25rem' }}>
@@ -390,126 +461,124 @@ export default function KeymapViewer() {
     );
 
     /* キー描画 */
-    // MODIFIED: showKeyLabels を依存配列に追加
     const renderKana = useCallback((layoutIndex: number) => (key: string, idx: number) => {
-        let originalKey = (key ?? '').trim(); // 元のキーデータ
-        const isEmptyKey = originalKey === ''; // 元のキーデータが空か
+        let originalKey = (key ?? '').trim();
+        const isEmptyKey = originalKey === '';
 
-        let k = originalKey; // 表示用のキー文字列 (初期値は元のキーデータ)
+        let k = originalKey;
 
         const kigoMapping2: Record<string, string> = {
             'あ行': '＋', 'か行': '＿', 'さ行': '＊', 'た行': '－', 'な行': '＠',
             'は行': '・', 'ま行': '＆', 'や行': '｜', 'ら行': '％', 'わ行': '￥',
-            '記号': '後押し',
+            '記号': '記号',
         };
-        // kigoMapping3 も定義しておく (useKigoPractice3 で使用)
-        // const kigoMapping3: Record<string, string> = { /* ... kigoMapping3 の内容 ... */ };
 
         let cName = '';
         let isInvalid = false;
 
-        // 練習モードに応じたキー表示の調整 (k が '____' になる可能性あり)
-        // この調整はキー表示ONのときのみ意味を持つ
         if (showKeyLabels) {
             if (practice === '記号の基本練習１') {
-                if (layoutIndex === 2) {
-                    const kigo1Char = layers[6]?.[idx]?.trim();
-                    if (kigo1Char && kigo1Char !== '____') {
-                        k = kigo1Char;
-                    }
+                if (layoutIndex === 6) {
+                    // 記号1レイヤーの表示調整
+                } else if (layoutIndex === 2) {
+                     k = '____';
                 }
             } else if (practice === '記号の基本練習２') {
                 if (layoutIndex === 2) {
-                    k = kigoMapping2[originalKey] ?? k; // 元のキーでマッピング
+                    k = kigoMapping2[originalKey] ?? k;
                 }
             } else if (practice === '記号の基本練習３') {
                 if (layoutIndex === 2) {
-                    // kigoMapping3 が data/keymapData.ts からインポートされている前提
-                    k = kigoMapping3[originalKey] ?? k; // 元のキーでマッピング
+                    k = kigoMapping3[originalKey] ?? k;
                 }
             } else if (layoutIndex === 3) {
-                if (['拗１', '拗２', '拗３', '拗４'].includes(originalKey)) { // 元のキーで判定
-                    k = '____'; // 表示を '____' にする
+                if (['拗１', '拗２', '拗３', '拗４'].includes(originalKey)) {
+                    k = '____';
                 }
             }
         }
 
-        // 不正入力ハイライト処理 (キー表示ON/OFFに関わらず適用)
+        // 不正入力ハイライト処理
         if (lastInvalidKeyCode !== null) {
-            const isStartLayoutInput = lastInvalidKeyCode <= 0x14;
-            const pressCode = isStartLayoutInput ? lastInvalidKeyCode : lastInvalidKeyCode - 0x14;
+            const pressCode = lastInvalidKeyCode;
             const targetKeyIndex = pressCode - 1;
+
             let isTargetLayout = false;
             if (activePractice) {
-                const logicLayoutIndex = practice === '記号の基本練習１' ? 6 : layoutIndex;
-                isTargetLayout = activePractice.isInvalidInputTarget(lastInvalidKeyCode, logicLayoutIndex, idx);
-            } else {
-                 isTargetLayout = (isStartLayoutInput && layoutIndex === 2) || (!isStartLayoutInput && layoutIndex === 3);
+                isTargetLayout = activePractice.isInvalidInputTarget(pressCode, layoutIndex, idx);
             }
             if (isTargetLayout && idx === targetKeyIndex) {
                 cName = 'bg-red-100'; isInvalid = true;
+                console.log(`Highlighting invalid key: pressCode=0x${pressCode.toString(16)}, layoutIndex=${layoutIndex}, idx=${idx}`);
             }
         }
 
-        // 正解キーハイライト処理 (キー表示ONのときのみ適用、かつ '____' はハイライトしない)
-        // isInvalid でない場合のみ青ハイライトを検討
-        if (!isInvalid && showKeyLabels && !okVisible && activePractice) {
-            const logicLayoutIndex = practice === '記号の基本練習１' ? 6 : layoutIndex;
-            const highlightTargetKey = practice === '記号の基本練習１' ? layers[6]?.[idx]?.trim() ?? '' : originalKey;
-
-            // 表示内容が '____' になるキーは青ハイライトしない
-            // k は練習モードによって '____' に書き換えられる可能性があるため、k で判定
+        // 正解キーハイライト処理
+        if (!isInvalid && showKeyLabels && !activePractice?.isOkVisible && activePractice) {
+            const highlightTargetKey = originalKey;
             const shouldHighlight = k !== '____';
 
             if (shouldHighlight) {
-                const highlightClass = activePractice.getHighlightClassName(highlightTargetKey, logicLayoutIndex);
-                // 青ハイライトクラスが返ってきた場合のみ cName を設定
+                const highlightClass = activePractice.getHighlightClassName(highlightTargetKey, layoutIndex);
                 if (highlightClass === 'bg-blue-100') {
                      cName = highlightClass;
                 }
             }
         }
 
-        // 最終的な表示内容を決定
         let displayContent: string;
         if (showKeyLabels) {
-            // ON: 空なら改行、それ以外は計算後の k を表示
             displayContent = isEmptyKey ? '\n' : k;
         } else {
-            // OFF: 空なら改行、それ以外は '____' を表示
             displayContent = isEmptyKey ? '\n' : '____';
         }
 
-        // キー要素のJSXを返す
         return (
             <div key={idx} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center whitespace-pre-line ${cName}`}>
-                {/* MODIFIED: 最終的な表示内容 displayContent を使用 */}
                 {displayContent}
             </div>
         );
-    // MODIFIED: showKeyLabels を依存配列に追加
-    }, [activePractice, okVisible, lastInvalidKeyCode, practice, layers, showKeyLabels]);
+    }, [activePractice, lastInvalidKeyCode, practice, showKeyLabels]); // okVisible を削除し、activePractice を追加
+
+    // ボタンのスタイル
+    const buttonStyle: React.CSSProperties = {
+        marginBottom: '0.5rem',
+        padding: '5px 10px',
+        display: 'block',
+        minWidth: '120px',
+        textAlign: 'center',
+    };
 
     // コンポーネント全体のJSX
     return (
         <div className='p-4 relative'>
-            {/* MODIFIED: ボタンを縦に並べるためのコンテナ */}
+            {/* ボタンエリア */}
             {showTrainingButton && (
-                <div className="absolute top-4 right-4 flex flex-col space-y-2 items-end"> {/* items-end で右寄せ */}
+                <div className="absolute top-4 right-4 flex flex-col space-y-2 items-end">
                     <button
                         className={`px-4 py-1 rounded shadow text-white ${training ? 'bg-gray-600' : 'bg-green-600'}`}
                         onClick={() => { sendHid(!training); }}
+                        style={buttonStyle}
                     >
                         {training ? '練習モード OFF' : '練習モード ON'}
                     </button>
-                    {/* NEW: 練習モードONのときだけキー表示ボタンを表示 */}
                     {training && (
-                        <button
-                            className="px-4 py-1 rounded shadow text-white bg-blue-600 hover:bg-blue-700" // スタイル調整
-                            onClick={() => setShowKeyLabels(prev => !prev)} // クリックで状態をトグル
-                        >
-                            {showKeyLabels ? 'キー表示 OFF' : 'キー表示 ON'} {/* 状態に応じてテキスト変更 */}
-                        </button>
+                        <>
+                            <button
+                                className="px-4 py-1 rounded shadow text-white bg-blue-600 hover:bg-blue-700"
+                                onClick={() => setShowKeyLabels(prev => !prev)}
+                                style={buttonStyle}
+                            >
+                                {showKeyLabels ? 'キー表示 OFF' : 'キー表示 ON'}
+                            </button>
+                            <button
+                                className="px-4 py-1 rounded shadow text-white bg-purple-600 hover:bg-purple-700"
+                                onClick={toggleRandomMode}
+                                style={buttonStyle}
+                            >
+                                ランダム {isRandomMode ? 'OFF' : 'ON'}
+                            </button>
+                        </>
                     )}
                 </div>
             )}
@@ -547,34 +616,28 @@ export default function KeymapViewer() {
                             </ul>
                         </div>
 
-                        {['記号の基本練習１', '記号の基本練習２', '記号の基本練習３'].includes(practice) ? (
+                        {/* 練習モードに応じたキーボード表示 */}
+                        {practice === '記号の基本練習１' ? (
                             <div className="col-start-2 justify-self-center">
-                                {practice === '記号の基本練習１' && (
-                                    <div key={2} style={{ width: fixedWidth }}>
-                                        <h3 className='text-lg font-semibold mb-2 text-center'>記号１ (長押し)</h3>
-                                        <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
-                                            {layers[2]?.map(renderKana(2))}
-                                        </div>
+                                <div style={{ width: fixedWidth }}>
+                                    <h3 className='text-lg font-semibold mb-2 text-center'>記号１ (長押し)</h3>
+                                    <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
+                                        {layers[6]?.map(renderKana(6))}
                                     </div>
-                                )}
-                                {practice === '記号の基本練習２' && (
-                                    <div key={2} style={{ width: fixedWidth }}>
-                                        <h3 className='text-lg font-semibold mb-2 text-center'>記号２ (後押し)</h3>
-                                        <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
-                                            {layers[2]?.map(renderKana(2))}
-                                        </div>
-                                    </div>
-                                )}
-                                {practice === '記号の基本練習３' && (
-                                    <div key={2} style={{ width: fixedWidth }}>
-                                        <h3 className='text-lg font-semibold mb-2 text-center'>記号３（先押し）</h3>
-                                        <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
-                                            {layers[2]?.map(renderKana(2))}
-                                        </div>
-                                    </div>
-                                )}
+                                </div>
                             </div>
-                        ) : practice ? (
+                        ) : ['記号の基本練習２', '記号の基本練習３'].includes(practice) ? (
+                            <div className="col-start-2 justify-self-center">
+                                <div style={{ width: fixedWidth }}>
+                                    <h3 className='text-lg font-semibold mb-2 text-center'>
+                                        {practice === '記号の基本練習２' ? '記号２ (後押し)' : '記号３（先押し）'}
+                                    </h3>
+                                    <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
+                                        {layers[2]?.map(renderKana(2))}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : practice ? ( // 通常のかな練習
                             <>
                                 <div className="justify-self-center">
                                     <div style={{ width: fixedWidth }}>
@@ -596,13 +659,14 @@ export default function KeymapViewer() {
                         ) : null}
                     </div>
 
-                    {okVisible && (
+                    {/* ★★★ OK表示: activePractice?.isOkVisible を参照 ★★★ */}
+                    {activePractice?.isOkVisible && (
                         <div className="flex justify-center mt-4">
                             <span className='text-3xl font-bold text-green-600' style={{ padding: '0.25rem' }}>OK</span>
                         </div>
                     )}
                 </>
-            ) : (
+            ) : ( // 練習モードOFF時の表示
                  <div className='grid grid-cols-2 gap-4'>
                      {layers.map((layer: string[], li: number) => (
                          <div key={li} style={{ width: fixedWidth }}>

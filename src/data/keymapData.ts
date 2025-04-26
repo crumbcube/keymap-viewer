@@ -170,7 +170,7 @@ export const sampleJson = {
       "____", "②",    "①",    "④",    "____",
       "____", "",     "",     "",     "____"
     ],
-    [ // layers[6] 記号・長押し - left ★★★ 修正済み ★★★
+    [ // layers[6] 記号・長押し - left
       "____", // 0: BS
       "____", // 1: 濁音
       "____", // 2: 拗音
@@ -410,7 +410,7 @@ export const sampleJson = {
       "____", "",     "",     "",
       "____", "____", "____", "____"
     ],
-    [ // layers[6] 記号・長押し - left ★★★ 修正済み ★★★
+    [ // layers[6] 記号・長押し - left
       "____", // 0: BS
       "____", // 1: 濁音
       "____", // 2: 拗音
@@ -587,17 +587,22 @@ export const sokuonKomojiData: {
   chars: string[];
   inputs: {
       gyouKey: (typeof gyouList)[number];
+      middleKey?: '濁音';
       dan: string;
   }[];
 }[] = [
   { groupName: '小文字1', chars: ['ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ'], inputs: [
-      { gyouKey: 'あ行', dan: 'あ段' }, { gyouKey: 'あ行', dan: 'い段' }, { gyouKey: 'あ行', dan: 'う段' }, { gyouKey: 'あ行', dan: 'え段' }, { gyouKey: 'あ行', dan: 'お段' }
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'あ段' },
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'い段' },
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'う段' },
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'え段' },
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'お段' }
   ]},
   { groupName: '小文字2', chars: ['ゃ', 'ゅ', 'ょ', 'ゎ', 'っ'], inputs: [
-      { gyouKey: 'や行', dan: 'あ段' }, // ゃ
-      { gyouKey: 'や行', dan: 'う段' }, // ゅ
-      { gyouKey: 'や行', dan: 'お段' }, // ょ
-      { gyouKey: 'わ行', dan: 'あ段' }, // ゎ
+      { gyouKey: 'や行', middleKey: '濁音', dan: 'あ段' }, // ゃ
+      { gyouKey: 'や行', middleKey: '濁音', dan: 'う段' }, // ゅ
+      { gyouKey: 'や行', middleKey: '濁音', dan: 'お段' }, // ょ
+      { gyouKey: 'わ行', middleKey: '濁音', dan: 'あ段' }, // ゎ
       { gyouKey: 'た行', dan: 'う段' }  // っ
   ]},
 ];
