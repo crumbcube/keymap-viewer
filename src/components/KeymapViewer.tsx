@@ -19,7 +19,9 @@ import {
     kigoPractice1Data,
     kigoPractice2Data,
     kigoPractice3Data,
-    kigoMapping3
+    kigoMapping2,
+    kigoMapping3,
+    functionKeyMaps,
 } from '../data/keymapData';
 import { getKeyStyle, isLargeSymbol } from '../utils/styleUtils';
 import {
@@ -101,6 +103,10 @@ export default function KeymapViewer() {
 
     // キーボード表示の固定幅
     const fixedWidth = `${cols * 5.5}rem`;
+
+    const currentFunctionKeyMap = useMemo(() => {
+        return functionKeyMaps[kb]?.[side] ?? {};
+    }, [kb, side]);
 
     // --- 不正入力処理 ---
     const handleInvalidInput = useCallback((pressCode: number) => {
@@ -467,34 +473,48 @@ export default function KeymapViewer() {
 
         let k = originalKey;
 
-        const kigoMapping2: Record<string, string> = {
-            'あ行': '＋', 'か行': '＿', 'さ行': '＊', 'た行': '－', 'な行': '＠',
-            'は行': '・', 'ま行': '＆', 'や行': '｜', 'ら行': '％', 'わ行': '￥',
-            '記号': '記号',
-        };
+        // ▼▼▼ kigoMapping2 の直接定義を削除 ▼▼▼
+        // const kigoMapping2: Record<string, string> = {
+        //     'あ行': '＋', 'か行': '＿', 'さ行': '＊', 'た行': '－', 'な行': '＠',
+        //     'は行': '・', 'ま行': '＆', 'や行': '｜', 'ら行': '％', 'わ行': '￥',
+        //     '記号': '記号',
+        // };
+        // ▲▲▲ 削除 ▲▲▲
 
         let cName = '';
         let isInvalid = false;
 
         if (showKeyLabels) {
             if (practice === '記号の基本練習１') {
-                if (layoutIndex === 6) {
-                    // 記号1レイヤーの表示調整
+                if (layoutIndex === 6 && currentFunctionKeyMap[idx]) {
+                    k = currentFunctionKeyMap[idx];
                 } else if (layoutIndex === 2) {
                      k = '____';
                 }
             } else if (practice === '記号の基本練習２') {
                 if (layoutIndex === 2) {
-                    k = kigoMapping2[originalKey] ?? k;
+                    if (currentFunctionKeyMap[idx]) {
+                        k = currentFunctionKeyMap[idx];
+                    } else {
+                        k = kigoMapping2[originalKey] ?? k;
+                    }
                 }
             } else if (practice === '記号の基本練習３') {
                 if (layoutIndex === 2) {
-                    k = kigoMapping3[originalKey] ?? k;
+                    if (currentFunctionKeyMap[idx]) {
+                        k = currentFunctionKeyMap[idx];
+                    } else {
+                        k = kigoMapping3[originalKey] ?? k;
+                    }
                 }
-            } else if (layoutIndex === 3) {
+            } else if (layoutIndex === 3) { // 通常のかな練習時のエンドレイヤー
                 if (['拗１', '拗２', '拗３', '拗４'].includes(originalKey)) {
                     k = '____';
                 }
+            } else if (layoutIndex === 2) { // 通常のかな練習時のスタートレイヤー
+                 if (currentFunctionKeyMap[idx]) {
+                     k = currentFunctionKeyMap[idx];
+                 }
             }
         }
 
@@ -515,7 +535,7 @@ export default function KeymapViewer() {
 
         // 正解キーハイライト処理
         if (!isInvalid && showKeyLabels && !activePractice?.isOkVisible && activePractice) {
-            const highlightTargetKey = originalKey;
+            const highlightTargetKey = k;
             const shouldHighlight = k !== '____';
 
             if (shouldHighlight) {
@@ -538,7 +558,7 @@ export default function KeymapViewer() {
                 {displayContent}
             </div>
         );
-    }, [activePractice, lastInvalidKeyCode, practice, showKeyLabels]); // okVisible を削除し、activePractice を追加
+    }, [activePractice, lastInvalidKeyCode, practice, showKeyLabels, currentFunctionKeyMap]);
 
     // ボタンのスタイル
     const buttonStyle: React.CSSProperties = {
@@ -674,20 +694,22 @@ export default function KeymapViewer() {
                                  {layerNames[li] ?? `レイヤー ${li}`}
                              </h2>
                              <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
-                                 {layer.map((code: string, ki: number) => (
-                                     <motion.div key={ki} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center ${getKeyStyle(code)}`}
-                                         whileHover={{ scale: 1.05 }}
-                                         style={{ minHeight: '3rem', fontSize: isLargeSymbol(code) ? '1.8rem' : undefined }}>
-                                         <code style={{ whiteSpace: "pre-line" }}>
-                                           {(code ?? "").split(/\r?\n/).map((l: string, i: number, a: string[]) => (
-                                             <span key={i}>
-                                               {l}
-                                               {i < a.length - 1 && <br />}
-                                             </span>
-                                           ))}
-                                         </code>
-                                     </motion.div>
-                                 ))}
+                                 {layer.map((code: string, ki: number) => {
+                                     return (
+                                         <motion.div key={ki} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center ${getKeyStyle(code)}`}
+                                             whileHover={{ scale: 1.05 }}
+                                             style={{ minHeight: '3rem', fontSize: isLargeSymbol(code) ? '1.8rem' : undefined }}>
+                                             <code style={{ whiteSpace: "pre-line" }}>
+                                               {(code ?? "").split(/\r?\n/).map((l: string, i: number, a: string[]) => (
+                                                 <span key={i}>
+                                                   {l}
+                                                   {i < a.length - 1 && <br />}
+                                                 </span>
+                                               ))}
+                                             </code>
+                                         </motion.div>
+                                     );
+                                 })}
                              </div>
                          </div>
                      ))}

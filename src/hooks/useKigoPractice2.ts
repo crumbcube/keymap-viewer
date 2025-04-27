@@ -1,6 +1,6 @@
-// src/hooks/useKigoPractice2.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useKigoPractice2.ts
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { kigoPractice2Data } from '../data/keymapData';
+import { kigoPractice2Data, kigoMapping2, functionKeyMaps } from '../data/keymapData';
 import {
     PracticeHookProps,
     PracticeInputInfo,
@@ -12,11 +12,22 @@ import {
     hid2GyouVLeft_Kana,
     CharInfoKigo2,
     allKigo2CharInfos,
+    KeyboardSide,
+    KeyboardModel,
 } from './usePracticeCommons';
 
 type KigoPractice2Stage = 'gyouInput' | 'kigoInput';
 
-const useKigoPractice2 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult => {
+const useKigoPractice2 = ({
+    gIdx,
+    dIdx,
+    isActive,
+    okVisible,
+    side,
+    kb,
+    layers,
+    isRandomMode
+}: PracticeHookProps): PracticeHookResult => {
     const [stage, setStage] = useState<KigoPractice2Stage>('gyouInput');
     const hid2Gyou = useMemo(() => {
         if (kb === 'tw-20v') {
@@ -87,7 +98,7 @@ const useKigoPractice2 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         } else {
             reset(); // 非アクティブ時もリセット
         }
-    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]); // internalOkVisible を削除
+    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
     // 通常モード用
     const currentGroup = useMemo(() => {
@@ -102,11 +113,38 @@ const useKigoPractice2 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         return currentGroup.inputs[dIdx];
     }, [isRandomMode, currentGroup, dIdx]);
 
-    // ランダム/通常モード共通
-    const expectedGyouKey = useMemo(() => {
+    const currentTargetOriginalKey = useMemo(() => {
         if (isRandomMode) return randomTarget?.gyouKey ?? null;
         return currentInputDef?.gyouKey ?? null;
     }, [isRandomMode, randomTarget, currentInputDef]);
+
+    const currentTargetChar = useMemo(() => {
+        if (isRandomMode) return randomTarget?.char ?? null;
+        return currentGroup?.chars[dIdx] ?? null;
+    }, [isRandomMode, randomTarget, currentGroup, dIdx]);
+
+
+    // 現在のキーボードモデルとサイドに応じた機能キーマップを取得
+    const currentFunctionKeyMap = useMemo(() => {
+        return functionKeyMaps[kb]?.[side] ?? {};
+    }, [kb, side]);
+
+    // ハイライト対象の「表示名」を計算
+    const highlightTargetDisplayName = useMemo(() => {
+        const layer2 = layers[2] ?? [];
+        // currentTargetOriginalKey が layers[2] のどのインデックスに対応するか検索
+        const targetIndex = layer2.findIndex(key => key === currentTargetOriginalKey);
+
+        if (targetIndex !== -1 && currentFunctionKeyMap[targetIndex]) {
+            // 機能キーの場合、機能キー名を返す
+            return currentFunctionKeyMap[targetIndex];
+        } else {
+            // 機能キーでない場合、kigoMapping2 で変換した記号を返す
+            // currentTargetChar が kigoMapping2 の結果と一致するはず
+            return currentTargetChar; // ヘッダーに表示されている文字をそのまま使う
+        }
+    }, [currentTargetOriginalKey, currentTargetChar, currentFunctionKeyMap, layers]);
+
 
     // ヘッダー文字
     const headingChars = useMemo(() => {
@@ -121,14 +159,14 @@ const useKigoPractice2 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
     const currentOkVisible = okVisible;
 
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
-        console.log("Kigo2 Input:", inputInfo, "Stage:", stage, "Expected Gyou:", expectedGyouKey, "RandomMode:", isRandomMode, "PropOK:", okVisible);
+        console.log("Kigo2 Input:", inputInfo, "Stage:", stage, "Expected Gyou:", currentTargetOriginalKey, "RandomMode:", isRandomMode, "PropOK:", okVisible);
 
         if (!isActive || okVisible) {
             console.log("Kigo2 Input Ignored: Inactive or Prop OK visible");
             return { isExpected: false, shouldGoToNext: false };
         }
-        if (!expectedGyouKey) {
-            console.log("Kigo2 Input Ignored: expectedGyouKey is null");
+        if (!currentTargetOriginalKey) {
+            console.log("Kigo2 Input Ignored: currentTargetOriginalKey is null");
             return { isExpected: false, shouldGoToNext: false };
         }
         if (inputInfo.type !== 'release') {
@@ -142,7 +180,7 @@ const useKigoPractice2 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         switch (stage) {
             case 'gyouInput':
                 const expectedGyouKeyCodes = Object.entries(hid2Gyou)
-                    .filter(([_, name]) => name === expectedGyouKey)
+                    .filter(([_, name]) => name === currentTargetOriginalKey)
                     .map(([codeStr, _]) => parseInt(codeStr));
 
                 if (expectedGyouKeyCodes.includes(pressCode)) {
@@ -180,43 +218,40 @@ const useKigoPractice2 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         console.log("Kigo2 Result:", { isExpected, shouldGoToNext });
         return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, /* reset, */ stage, hid2Gyou, expectedGyouKey,
-        isRandomMode, selectNextRandomTarget, setStage // handleCorrectAndGoNextRandom, internalOkVisible を削除
+        isActive, okVisible, stage, hid2Gyou, currentTargetOriginalKey,
+        isRandomMode, selectNextRandomTarget, setStage
     ]);
 
-    const getHighlightClassName = useCallback((key: string, layoutIndex: number): string | null => {
+    const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): string | null => {
         if (!isActive || okVisible) {
             return null;
         }
-        if (!expectedGyouKey) {
-            return null;
-        }
-
         // 問題切り替え直後は強制的に 'gyouInput' として扱う (通常モードのみ)
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
         const currentStageForHighlight = indicesJustChanged ? 'gyouInput' : stage;
 
-        let expectedKeyName: string | null = null;
+        let expectedKeyDisplayName: string | null = null;
         const targetLayoutIndex = 2; // 記号2はスタートレイヤーのみ
 
         switch (currentStageForHighlight) {
             case 'gyouInput':
-                expectedKeyName = expectedGyouKey;
+                expectedKeyDisplayName = highlightTargetDisplayName;
                 break;
             case 'kigoInput':
-                expectedKeyName = '記号';
+                const kigoKeyIndex = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '記号')?.[0];
+                expectedKeyDisplayName = kigoKeyIndex !== undefined ? currentFunctionKeyMap[parseInt(kigoKeyIndex)] : '記号'; // 機能キー名 or デフォルト
                 break;
         }
 
-        if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && key === expectedKeyName) {
+        if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyDisplayName) {
             return 'bg-blue-100';
         }
         return null;
     }, [
-        isActive, okVisible, stage, expectedGyouKey, isRandomMode, gIdx, dIdx // internalOkVisible を削除
+        isActive, okVisible, stage, highlightTargetDisplayName,
+        isRandomMode, gIdx, dIdx, currentFunctionKeyMap
     ]);
 
-    // isInvalidInputTarget (変更なし)
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
         const targetKeyIndex = pressCode - 1;
