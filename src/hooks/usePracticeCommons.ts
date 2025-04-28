@@ -15,7 +15,8 @@ import {
     sokuonKomojiData,
     kigoPractice1Data,
     kigoPractice2Data,
-    kigoPractice3Data
+    kigoPractice3Data,
+    functionKeyMaps,
 } from '../data/keymapData';
 
 /* 練習モードの型定義 */
@@ -28,6 +29,8 @@ export type PracticeMode =
     | '記号の基本練習１'
     | '記号の基本練習２'
     | '記号の基本練習３'
+    | '拗濁音の練習'
+    | '拗半濁音の練習'
     | ''; // 未選択状態
 
 /* 左右の型 */
@@ -395,7 +398,7 @@ export const allSokuonKomojiCharInfos: CharInfoSokuonKomoji[] = sokuonKomojiData
       };
     })
 );
-  
+
 // 全記号1情報
 export const allKigo1CharInfos: CharInfoKigo1[] = kigoPractice1Data.flatMap(group =>
     group.chars.map((char, index) => ({
@@ -445,5 +448,6 @@ export {
     sokuonKomojiData,
     kigoPractice1Data,
     kigoPractice2Data,
-    kigoPractice3Data
+    kigoPractice3Data,
+    functionKeyMaps,
 };

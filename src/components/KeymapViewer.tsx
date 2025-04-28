@@ -6,7 +6,9 @@ import { HIDDevice, HIDInputReportEvent } from '../types/hid';
 import {
     sampleJson,
     layerNames,
-    practiceMenuItems,
+    basicPracticeMenuItems,
+    stepUpPracticeMenuItems,
+    // practiceMenuItems, // 未使用のためコメントアウト
     gyouList,
     danOrder,
     youonGyouList,
@@ -19,6 +21,8 @@ import {
     kigoPractice1Data,
     kigoPractice2Data,
     kigoPractice3Data,
+    youdakuonPracticeData,
+    youhandakuonPracticeData,
     kigoMapping2,
     kigoMapping3,
     functionKeyMaps,
@@ -40,6 +44,8 @@ import useSokuonKomojiPractice from '../hooks/useSokuonKomojiPractice';
 import useKigoPractice1 from '../hooks/useKigoPractice1';
 import useKigoPractice2 from '../hooks/useKigoPractice2';
 import useKigoPractice3 from '../hooks/useKigoPractice3';
+import useYoudakuonPractice from '../hooks/useYoudakuonPractice';
+import useYouhandakuonPractice from '../hooks/useYouhandakuonPractice';
 
 export default function KeymapViewer() {
     /* UI 状態 */
@@ -61,19 +67,19 @@ export default function KeymapViewer() {
     const [dIdx, setDIdx] = useState(0);
 
     /* UIフィードバック */
-    const [okVisible, setOK] = useState(false); // 通常モード用のOK表示ステート
-    const [lastInvalidKeyCode, setLastInvalidKeyCode] = useState<number | null>(null); // 不正入力されたキーの *押下コード* を保持
+    const [okVisible, setOK] = useState(false);
+    const [lastInvalidKeyCode, setLastInvalidKeyCode] = useState<number | null>(null);
 
     /* HID / カウンタ */
     const devRef = useRef<HIDDevice | null>(null);
     const opening = useRef(false);
     const invalidInputTimeoutRef = useRef<number | null>(null);
-    const pressedKeysRef = useRef<Map<number, number>>(new Map()); // キーコード(押下) -> タイムスタンプ
+    const pressedKeysRef = useRef<Map<number, number>>(new Map());
     const lastInvalidInputTime = useRef<number>(0);
 
     // --- カスタムフックの呼び出し ---
-    const commonHookProps: Omit<PracticeHookProps, 'isActive'> = useMemo(() => ({
-        gIdx, dIdx, okVisible, side, layers, kb, isRandomMode
+    const commonHookProps: PracticeHookProps = useMemo(() => ({
+        gIdx, dIdx, isActive: false, okVisible, side, layers, kb, isRandomMode
     }), [gIdx, dIdx, okVisible, side, layers, kb, isRandomMode]);
 
     // 各練習フックの呼び出し
@@ -82,9 +88,13 @@ export default function KeymapViewer() {
     const dakuonPractice = useDakuonPractice({ ...commonHookProps, isActive: practice === '濁音の基本練習' });
     const handakuonPractice = useHandakuonPractice({ ...commonHookProps, isActive: practice === '半濁音の基本練習' });
     const sokuonKomojiPractice = useSokuonKomojiPractice({ ...commonHookProps, isActive: practice === '小文字(促音)の基本練習' });
-    const kigoPractice1 = useKigoPractice1({ ...commonHookProps, isActive: practice === '記号の基本練習１' });
+    // ▼▼▼ useKigoPractice1 の呼び出しに layers を追加 ▼▼▼
+    const kigoPractice1 = useKigoPractice1({ ...commonHookProps, isActive: practice === '記号の基本練習１', layers });
+    // ▲▲▲ 追加完了 ▲▲▲
     const kigoPractice2 = useKigoPractice2({ ...commonHookProps, isActive: practice === '記号の基本練習２' });
     const kigoPractice3 = useKigoPractice3({ ...commonHookProps, isActive: practice === '記号の基本練習３' });
+    const youdakuonPractice = useYoudakuonPractice({ ...commonHookProps, isActive: practice === '拗濁音の練習' });
+    const youhandakuonPractice = useYouhandakuonPractice({ ...commonHookProps, isActive: practice === '拗半濁音の練習' });
 
     // --- 現在アクティブな練習フックを選択 ---
     const activePractice: PracticeHookResult | null = useMemo(() => {
@@ -97,12 +107,17 @@ export default function KeymapViewer() {
             case '記号の基本練習１': return kigoPractice1;
             case '記号の基本練習２': return kigoPractice2;
             case '記号の基本練習３': return kigoPractice3;
+            case '拗濁音の練習': return youdakuonPractice;
+            case '拗半濁音の練習': return youhandakuonPractice;
             default: return null;
         }
-    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3]) as PracticeHookResult | null;
+    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice]);
 
-    // キーボード表示の固定幅
-    const fixedWidth = `${cols * 5.5}rem`;
+    // キーボード表示の固定幅 (数値としても保持)
+    const keyWidthRem = 5.5;
+    const gapRem = 0.5; // gap-2 = 0.5rem
+    const fixedWidthNum = cols * keyWidthRem;
+    const fixedWidth = `${fixedWidthNum}rem`;
 
     const currentFunctionKeyMap = useMemo(() => {
         return functionKeyMaps[kb]?.[side] ?? {};
@@ -141,12 +156,11 @@ export default function KeymapViewer() {
             console.warn("nextStage called in random mode. This should not happen.");
             return;
         }
-        setOK(true); // 通常モードのOK表示をON
+        setOK(true);
         setTimeout(() => {
             let nextGIdx = gIdx;
             let nextDIdx = dIdx;
 
-            // ... (各練習モードの次の問題への遷移ロジック - 変更なし) ...
             if (practice === '清音の基本練習') {
                 const currentGyouKey = gyouList[gIdx];
                 if (!currentGyouKey || !gyouList.includes(currentGyouKey)) { console.error("清音練習で無効な gIdx または currentGyouKey"); return; }
@@ -214,15 +228,32 @@ export default function KeymapViewer() {
                         nextDIdx = 0;
                     }
                 }
+            } else if (practice === '拗濁音の練習') {
+                if (gIdx < 0 || gIdx >= youdakuonPracticeData.length) { console.error("拗濁音練習で無効な gIdx"); return; }
+                const currentGroup = youdakuonPracticeData[gIdx];
+                if (dIdx < currentGroup.chars.length - 1) {
+                    nextDIdx = dIdx + 1;
+                } else {
+                    nextDIdx = 0;
+                    nextGIdx = (gIdx + 1) % youdakuonPracticeData.length;
+                }
+            } else if (practice === '拗半濁音の練習') {
+                const currentGroup = youhandakuonPracticeData[0];
+                if (dIdx < currentGroup.chars.length - 1) {
+                    nextDIdx = dIdx + 1;
+                } else {
+                    nextDIdx = 0;
+                }
+                nextGIdx = 0;
             }
 
             setGIdx(nextGIdx);
             setDIdx(nextDIdx);
-            setOK(false); // 通常モードのOK表示をOFF
+            setOK(false);
         }, 1000);
     }, [practice, gIdx, dIdx, setOK, setGIdx, setDIdx, isRandomMode]);
 
-    // onInput (releaseOffset と isReleaseEventAdjusted の計算を修正済み)
+    // onInput
     const onInput: (ev: HIDInputReportEvent) => void = useCallback((ev) => {
         const data = new Uint8Array(ev.data.buffer);
         const reportId = data[0];
@@ -231,7 +262,6 @@ export default function KeymapViewer() {
 
         console.log(`onInput called. kb: ${kb}, reportId: 0x${reportId.toString(16)}, keyCode: 0x${keyCode.toString(16)}`);
 
-        // 練習モード強制開始
         if (reportId === 0x14 && keyCode === 0x03) {
             if (!training) {
                 console.log("Forcing training mode ON");
@@ -242,14 +272,11 @@ export default function KeymapViewer() {
             return;
         }
 
-        // 練習中のキー入力処理
         if (reportId === 0x15 && training && practice && activePractice) {
-            const releaseOffset = 0x14; // 常に 0x14
-
-            const maxStartLayoutKeyCode = 0x14; // TW-20H も TW-20V も 0x14 まで
-
+            const releaseOffset = 0x14;
+            const maxStartLayoutKeyCode = 0x14;
             const isPressEventAdjusted = keyCode <= maxStartLayoutKeyCode;
-            const isReleaseEventAdjusted = keyCode >= (releaseOffset + 1); // 離上コードは 0x15 以上
+            const isReleaseEventAdjusted = keyCode >= (releaseOffset + 1);
 
             console.log(`maxStartLayoutKeyCode: 0x${maxStartLayoutKeyCode.toString(16)}, releaseOffset: 0x${releaseOffset.toString(16)}`);
             console.log(`isPressEventAdjusted: ${isPressEventAdjusted}, isReleaseEventAdjusted: ${isReleaseEventAdjusted}`);
@@ -265,7 +292,7 @@ export default function KeymapViewer() {
                 activePractice.handleInput(inputInfo);
 
             } else if (isReleaseEventAdjusted) {
-                const pressCode = keyCode - releaseOffset; // 常に 0x14 を引く
+                const pressCode = keyCode - releaseOffset;
                 console.log(`Release event detected. Calculated pressCode: 0x${pressCode.toString(16)} (keyCode: 0x${keyCode.toString(16)})`);
 
                 if (pressCode <= 0) {
@@ -284,10 +311,9 @@ export default function KeymapViewer() {
                     const result = activePractice.handleInput(inputInfo);
 
                     if (result.isExpected) {
-                        if (result.shouldGoToNext) { // 通常モードでのみ true
+                        if (result.shouldGoToNext) {
                             nextStage();
                         }
-                        // ランダムモードのOK表示はフック内部で管理され、activePractice.isOkVisible で取得
                     } else {
                         handleInvalidInput(pressCode);
                     }
@@ -349,7 +375,7 @@ export default function KeymapViewer() {
     /* 初期化 */
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const kbRaw = params.get('kb') ?? 'tw-20h'; // デフォルト 'tw-20h'
+        const kbRaw = params.get('kb') ?? 'tw-20h';
         const sideRaw = params.get('side') ?? 'right';
 
         const currentKb: KeyboardModel = kbRaw === 'tw-20h' ? 'tw-20h' : 'tw-20v';
@@ -406,7 +432,6 @@ export default function KeymapViewer() {
         };
         initHid();
 
-        // クリーンアップ関数
         return () => {
             const dev = devRef.current;
             if (dev && (dev as any).opened) {
@@ -444,27 +469,67 @@ export default function KeymapViewer() {
 
     /* heading（見出し） */
     const headingChars = activePractice?.headingChars ?? [];
-    const heading = (
-      <div className="flex justify-center">
-        {headingChars.map((char: string, index: number) => {
-          let className = 'text-2xl font-bold';
-          if (!isRandomMode) {
-              if (practice === '記号の基本練習３') {
-                  if (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx) {
-                     className += ' bg-blue-100';
-                  }
-              } else if (index === dIdx) {
-                className += ' bg-blue-100';
-              }
-          }
-          return (
-            <span key={index} className={className} style={{ padding: '0.25rem' }}>
-              {char}
-            </span>
-          );
-        })}
-      </div>
-    );
+    // ▼▼▼ heading の JSX 構造を修正 ▼▼▼
+    const heading = useMemo(() => {
+        // BSキーのインデックスを探す
+        const bsKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === 'BS');
+        const bsKeyIndex = bsKeyEntry ? parseInt(bsKeyEntry[0]) : -1;
+
+        let okLeftPosition = '50%'; // デフォルトは中央
+
+        if (bsKeyIndex !== -1) {
+            // BSキーの中央の水平位置を計算
+            // 1. Grid中央列の左端からのオフセット
+            const offsetFromGridStart = bsKeyIndex * (keyWidthRem + gapRem) + keyWidthRem / 2;
+            // 2. 画面中央からのオフセットに変換
+            //    Grid中央列の左端は画面中央から fixedWidthNum / 2 だけ左にある
+            const offsetFromCenter = offsetFromGridStart - fixedWidthNum / 2;
+            okLeftPosition = `calc(50% + ${offsetFromCenter}rem)`;
+        }
+
+        return (
+          // ヘッダ全体を囲むコンテナに relative を追加
+          <div className="relative flex justify-center mb-6">
+            {/* 練習文字を表示する部分 */}
+            <div className="flex justify-center">
+              {headingChars.map((char: string, index: number) => {
+                let className = 'text-2xl font-bold';
+                if (!isRandomMode) {
+                    // ... (既存のハイライトロジックは変更なし) ...
+                    if (practice === '拗濁音の練習') {
+                        if (gIdx >= 0 && gIdx < youdakuonPracticeData.length && youdakuonPracticeData[gIdx]?.chars && index === dIdx) { className += ' bg-blue-100'; }
+                    } else if (practice === '拗半濁音の練習') {
+                        if (index === dIdx) { className += ' bg-blue-100'; }
+                    } else if (practice === '記号の基本練習３') {
+                        if (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx) { className += ' bg-blue-100'; }
+                    } else if (index === dIdx) {
+                      className += ' bg-blue-100';
+                    }
+                }
+                return (
+                  <span key={index} className={className} style={{ padding: '0.25rem' }}>
+                    {char}
+                  </span>
+                );
+              })}
+            </div>
+            {/* OKマーク (ヘッダと同じ行、BSキーの位置に配置) */}
+            {activePractice?.isOkVisible && (
+                <div
+                    className="absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2"
+                    style={{
+                        left: okLeftPosition, // 計算したBSキーの位置
+                        zIndex: 10
+                    }}
+                >
+                    <span className='text-3xl font-bold text-green-600' style={{ padding: '0.25rem' }}>OK</span>
+                </div>
+            )}
+          </div>
+        );
+    // ▼▼▼ 依存配列に計算に必要な値を追加 ▼▼▼
+    }, [headingChars, activePractice?.isOkVisible, isRandomMode, practice, gIdx, dIdx, currentFunctionKeyMap, cols, fixedWidthNum]);
+    // ▲▲▲ 修正完了 ▲▲▲
 
     /* キー描画 */
     const renderKana = useCallback((layoutIndex: number) => (key: string, idx: number) => {
@@ -473,21 +538,15 @@ export default function KeymapViewer() {
 
         let k = originalKey;
 
-        // ▼▼▼ kigoMapping2 の直接定義を削除 ▼▼▼
-        // const kigoMapping2: Record<string, string> = {
-        //     'あ行': '＋', 'か行': '＿', 'さ行': '＊', 'た行': '－', 'な行': '＠',
-        //     'は行': '・', 'ま行': '＆', 'や行': '｜', 'ら行': '％', 'わ行': '￥',
-        //     '記号': '記号',
-        // };
-        // ▲▲▲ 削除 ▲▲▲
-
         let cName = '';
         let isInvalid = false;
 
         if (showKeyLabels) {
             if (practice === '記号の基本練習１') {
-                if (layoutIndex === 6 && currentFunctionKeyMap[idx]) {
-                    k = currentFunctionKeyMap[idx];
+                if (layoutIndex === 6) {
+                    if (isEmptyKey && currentFunctionKeyMap[idx]) {
+                        k = currentFunctionKeyMap[idx];
+                    }
                 } else if (layoutIndex === 2) {
                      k = '____';
                 }
@@ -507,11 +566,11 @@ export default function KeymapViewer() {
                         k = kigoMapping3[originalKey] ?? k;
                     }
                 }
-            } else if (layoutIndex === 3) { // 通常のかな練習時のエンドレイヤー
-                if (['拗１', '拗２', '拗３', '拗４'].includes(originalKey)) {
+            } else if (layoutIndex === 3) {
+                if (['拗1', '拗2', '拗3', '拗4'].includes(originalKey)) {
                     k = '____';
                 }
-            } else if (layoutIndex === 2) { // 通常のかな練習時のスタートレイヤー
+            } else if (layoutIndex === 2) {
                  if (currentFunctionKeyMap[idx]) {
                      k = currentFunctionKeyMap[idx];
                  }
@@ -536,7 +595,7 @@ export default function KeymapViewer() {
         // 正解キーハイライト処理
         if (!isInvalid && showKeyLabels && !activePractice?.isOkVisible && activePractice) {
             const highlightTargetKey = k;
-            const shouldHighlight = k !== '____';
+            const shouldHighlight = k !== '____' && k !== '';
 
             if (shouldHighlight) {
                 const highlightClass = activePractice.getHighlightClassName(highlightTargetKey, layoutIndex);
@@ -548,13 +607,17 @@ export default function KeymapViewer() {
 
         let displayContent: string;
         if (showKeyLabels) {
-            displayContent = isEmptyKey ? '\n' : k;
+            displayContent = k === '' ? '\n' : k;
         } else {
             displayContent = isEmptyKey ? '\n' : '____';
         }
 
         return (
-            <div key={idx} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center whitespace-pre-line ${cName}`}>
+            <div
+              key={idx}
+              className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center whitespace-pre-line ${cName}`}
+              style={{ minHeight: '3rem' }}
+            >
                 {displayContent}
             </div>
         );
@@ -571,7 +634,9 @@ export default function KeymapViewer() {
 
     // コンポーネント全体のJSX
     return (
-        <div className='p-4 relative'>
+        // ▼▼▼ 外側のコンテナから relative を削除 ▼▼▼
+        <div className='p-4'>
+        {/* ▲▲▲ 削除完了 ▲▲▲ */}
             {/* ボタンエリア */}
             {showTrainingButton && (
                 <div className="absolute top-4 right-4 flex flex-col space-y-2 items-end">
@@ -615,32 +680,42 @@ export default function KeymapViewer() {
             {/* 練習モードON時の表示 */}
             {training ? (
                 <>
-                    {practice && (
-                        <div className='flex justify-center mb-6'>
-                            {heading}
-                        </div>
-                    )}
+                    {practice && heading}
 
+                    {/* ▼▼▼ Grid コンテナから relative を削除 ▼▼▼ */}
                     <div className='grid grid-cols-3 gap-4 items-start'>
+                    {/* ▲▲▲ 削除完了 ▲▲▲ */}
+                        {/* メニュー表示 */}
                         <div>
-                            <h2 className='text-lg font-semibold mb-2'>基本練習メニュー</h2>
-                            <ul>
-                                {practiceMenuItems.map(item => (
-                                    <li key={item}
-                                        className={`cursor-pointer p-2 border-b hover:bg-gray-200 ${item === practice ? 'bg-gray-300' : ''}`}
-                                        onClick={() => handlePracticeSelect(item as PracticeMode)}
-                                    >
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
+                          <h2 className='text-lg font-semibold mb-2'>基本練習メニュー</h2>
+                          <ul>
+                            {basicPracticeMenuItems.map(item => (
+                              <li key={item}
+                                  className={`cursor-pointer p-2 border-b hover:bg-gray-200 ${item === practice ? 'bg-gray-300' : ''}`}
+                                  onClick={() => handlePracticeSelect(item as PracticeMode)}
+                              >
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                          <h2 className='text-lg font-semibold mt-4 mb-2'>ステップアップメニュー</h2>
+                          <ul>
+                            {stepUpPracticeMenuItems.map(item => (
+                              <li key={item}
+                                  className={`cursor-pointer p-2 border-b hover:bg-gray-200 ${item === practice ? 'bg-gray-300' : ''}`}
+                                  onClick={() => handlePracticeSelect(item as PracticeMode)}
+                              >
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
 
-                        {/* 練習モードに応じたキーボード表示 */}
+                        {/* 練習モードに応じたキーボード表示 (OKマークは削除済み) */}
                         {practice === '記号の基本練習１' ? (
                             <div className="col-start-2 justify-self-center">
+                                <h3 className='text-lg font-semibold mb-2 text-center'>記号１ (長押し)</h3>
                                 <div style={{ width: fixedWidth }}>
-                                    <h3 className='text-lg font-semibold mb-2 text-center'>記号１ (長押し)</h3>
                                     <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
                                         {layers[6]?.map(renderKana(6))}
                                     </div>
@@ -648,28 +723,31 @@ export default function KeymapViewer() {
                             </div>
                         ) : ['記号の基本練習２', '記号の基本練習３'].includes(practice) ? (
                             <div className="col-start-2 justify-self-center">
+                                <h3 className='text-lg font-semibold mb-2 text-center'>
+                                    {practice === '記号の基本練習２' ? '記号２ (後押し)' : '記号３（先押し）'}
+                                </h3>
                                 <div style={{ width: fixedWidth }}>
-                                    <h3 className='text-lg font-semibold mb-2 text-center'>
-                                        {practice === '記号の基本練習２' ? '記号２ (後押し)' : '記号３（先押し）'}
-                                    </h3>
                                     <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
                                         {layers[2]?.map(renderKana(2))}
                                     </div>
                                 </div>
                             </div>
-                        ) : practice ? ( // 通常のかな練習
+                        ) : practice ? (
                             <>
+                                {/* かなモード（スタート） */}
                                 <div className="justify-self-center">
+                                    <h3 className='text-lg font-semibold mb-2 text-center'>かなモード（スタート）</h3>
                                     <div style={{ width: fixedWidth }}>
-                                        <h3 className='text-lg font-semibold mb-2 text-center'>かなモード（スタート）</h3>
                                         <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
                                             {layers[2]?.map(renderKana(2))}
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* かなモード（エンド） */}
                                 <div className="justify-self-center">
+                                    <h3 className='text-lg font-semibold mb-2 text-center'>かなモード（エンド）</h3>
                                     <div style={{ width: fixedWidth }}>
-                                        <h3 className='text-lg font-semibold mb-2 text-center'>かなモード（エンド）</h3>
                                         <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` }}>
                                             {layers[3]?.map(renderKana(3))}
                                         </div>
@@ -677,14 +755,11 @@ export default function KeymapViewer() {
                                 </div>
                             </>
                         ) : null}
-                    </div>
 
-                    {/* ★★★ OK表示: activePractice?.isOkVisible を参照 ★★★ */}
-                    {activePractice?.isOkVisible && (
-                        <div className="flex justify-center mt-4">
-                            <span className='text-3xl font-bold text-green-600' style={{ padding: '0.25rem' }}>OK</span>
-                        </div>
-                    )}
+                        {/* ▼▼▼ Grid コンテナ内の OK マークを削除 ▼▼▼ */}
+                        {/* {activePractice?.isOkVisible && ( ... )} */}
+                        {/* ▲▲▲ 削除完了 ▲▲▲ */}
+                    </div>
                 </>
             ) : ( // 練習モードOFF時の表示
                  <div className='grid grid-cols-2 gap-4'>

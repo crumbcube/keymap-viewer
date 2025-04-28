@@ -1,12 +1,11 @@
-// src/hooks/useKigoPractice1.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useKigoPractice1.ts
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { kigoPractice1Data } from '../data/keymapData'; // sampleJson は不要なので削除
+import { kigoPractice1Data, functionKeyMaps } from '../data/keymapData';
 import {
     PracticeHookProps,
     PracticeInputInfo,
     PracticeInputResult,
     PracticeHookResult,
-    // KeyboardModel, // 未使用
     hid2GyouHRight_Kigo1,
     hid2GyouHLeft_Kigo1,
     hid2GyouVRight_Kigo1,
@@ -18,7 +17,16 @@ import {
 // 長押し判定時間 (ミリ秒)
 const LONG_PRESS_DURATION = 600;
 
-const useKigoPractice1 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult => {
+const useKigoPractice1 = ({
+    gIdx,
+    dIdx,
+    isActive,
+    okVisible,
+    side,
+    kb,
+    layers,
+    isRandomMode
+}: PracticeHookProps): PracticeHookResult => {
     const hid2Gyou = useMemo(() => {
         if (kb === 'tw-20v') {
             return side === 'left' ? hid2GyouVLeft_Kigo1 : hid2GyouVRight_Kigo1;
@@ -26,6 +34,10 @@ const useKigoPractice1 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
             return side === 'left' ? hid2GyouHLeft_Kigo1 : hid2GyouHRight_Kigo1;
         }
     }, [side, kb]);
+
+    const currentFunctionKeyMap = useMemo(() => {
+        return functionKeyMaps[kb]?.[side] ?? {};
+    }, [kb, side]);
 
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
@@ -231,15 +243,30 @@ const useKigoPractice1 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         isActive, okVisible, expectedKeyName, isLongPressSuccess // internalOkVisible, isRandomMode, hid2Gyou を削除
     ]);
 
-    // isInvalidInputTarget
+    // ▼▼▼ isInvalidInputTarget 関数を修正 ▼▼▼
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
-        if (layoutIndex !== 6) return false; // 記号1はレイヤー6のみ対象
+        // 記号1はレイヤー6のみ表示・ハイライト対象
+        if (layoutIndex !== 6) return false;
 
-        // hid2Gyou (記号1用マッピング) に pressCode がキーとして存在するかどうかで判定
-        return hid2Gyou.hasOwnProperty(pressCode);
+        const targetKeyIndex = pressCode - 1;
 
-    }, [isActive, hid2Gyou]); // hid2Gyou を追加
+        // 押されたキーが機能キーかどうかを判定
+        const isFunctionKey = currentFunctionKeyMap.hasOwnProperty(targetKeyIndex);
+
+        if (isFunctionKey) {
+            // 機能キーが押された場合、そのキーの位置が一致すればハイライト対象
+            return keyIndex === targetKeyIndex;
+        } else {
+            // 機能キー以外の場合、レイヤー6の記号キーマッピングに存在するかどうかで判定
+            // (hid2Gyou は Kigo1 用のマッピング)
+            const isKigo1Key = hid2Gyou.hasOwnProperty(pressCode);
+            // 記号キーが押された場合、そのキーの位置が一致すればハイライト対象
+            // (ただし、本来押すべきキーではないので不正入力扱い)
+            return isKigo1Key && keyIndex === targetKeyIndex;
+        }
+    }, [isActive, hid2Gyou, currentFunctionKeyMap]);
+    // ▲▲▲ 修正完了 ▲▲▲
 
     return {
         headingChars,
