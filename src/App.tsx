@@ -1,12 +1,9 @@
 // src/App.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-// import { motion } from 'framer-motion'; // KeyboardLayout に移動
-import { HIDDevice, HIDInputReportEvent } from './types/hid'; // パス修正済み
+import { HIDDevice, HIDInputReportEvent } from './types/hid';
 import {
     sampleJson,
     layerNames,
-    // basicPracticeMenuItems, // PracticeMenu に移動
-    // stepUpPracticeMenuItems, // PracticeMenu に移動
     gyouList,
     danOrder,
     youonGyouList,
@@ -21,13 +18,10 @@ import {
     kigoPractice3Data,
     youdakuonPracticeData,
     youhandakuonPracticeData,
-    // kigoMapping2, // KeyboardLayout に移動
-    // kigoMapping3, // KeyboardLayout に移動
     functionKeyMaps,
-    youonKakuchoChars, // 拗音拡張のデータも依存配列に含めるためインポート
-    youonKakuchoDanMapping, // 拗音拡張のデータも依存配列に含めるためインポート
+    youonKakuchoChars,
+    gairaigoPracticeData,
 } from './data/keymapData';
-// import { getKeyStyle, isLargeSymbol } from './utils/styleUtils'; // KeyboardLayout に移動
 import {
     PracticeMode,
     PracticeInputInfo,
@@ -46,14 +40,12 @@ import useKigoPractice2 from './hooks/useKigoPractice2';
 import useKigoPractice3 from './hooks/useKigoPractice3';
 import useYoudakuonPractice from './hooks/useYoudakuonPractice';
 import useYouhandakuonPractice from './hooks/useYouhandakuonPractice';
-import useYouonKakuchoPractice from './hooks/useYouonKakuchoPractice'; // ← 追加
-
-// 作成したコンポーネントをインポート
+import useYouonKakuchoPractice from './hooks/useYouonKakuchoPractice';
+import useGairaigoPractice from './hooks/useGairaigoPractice';
 import PracticeMenu from './components/PracticeMenu';
 import PracticeHeading from './components/PracticeHeading';
 import KeyboardLayout from './components/KeyboardLayout';
 
-// App コンポーネント (旧 KeymapViewer)
 export default function App() {
     /* UI 状態 */
     const [layers, setLayers] = useState<string[][]>([]);
@@ -68,10 +60,8 @@ export default function App() {
     const [kb, setKb] = useState<KeyboardModel>('tw-20v');
     const [showKeyLabels, setShowKeyLabels] = useState(true);
     const [isRandomMode, setIsRandomMode] = useState(false);
-
-    /* 現在の行/段/文字インデックス */
-    const [gIdx, setGIdx] = useState(0);
-    const [dIdx, setDIdx] = useState(1); // 拗音拡張の初期値を 1 (ぃ) に変更
+    const [gIdx, setGIdx] = useState(0); // 初期値は 0 に戻す
+    const [dIdx, setDIdx] = useState(0); // 初期値は 0 に戻す
 
     /* UIフィードバック */
     const [okVisible, setOK] = useState(false);
@@ -100,7 +90,8 @@ export default function App() {
     const kigoPractice3 = useKigoPractice3({ ...commonHookProps, isActive: practice === '記号の基本練習３' });
     const youdakuonPractice = useYoudakuonPractice({ ...commonHookProps, isActive: practice === '拗濁音の練習' });
     const youhandakuonPractice = useYouhandakuonPractice({ ...commonHookProps, isActive: practice === '拗半濁音の練習' });
-    const youonKakuchoPractice = useYouonKakuchoPractice({ ...commonHookProps, isActive: practice === '拗音拡張' }); // ← 追加
+    const youonKakuchoPractice = useYouonKakuchoPractice({ ...commonHookProps, isActive: practice === '拗音拡張' });
+    const gairaigoPractice = useGairaigoPractice({ ...commonHookProps, isActive: practice === '外来語の発音補助' });
 
     // --- 現在アクティブな練習フックを選択 ---
     const activePractice: PracticeHookResult | null = useMemo(() => {
@@ -115,14 +106,15 @@ export default function App() {
             case '記号の基本練習３': return kigoPractice3;
             case '拗濁音の練習': return youdakuonPractice;
             case '拗半濁音の練習': return youhandakuonPractice;
-            case '拗音拡張': return youonKakuchoPractice; // ← 追加
+            case '拗音拡張': return youonKakuchoPractice;
+            case '外来語の発音補助': return gairaigoPractice;
             default: return null;
         }
-    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice]); // ← 依存配列に追加
+    // 依存配列に gairaigoPractice を追加
+    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice, gairaigoPractice]);
 
     // キーボード表示の固定幅 (変更なし)
     const keyWidthRem = 5.5;
-    // const gapRem = 0.5; // gap-2 = 0.5rem - PracticeHeading に移動したため削除
     const fixedWidthNum = cols * keyWidthRem;
     const fixedWidth = `${fixedWidthNum}rem`;
 
@@ -130,7 +122,6 @@ export default function App() {
         return functionKeyMaps[kb]?.[side] ?? {};
     }, [kb, side]);
 
-    // --- 不正入力処理 --- (依存配列修正済み)
     const handleInvalidInput = useCallback((pressCode: number) => {
         const now = Date.now();
         if (now - lastInvalidInputTime.current < 50) {
@@ -138,7 +129,6 @@ export default function App() {
         }
         lastInvalidInputTime.current = now;
         setLastInvalidKeyCode(pressCode);
-        console.log(`Invalid input detected. Setting lastInvalidKeyCode to: 0x${pressCode.toString(16)}`);
 
         if (invalidInputTimeoutRef.current !== null) {
             clearTimeout(invalidInputTimeoutRef.current);
@@ -147,7 +137,6 @@ export default function App() {
         const timerId = window.setTimeout((codeToClear: number) => {
             setLastInvalidKeyCode(prevCode => {
                 if (prevCode === codeToClear) {
-                    console.log(`Clearing lastInvalidKeyCode: 0x${codeToClear.toString(16)}`);
                     return null;
                 }
                 return prevCode;
@@ -160,12 +149,13 @@ export default function App() {
     // --- 次のステージへ --- (依存配列修正済み)
     const nextStage = useCallback(() => {
         if (isRandomMode) {
-            // ランダムモードの場合は activePractice?.reset() を呼ぶ (フック内で次のターゲット生成)
-            activePractice?.reset?.();
+            // ランダムモード時は練習フック側で次のターゲットを選択する
+            activePractice?.reset?.(); // 状態リセットは必要に応じて行う
             setOK(true);
-            setTimeout(() => setOK(false), 1000); // OK表示だけ行う
+            setTimeout(() => setOK(false), 1000);
             return;
         }
+        // --- 通常モード (isRandomMode === false) の進行ロジック ---
         setOK(true);
         setTimeout(() => {
             let nextGIdx = gIdx;
@@ -256,7 +246,6 @@ export default function App() {
                 }
                 nextGIdx = 0;
             }
-            // ▼▼▼ 拗音拡張のロジックを修正 ▼▼▼
             else if (practice === '拗音拡張') {
                 if (dIdx === 1) { // 現在「ぃ」を練習していた場合
                     nextDIdx = 3; // 次は「ぇ」
@@ -264,21 +253,26 @@ export default function App() {
                     nextDIdx = 1; // 次は次の行の「ぃ」
                     nextGIdx = (gIdx + 1) % youonGyouList.length;
                 } else {
-                    // dIdx が 1, 3 以外の場合は強制的に 1 に戻す
                     console.warn(`Invalid dIdx ${dIdx} in nextStage for 拗音拡張. Resetting to 1.`);
                     nextDIdx = 1;
-                    // gIdx はそのまま or 必要ならリセット
                 }
             }
-            // ▲▲▲ 修正完了 ▲▲▲
-
+            else if (practice === '外来語の発音補助') {
+                const currentGroup = gairaigoPracticeData[gIdx];
+                if (dIdx < currentGroup.targets.length - 1) {
+                    nextDIdx = dIdx + 1;
+                } else {
+                    nextDIdx = 0;
+                    nextGIdx = (gIdx + 1) % gairaigoPracticeData.length;
+                }
+            }
 
             setGIdx(nextGIdx);
             setDIdx(nextDIdx);
             setOK(false);
         }, 1000);
-    // 依存配列に youonGyouList を追加
-    }, [practice, gIdx, dIdx, setOK, setGIdx, setDIdx, isRandomMode, activePractice, /* ...他の練習データ... */ gyouList, danOrder, youonGyouList, youonGyouChars, dakuonGyouList, dakuonGyouChars, handakuonGyouList, handakuonGyouChars, sokuonKomojiData, kigoPractice1Data, kigoPractice2Data, kigoPractice3Data, youdakuonPracticeData, youhandakuonPracticeData, youonKakuchoChars]);
+    // 依存配列に gairaigoPracticeData を追加
+    }, [practice, gIdx, dIdx, setOK, setGIdx, setDIdx, isRandomMode, activePractice, gyouList, danOrder, youonGyouList, youonGyouChars, dakuonGyouList, dakuonGyouChars, handakuonGyouList, handakuonGyouChars, sokuonKomojiData, kigoPractice1Data, kigoPractice2Data, kigoPractice3Data, youdakuonPracticeData, youhandakuonPracticeData, youonKakuchoChars, gairaigoPracticeData]);
 
     // onInput (依存配列修正済み)
     const onInput: (ev: HIDInputReportEvent) => void = useCallback((ev) => {
@@ -287,11 +281,8 @@ export default function App() {
         const keyCode = data[1];
         const timestamp = Date.now();
 
-        console.log(`onInput called. kb: ${kb}, reportId: 0x${reportId.toString(16)}, keyCode: 0x${keyCode.toString(16)}`);
-
         if (reportId === 0x14 && keyCode === 0x03) {
             if (!training) {
-                console.log("Forcing training mode ON");
                 setTraining(true);
                 setShowKeyLabels(true);
                 setIsRandomMode(false);
@@ -305,12 +296,8 @@ export default function App() {
             const isPressEventAdjusted = keyCode <= maxStartLayoutKeyCode;
             const isReleaseEventAdjusted = keyCode >= (releaseOffset + 1);
 
-            console.log(`maxStartLayoutKeyCode: 0x${maxStartLayoutKeyCode.toString(16)}, releaseOffset: 0x${releaseOffset.toString(16)}`);
-            console.log(`isPressEventAdjusted: ${isPressEventAdjusted}, isReleaseEventAdjusted: ${isReleaseEventAdjusted}`);
-
             if (isPressEventAdjusted) {
                 const pressCode = keyCode;
-                console.log(`Press event detected. Recording pressCode: 0x${pressCode.toString(16)}`);
                 pressedKeysRef.current.set(pressCode, timestamp);
 
                 const inputInfo: PracticeInputInfo = {
@@ -320,7 +307,6 @@ export default function App() {
 
             } else if (isReleaseEventAdjusted) {
                 const pressCode = keyCode - releaseOffset;
-                console.log(`Release event detected. Calculated pressCode: 0x${pressCode.toString(16)} (keyCode: 0x${keyCode.toString(16)})`);
 
                 if (pressCode <= 0) {
                     console.warn(`Invalid calculated pressCode: 0x${pressCode.toString(16)}. Ignoring release event.`);
@@ -329,7 +315,6 @@ export default function App() {
 
                 const pressTimestamp = pressedKeysRef.current.get(pressCode);
                 if (pressTimestamp) {
-                    console.log(`Found matching press event for pressCode: 0x${pressCode.toString(16)}`);
                     pressedKeysRef.current.delete(pressCode);
 
                     const inputInfo: PracticeInputInfo = {
@@ -350,9 +335,9 @@ export default function App() {
                 }
             }
         }
-     }, [training, practice, activePractice, handleInvalidInput, nextStage, setTraining, setShowKeyLabels, setIsRandomMode, kb]); // 依存配列を修正
+     }, [training, practice, activePractice, handleInvalidInput, nextStage, setTraining, setShowKeyLabels, setIsRandomMode, kb]);
 
-    /* HID send (練習 ON/OFF) */ // (依存配列修正済み)
+    /* HID send (練習 ON/OFF) */
     const sendHid: (on: boolean) => Promise<void> = useCallback(async (on) => {
         const filters = [{ usagePage: 0xff60, usage: 0x61 }];
         let dev = devRef.current;
@@ -381,7 +366,6 @@ export default function App() {
         setTraining(on);
         if (on) {
             setShowKeyLabels(true);
-            setIsRandomMode(false);
         } else {
             setPractice('');
             setGIdx(0); setDIdx(0);
@@ -396,17 +380,16 @@ export default function App() {
             setShowKeyLabels(true);
             setIsRandomMode(false);
         }
-     }, [setTraining, setPractice, setGIdx, setDIdx, setOK, setLastInvalidKeyCode, activePractice, setShowKeyLabels, setIsRandomMode]); // 依存配列を修正
+     }, [setTraining, setPractice, setGIdx, setDIdx, setOK, setLastInvalidKeyCode, activePractice, setShowKeyLabels, setIsRandomMode]);
 
-    /* 初期化 */ // (依存配列修正済み)
+    /* 初期化 */
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const kbRaw = params.get('kb') ?? 'tw-20h';
+        const kbRaw = params.get('kb') ?? 'tw-20v';
         const sideRaw = params.get('side') ?? 'right';
 
         const currentKb: KeyboardModel = kbRaw === 'tw-20h' ? 'tw-20h' : 'tw-20v';
         setKb(currentKb);
-        console.log(`Initialized kb model to: ${currentKb}`);
 
         const currentSide: KeyboardSide = sideRaw === 'left' ? 'left' : 'right';
         setSide(currentSide);
@@ -434,23 +417,18 @@ export default function App() {
             try {
                 const ds = await navigator.hid?.getDevices();
                 if (!ds || !ds.length) {
-                    console.log("No HID devices found on init.");
                     return;
                 }
                 const device = ds[0];
-                console.log("Found existing HID device:", device);
                 if (!opening.current && !(device as any).opened) {
                     opening.current = true;
                     try {
-                        console.log("Opening existing HID device...");
                         await device.open();
-                        console.log("Existing HID device opened.");
                         device.oninputreport = onInput;
                         devRef.current = device;
                     } catch (err) { console.error("既存のHIDデバイスを開けませんでした:", err); }
                     finally { opening.current = false; }
                 } else if ((device as any).opened) {
-                    console.log("Existing HID device already opened. Setting oninputreport.");
                     device.oninputreport = onInput;
                     devRef.current = device;
                 }
@@ -461,21 +439,22 @@ export default function App() {
         return () => {
             const dev = devRef.current;
             if (dev && (dev as any).opened) {
-                console.log("Closing HID device on cleanup.");
                 dev.oninputreport = null;
-                // dev.close(); // 必要に応じてコメント解除
             }
         };
-     }, [onInput, setTitle, setCols, setLayers, setFW, setSN, setShowTrainingButton, setSide, setKb, sampleJson]); // 依存配列に sampleJson を追加
+     }, [onInput, setTitle, setCols, setLayers, setFW, setSN, setShowTrainingButton, setSide, setKb, sampleJson, isRandomMode]); // 依存配列に sampleJson を追加
 
     // 練習モード選択時のリセット処理
     const handlePracticeSelect = (item: PracticeMode) => {
-        console.log(`Practice mode selected: ${item}`);
         activePractice?.reset?.();
         setPractice(item);
         setGIdx(0);
-        // 拗音拡張選択時は dIdx を 1 に初期化
-        setDIdx(item === '拗音拡張' ? 1 : 0);
+        // 練習モードに応じて dIdx を初期化
+        if (item === '拗音拡張') {
+            setDIdx(1);
+        } else {
+            setDIdx(0); // 外来語含む他のモードは 0
+        }
         setOK(false);
         setLastInvalidKeyCode(null);
         if (invalidInputTimeoutRef.current !== null) {
@@ -487,19 +466,12 @@ export default function App() {
         setIsRandomMode(false);
      };
 
-    // ランダムモード切り替えハンドラ (依存配列修正済み)
+    // ランダムモード切り替えハンドラ
     const toggleRandomMode = useCallback(() => {
         const nextIsRandomMode = !isRandomMode;
-        console.log(`Toggling random mode to: ${nextIsRandomMode}`);
         setIsRandomMode(nextIsRandomMode);
         activePractice?.reset?.();
-     }, [activePractice, setIsRandomMode, isRandomMode]); // 依存配列を修正
-
-    /* heading（見出し） - PracticeHeading コンポーネントに移動 */
-    // const heading = useMemo(() => { /* ... */ }, [/* ... */]);
-
-    /* キー描画 - KeyboardLayout コンポーネントに移動 */
-    // const renderKana = useCallback((layoutIndex: number) => (key: string, idx: number) => { /* ... */ }, [/* ... */]);
+     }, [activePractice, setIsRandomMode, isRandomMode, practice]); // practice を依存配列に追加
 
     // ボタンのスタイル (変更なし)
     const buttonStyle: React.CSSProperties = {
@@ -532,12 +504,18 @@ export default function App() {
                             >
                                 {showKeyLabels ? 'キー表示 OFF' : 'キー表示 ON'}
                             </button>
+                            {/* ▼▼▼ ログ追加 10: ボタンレンダリング時の isRandomMode 確認 ▼▼▼ */}
+                            {console.log(`[Render Button] Rendering random mode button. isRandomMode: ${isRandomMode}`)}
+                            {/* ▲▲▲ ログ追加 ▲▲▲ */}
                             <button
-                                className="px-4 py-1 rounded shadow text-white bg-purple-600 hover:bg-purple-700"
+                                className={`px-4 py-1 rounded shadow text-white bg-purple-600 hover:bg-purple-700`}
                                 onClick={toggleRandomMode}
                                 style={buttonStyle}
                             >
+                                {/* ▼▼▼ ボタンテキスト表示 (B-2仕様のまま) ▼▼▼ */}
+                                {/* isRandomMode が false の時に 'ON'、true の時に 'OFF' と表示 */}
                                 ランダム {isRandomMode ? 'OFF' : 'ON'}
+                                {/* ▲▲▲ 変更なし ▲▲▲ */}
                             </button>
                         </>
                     )}
@@ -560,12 +538,11 @@ export default function App() {
                     {practice && (
                         <PracticeHeading
                             activePractice={activePractice}
-                            isRandomMode={isRandomMode}
+                            isRandomMode={isRandomMode} // isRandomMode をそのまま渡す
                             practice={practice}
                             gIdx={gIdx}
-                            dIdx={dIdx} // dIdx をそのまま渡す (フック内で補正 or Heading で利用)
+                            dIdx={dIdx} // dIdx を渡す
                             currentFunctionKeyMap={currentFunctionKeyMap}
-                            // cols={cols} // PracticeHeadingProps から削除したため渡さない
                             fixedWidthNum={fixedWidthNum}
                         />
                     )}
@@ -578,7 +555,7 @@ export default function App() {
                         />
 
                         {/* 練習モードに応じたキーボード表示 */}
-                        {/* 記号練習1, 2, 3 以外の場合にかなスタート/エンドを表示 */}
+                        {/* 外来語練習もかなスタート/エンドを表示 */}
                         {(practice && !['記号の基本練習１', '記号の基本練習２', '記号の基本練習３'].includes(practice)) ? (
                              <>
                                 {/* かなモード（スタート） */}
@@ -654,23 +631,25 @@ export default function App() {
                 </>
             ) : ( // 練習モードOFF時の表示
                  <div className='grid grid-cols-2 gap-4'>
-                     {layers.map((layer: string[], li: number) => (
-                         <div key={li} className="justify-self-center"> {/* 中央寄せを追加 */}
-                            <KeyboardLayout
-                                layerData={layer}
-                                layoutIndex={li}
-                                layoutTitle={layerNames[li] ?? `レイヤー ${li}`}
-                                cols={cols}
-                                fixedWidth={fixedWidth}
-                                showKeyLabels={true} // 常に表示
-                                lastInvalidKeyCode={null} // OFF時はハイライト不要
-                                activePractice={null} // OFF時はハイライト不要
-                                practice={''} // practice が空なら練習モードOFF
-                                currentFunctionKeyMap={{}} // OFF時は不要
-                                training={training} // training を渡す (false になる)
-                            />
-                         </div>
-                     ))}
+                     {layers.map((layer: string[], li: number) => {
+                        return (
+                            <div key={li} className="justify-self-center">
+                                <KeyboardLayout
+                                    layerData={layer}
+                                    layoutIndex={li}
+                                    layoutTitle={layerNames[li] ?? `レイヤー ${li}`}
+                                    cols={cols}
+                                    fixedWidth={fixedWidth}
+                                    showKeyLabels={true}
+                                    lastInvalidKeyCode={null}
+                                    activePractice={null}
+                                    practice={''}
+                                    currentFunctionKeyMap={{}}
+                                    training={training} // training state (false) を渡す
+                                />
+                            </div>
+                        );
+                     })}
                  </div>
             )}
         </div>

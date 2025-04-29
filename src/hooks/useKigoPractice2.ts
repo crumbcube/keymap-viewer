@@ -14,6 +14,7 @@ import {
     allKigo2CharInfos,
     KeyboardSide,
     KeyboardModel,
+    PracticeHighlightResult,
 } from './usePracticeCommons';
 
 type KigoPractice2Stage = 'gyouInput' | 'kigoInput';
@@ -47,7 +48,6 @@ const useKigoPractice2 = ({
         if (allKigo2CharInfos.length > 0) {
             const randomIndex = Math.floor(Math.random() * allKigo2CharInfos.length);
             const nextTarget = allKigo2CharInfos[randomIndex];
-            console.log(">>> Selecting new random target (Kigo2):", nextTarget);
             setRandomTarget(nextTarget);
             setStage('gyouInput'); // 常に gyouInput から
         } else {
@@ -66,7 +66,6 @@ const useKigoPractice2 = ({
     }, [setStage, setRandomTarget]);
 
     useEffect(() => {
-        console.log("Kigo2 useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
 
         if (isActive) {
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
@@ -74,7 +73,6 @@ const useKigoPractice2 = ({
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                console.log("Resetting Kigo2 to normal mode or index changed");
                 reset(); // reset 関数を呼び出す
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
@@ -159,14 +157,11 @@ const useKigoPractice2 = ({
     const currentOkVisible = okVisible;
 
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
-        console.log("Kigo2 Input:", inputInfo, "Stage:", stage, "Expected Gyou:", currentTargetOriginalKey, "RandomMode:", isRandomMode, "PropOK:", okVisible);
 
         if (!isActive || okVisible) {
-            console.log("Kigo2 Input Ignored: Inactive or Prop OK visible");
             return { isExpected: false, shouldGoToNext: false };
         }
         if (!currentTargetOriginalKey) {
-            console.log("Kigo2 Input Ignored: currentTargetOriginalKey is null");
             return { isExpected: false, shouldGoToNext: false };
         }
         if (inputInfo.type !== 'release') {
@@ -186,10 +181,8 @@ const useKigoPractice2 = ({
                 if (expectedGyouKeyCodes.includes(pressCode)) {
                     isExpected = true;
                     setStage('kigoInput');
-                    console.log("Correct gyou input, transition to kigoInput");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect gyou input");
                 }
                 break;
             case 'kigoInput':
@@ -206,25 +199,23 @@ const useKigoPractice2 = ({
                     } else {
                         shouldGoToNext = true;
                     }
-                    console.log("Correct kigo input");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect kigo input");
                     setStage('gyouInput');
                 }
                 break;
         }
 
-        console.log("Kigo2 Result:", { isExpected, shouldGoToNext });
         return { isExpected, shouldGoToNext };
     }, [
         isActive, okVisible, stage, hid2Gyou, currentTargetOriginalKey,
         isRandomMode, selectNextRandomTarget, setStage
     ]);
 
-    const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): string | null => {
+    const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
+        const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive || okVisible) {
-            return null;
+            return noHighlight; //
         }
         // 問題切り替え直後は強制的に 'gyouInput' として扱う (通常モードのみ)
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
@@ -244,9 +235,9 @@ const useKigoPractice2 = ({
         }
 
         if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyDisplayName) {
-            return 'bg-blue-100';
+            return { className: 'bg-blue-100', overrideKey: null };
         }
-        return null;
+        return noHighlight;
     }, [
         isActive, okVisible, stage, highlightTargetDisplayName,
         isRandomMode, gIdx, dIdx, currentFunctionKeyMap

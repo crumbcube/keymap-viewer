@@ -4,6 +4,7 @@ import { PracticeMode, PracticeHookResult } from '../hooks/usePracticeCommons';
 import {
     youdakuonPracticeData,
     kigoPractice3Data,
+    gairaigoPracticeData, // 外来語データをインポート
 } from '../data/keymapData';
 
 interface PracticeHeadingProps {
@@ -45,25 +46,48 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
     return position;
   }, [currentFunctionKeyMap, fixedWidthNum]);
 
+  // 外来語練習用の現在のターゲット情報を取得 (存在すれば) - 通常モード用
+  const currentGairaigoGroup = useMemo(() => {
+      if (!isRandomMode && practice === '外来語の発音補助' && gIdx >= 0 && gIdx < gairaigoPracticeData.length) {
+          return gairaigoPracticeData[gIdx];
+      }
+      return null;
+  }, [practice, gIdx, isRandomMode]); // isRandomMode を依存配列に追加
+
+  const currentGairaigoTarget = useMemo(() => {
+      if (currentGairaigoGroup && dIdx >= 0 && dIdx < currentGairaigoGroup.targets.length) {
+          return currentGairaigoGroup.targets[dIdx];
+      }
+      return null;
+  }, [currentGairaigoGroup, dIdx]);
+
   return (
     <div className="relative flex justify-center mb-6">
       {/* 練習文字を表示する部分 */}
       <div className="flex justify-center">
         {headingChars.map((char: string, index: number) => {
-          let className = 'text-2xl'; // デフォルトは太字なし
+          let className = 'text-2xl';
           let style: React.CSSProperties = { padding: '0.25rem' };
 
-          // ▼▼▼ 太字表示ロジックを修正 ▼▼▼
-          // 拗音拡張の場合、練習対象の文字(index 1 と 3)のみ太字にする
-          if (practice === '拗音拡張' && (index === 1 || index === 3)) {
-              className += ' font-bold';
-          } else if (practice !== '拗音拡張') {
-              // 拗音拡張以外はデフォルトで太字
+          // --- 太字表示ロジック ---
+          let isBoldTarget = false;
+          // ▼▼▼ 拗音拡張 または 外来語の発音補助 のランダムモード時のみ太字にする ▼▼▼
+          if (isRandomMode && (practice === '拗音拡張' || practice === '外来語の発音補助')) {
+              isBoldTarget = true;
+          // ▲▲▲ 修正 ▲▲▲
+          } else if (practice === '外来語の発音補助' && currentGairaigoGroup) { // 通常モードの外来語
+              // グループ内の練習対象文字のヘッダインデックスと一致するか (通常モードでは headingChars は複数表示される可能性があるため)
+              isBoldTarget = currentGairaigoGroup.targets.some(target => target.headerIndex === index);
+          } else if (practice !== '拗音拡張' && practice !== '外来語の発音補助') { // 上記以外の通常モード
+              // デフォルトで太字
+              isBoldTarget = true;
+          }
+
+          if (isBoldTarget) {
               className += ' font-bold';
           }
-          // ▲▲▲ 修正完了 ▲▲▲
 
-          // ハイライト処理 (ランダムモードでない場合)
+          // --- ハイライト処理 (ランダムモードでない場合) ---
           if (!isRandomMode) {
               let shouldHighlight = false;
               if (practice === '拗濁音の練習') {
@@ -72,11 +96,12 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
                   shouldHighlight = (index === dIdx);
               } else if (practice === '記号の基本練習３') {
                   shouldHighlight = (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx);
-              // ▼▼▼ 拗音拡張のハイライト条件を修正 ▼▼▼
               } else if (practice === '拗音拡張') {
                   // dIdx (App.tsx から渡される値) が 1 または 3 の場合にハイライト
                   shouldHighlight = (index === dIdx && (dIdx === 1 || dIdx === 3));
-              // ▲▲▲ 修正完了 ▲▲▲
+              } else if (practice === '外来語の発音補助' && currentGairaigoTarget) {
+                  // 現在のターゲットのヘッダインデックスと一致したらハイライト
+                  shouldHighlight = (index === currentGairaigoTarget.headerIndex);
               } else { // 清音、拗音、濁音、半濁音、小文字、記号1, 2
                   shouldHighlight = (index === dIdx);
               }

@@ -15,6 +15,7 @@ import {
   hid2DanVLeft_Kana,
   CharInfoHandakuon,
   allHandakuonCharInfos,
+  PracticeHighlightResult,
 } from './usePracticeCommons';
 import { handakuonGyouList, handakuonGyouChars, handakuonDanMapping } from '../data/keymapData';
 
@@ -79,7 +80,6 @@ export default function useHandakuonPractice({
   const selectNextRandomTarget = useCallback(() => {
       if (allHandakuonCharInfos.length > 0) {
           const randomIndex = Math.floor(Math.random() * allHandakuonCharInfos.length);
-          console.log(">>> Selecting new random target (Handakuon):", allHandakuonCharInfos[randomIndex]);
           setRandomTarget(allHandakuonCharInfos[randomIndex]);
           setStage('gyouInput'); // ステージもリセット
           resetBlinkingState(); // 点滅状態もリセット
@@ -101,7 +101,6 @@ export default function useHandakuonPractice({
 
   useEffect(() => {
 
-      console.log("Handakuon useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
 
       if (isActive) {
           const indicesChanged = dIdx !== prevDIdxRef.current;
@@ -110,7 +109,6 @@ export default function useHandakuonPractice({
 
           // --- リセット条件 ---
           if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-              console.log("Resetting Handakuon to normal mode or index changed");
               reset(); // reset 関数を呼び出す
               prevGIdxRef.current = gIdx;
               prevDIdxRef.current = dIdx;
@@ -170,12 +168,8 @@ export default function useHandakuonPractice({
   // handleInput
   const handleInput = useCallback(
     (input: PracticeInputInfo): PracticeInputResult => {
-      console.log("Handakuon Input:", input, "Stage:", stage, "Gyou:", currentGyouKey, "Dan:", currentDan, "RandomMode:", isRandomMode, "PropOK:", okVisible);
-      console.log("Expected H-Gyou Key Code:", hGyouKeyCode);
-      console.log("Expected Dakuon Key Code:", dakuonKeyCode);
 
       if (!isActive || okVisible || !currentDan || hGyouKeyCode === null || dakuonKeyCode === null) {
-          console.log("Handakuon Input Ignored: Inactive, Prop OK visible, keys invalid, or key codes not found");
           return { isExpected: false, shouldGoToNext: false };
       }
       if (input.type !== 'release') {
@@ -190,19 +184,15 @@ export default function useHandakuonPractice({
 
       switch (stage) {
         case 'gyouInput':
-          console.log("Stage: gyouInput, Input Gyou:", inputGyou, "Expected Gyou:", currentGyouKey, "Input Code:", pressCode, "Expected Code:", hGyouKeyCode);
           if (pressCode === hGyouKeyCode) {
             setStage('handakuonInput');
             inputCount.current = 0; // カウントリセット
             isExpected = true;
-            console.log("Transition to handakuonInput stage");
           } else {
-            console.log("Incorrect gyou input");
             isExpected = false;
           }
           break;
         case 'handakuonInput':
-          console.log("Stage: handakuonInput, Input Code:", pressCode, "Expected Code:", dakuonKeyCode, "Input Count:", inputCount.current, "Is Blinking:", isBlinking);
           if (pressCode === dakuonKeyCode) {
             if (inputCount.current === 0) {
               inputCount.current = 1;
@@ -211,21 +201,16 @@ export default function useHandakuonPractice({
               blinkTimeoutRef.current = window.setTimeout(() => {
                 setIsBlinking(false);
                 blinkTimeoutRef.current = null;
-                console.log("Blinking finished");
               }, 500);
               isExpected = true;
-              console.log("First dakuon key press, start blinking");
             } else if (inputCount.current === 1 && !isBlinking) {
               inputCount.current = 0;
               setStage('danInput');
               isExpected = true;
-              console.log("Second dakuon key press after blink, transition to danInput");
             } else if (inputCount.current === 1 && isBlinking) {
-                console.log("Second dakuon key press during blink, ignored");
                 isExpected = true;
             }
           } else {
-              console.log("Incorrect dakuon key input");
               isExpected = false;
           }
           break;
@@ -233,7 +218,6 @@ export default function useHandakuonPractice({
           const expectedDanKeyCodes = Object.entries(hid2Dan)
               .filter(([_, name]) => name === currentDan)
               .map(([codeStr, _]) => parseInt(codeStr));
-          console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", currentDan, "Input Code:", pressCode, "Expected Codes:", expectedDanKeyCodes);
           if (expectedDanKeyCodes.includes(pressCode)) {
             isExpected = true;
             if (isRandomMode) {
@@ -242,9 +226,7 @@ export default function useHandakuonPractice({
             } else {
                 shouldGoToNext = true;
             }
-            console.log("Correct dan input");
           } else {
-              console.log("Incorrect dan input");
               isExpected = false;
           }
           break;
@@ -255,7 +237,6 @@ export default function useHandakuonPractice({
           resetBlinkingState();
       }
 
-      console.log("Handakuon Result:", { isExpected, shouldGoToNext });
       return { isExpected, shouldGoToNext };
     }, [
         isActive, okVisible, stage, currentGyouKey, currentDan, isBlinking,
@@ -263,10 +244,10 @@ export default function useHandakuonPractice({
         isRandomMode, selectNextRandomTarget, setStage
     ]);
 
-  // getHighlightClassName
-  const getHighlightClassName = useCallback((key: string, layoutIndex: number): string | null => {
+  const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
+      const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
       if (!isActive || okVisible || !currentDan) {
-          return null;
+          return noHighlight;
       }
 
       // 問題切り替え直後は強制的に 'gyouInput' として扱う (通常モードのみ)
@@ -293,11 +274,11 @@ export default function useHandakuonPractice({
 
       if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && key === expectedKeyName) {
           if (currentStageForHighlight === 'handakuonInput' && isBlinking) {
-              return null;
+              return noHighlight;
           }
-          return 'bg-blue-100';
+          return { className: 'bg-blue-100', overrideKey: null };
       }
-      return null;
+      return noHighlight;
     }, [isActive, okVisible, currentDan, stage, isBlinking, isRandomMode, dIdx]);
 
   // isInvalidInputTarget

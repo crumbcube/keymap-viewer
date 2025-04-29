@@ -16,6 +16,7 @@ import {
     hid2DanVLeft_Kana,
     CharInfoSokuonKomoji,
     allSokuonKomojiCharInfos,
+    PracticeHighlightResult,
 } from './usePracticeCommons';
 
 type SokuonKomojiStage = 'tsuInput' | 'gyouInput' | 'middleInput' | 'danInput';
@@ -64,7 +65,6 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
         if (allSokuonKomojiCharInfos.length > 0) {
             const randomIndex = Math.floor(Math.random() * allSokuonKomojiCharInfos.length);
             const nextTarget = allSokuonKomojiCharInfos[randomIndex];
-            console.log(">>> Selecting new random target (Sokuon/Komoji):", nextTarget);
             setRandomTarget(nextTarget);
             setStage(nextTarget.isTsu ? 'tsuInput' : 'gyouInput');
         } else {
@@ -73,7 +73,6 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
     }, [setRandomTarget, setStage]);
 
     const reset = useCallback(() => {
-        console.log("Resetting Sokuon/Komoji Practice Hook");
         const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
         setStage(initialChar === 'っ' ? 'tsuInput' : 'gyouInput');
         setRandomTarget(null);
@@ -85,15 +84,12 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
 
     useEffect(() => {
 
-        console.log("Sokuon/Komoji useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
-
         if (isActive) {
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                console.log("Resetting Sokuon/Komoji to normal mode or index changed");
                 const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
                 setStage(initialChar === 'っ' ? 'tsuInput' : 'gyouInput');
                 setRandomTarget(null);
@@ -177,10 +173,8 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
     const currentOkVisible = okVisible;
 
     const handleInput = useCallback((input: PracticeInputInfo): PracticeInputResult => {
-        console.log("Sokuon/Komoji Input:", input, "Stage:", stage, "Expected Gyou:", expectedGyouKey, "Expected Dan:", expectedDanKey, "IsTsu:", isCurrentCharTsu, "MiddleRequired:", isMiddleKeyRequired, "RandomMode:", isRandomMode, "PropOK:", okVisible);
 
         if (!isActive || okVisible) {
-            console.log("Sokuon/Komoji Input Ignored: Inactive or Prop OK visible");
             return { isExpected: false, shouldGoToNext: false };
         }
         if (tsuKeyCode === null || (isMiddleKeyRequired && dakuonKeyCode === null)) {
@@ -201,10 +195,8 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
                     } else {
                         shouldGoToNext = true;
                     }
-                    console.log("Correct tsu input");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect tsu input");
                 }
             } else if (stage === 'gyouInput') { // 小文字の1打目（行キー）
                 if (!expectedGyouKey) return { isExpected: false, shouldGoToNext: false };
@@ -214,21 +206,16 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
                 if (expectedGyouKeyCodes.includes(input.pressCode)) {
                     setStage(isMiddleKeyRequired ? 'middleInput' : 'danInput');
                     isExpected = true;
-                    console.log(`Transition to ${isMiddleKeyRequired ? 'middleInput' : 'danInput'} stage`);
                 } else {
                     isExpected = false;
-                    console.log("Incorrect gyou input");
                 }
             } else if (stage === 'middleInput') { // 小文字の2打目（濁音キー）
                 if (input.pressCode === dakuonKeyCode) {
                     setStage('danInput');
                     isExpected = true;
-                    console.log("Correct middle key (dakuon) input, transition to danInput stage");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect middle key (dakuon) input");
                     setStage('gyouInput'); // 1打目からやり直し
-                    console.log("Resetting to gyouInput stage");
                 }
             } else if (stage === 'danInput') { // 小文字の最終打（段キー）
                 if (!expectedDanKey) return { isExpected: false, shouldGoToNext: false };
@@ -243,12 +230,9 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
                     } else {
                         shouldGoToNext = true;
                     }
-                    console.log("Correct dan input");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect dan input");
                     setStage('gyouInput'); // 1打目からやり直し
-                    console.log("Resetting to gyouInput stage");
                 }
             }
         }
@@ -258,27 +242,25 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
             setStage('gyouInput');
         }
 
-        console.log("Sokuon/Komoji Result:", { isExpected, shouldGoToNext });
         return { isExpected, shouldGoToNext };
     }, [
         isActive, okVisible, stage, expectedGyouKey, expectedDanKey, isCurrentCharTsu, tsuKeyCode, dakuonKeyCode, // dakuonKeyCode 追加
         hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage, isMiddleKeyRequired // isMiddleKeyRequired 追加
     ]);
 
-    const getHighlightClassName = useCallback((key: string, layoutIndex: number): string | null => {
+    const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
+        const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive || okVisible) {
-            return null;
+            return noHighlight;
         }
 
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
 
         let currentStageForHighlight: SokuonKomojiStage;
         if (indicesJustChanged) {
-            // インデックスが変わった直後は、新しい文字の初期ステージを使う
             const nextChar = sokuonKomojiData[gIdx]?.chars[dIdx];
             currentStageForHighlight = nextChar === 'っ' ? 'tsuInput' : 'gyouInput';
         } else {
-            // それ以外は現在の stage state を使う
             currentStageForHighlight = stage;
         }
 
@@ -300,9 +282,9 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
         }
 
         if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && key === expectedKeyName) {
-            return 'bg-blue-100';
+            return { className: 'bg-blue-100', overrideKey: null };
         }
-        return null;
+        return noHighlight;
     }, [isActive, okVisible, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {

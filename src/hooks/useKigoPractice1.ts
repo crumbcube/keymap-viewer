@@ -12,6 +12,7 @@ import {
     hid2GyouVLeft_Kigo1,
     CharInfoKigo1,
     allKigo1CharInfos,
+    PracticeHighlightResult,
 } from './usePracticeCommons';
 
 // 長押し判定時間 (ミリ秒)
@@ -24,7 +25,7 @@ const useKigoPractice1 = ({
     okVisible,
     side,
     kb,
-    layers,
+    layers, // layers は使わないが props として受け取る
     isRandomMode
 }: PracticeHookProps): PracticeHookResult => {
     const hid2Gyou = useMemo(() => {
@@ -60,7 +61,6 @@ const useKigoPractice1 = ({
         if (allKigo1CharInfos.length > 0) {
             const randomIndex = Math.floor(Math.random() * allKigo1CharInfos.length);
             const nextTarget = allKigo1CharInfos[randomIndex];
-            console.log(">>> Selecting new random target (Kigo1):", nextTarget);
             setRandomTarget(nextTarget);
             // Kigo1 はステージがないのでステージリセットは不要
             pressInfoRef.current = null; // 状態リセット
@@ -84,7 +84,6 @@ const useKigoPractice1 = ({
     }, [clearLongPressTimer, setRandomTarget]);
 
     useEffect(() => {
-        console.log("Kigo1 useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
 
         if (isActive) {
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
@@ -92,7 +91,6 @@ const useKigoPractice1 = ({
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                console.log("Resetting Kigo1 to normal mode or index changed");
                 reset(); // reset 関数を呼び出す
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
@@ -156,10 +154,7 @@ const useKigoPractice1 = ({
         const pressCode = inputInfo.pressCode;
         const inputKeyName = hid2Gyou[pressCode] ?? null;
 
-        console.log("Kigo1 Input:", inputInfo, "Expected Key:", expectedKeyName, "Input Key:", inputKeyName, "RandomMode:", isRandomMode, "PropOK:", okVisible);
-
         if (!isActive || okVisible || !expectedKeyName) {
-            console.log("Kigo1 Input Ignored: Inactive, OK visible, or expectedKeyName invalid");
             return { isExpected: false, shouldGoToNext: false };
         }
 
@@ -176,9 +171,6 @@ const useKigoPractice1 = ({
             longPressTimerRef.current = window.setTimeout(() => {
                 if (pressInfoRef.current && hid2Gyou[pressInfoRef.current.code] === expectedKeyName) {
                     setIsLongPressSuccess(true);
-                    console.log("Long press success flag set");
-                } else {
-                    console.log("Long press timer expired but key mismatch or pressInfo cleared");
                 }
                 longPressTimerRef.current = null;
             }, LONG_PRESS_DURATION);
@@ -194,8 +186,6 @@ const useKigoPractice1 = ({
 
                 clearLongPressTimer();
 
-                console.log("Kigo1 Release Check: InputKey:", inputKeyName, "ExpectedKey:", expectedKeyName, "Duration:", duration, "LongPressSuccess:", isLongPressSuccess);
-
                 if (inputKeyName === expectedKeyName && duration >= LONG_PRESS_DURATION && isLongPressSuccess) {
                     isExpected = true;
                     if (isRandomMode) {
@@ -204,14 +194,11 @@ const useKigoPractice1 = ({
                     } else {
                         shouldGoToNext = true;
                     }
-                    console.log("Correct long press input");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect input or duration too short or long press flag not set");
                 }
             } else {
                 isExpected = false;
-                console.log("Release key mismatch with pressed key");
             }
             pressInfoRef.current = null;
             setIsLongPressSuccess(false);
@@ -219,16 +206,17 @@ const useKigoPractice1 = ({
             return { isExpected: false, shouldGoToNext: false };
         }
 
-        console.log("Kigo1 Result:", { isExpected, shouldGoToNext });
         return { isExpected, shouldGoToNext };
     }, [
         isActive, okVisible, expectedKeyName, hid2Gyou, clearLongPressTimer, isLongPressSuccess,
         isRandomMode, selectNextRandomTarget // handleCorrectAndGoNextRandom, internalOkVisible, reset を削除
     ]);
 
-    const getHighlightClassName = useCallback((key: string, layoutIndex: number): string | null => {
+    // ▼▼▼ getHighlightClassName の修正 ▼▼▼
+    const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
+        const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive || okVisible || !expectedKeyName) {
-            return null;
+            return noHighlight;
         }
 
         const targetLayoutIndex = 6; // 記号1はレイヤー6のみ
@@ -236,14 +224,14 @@ const useKigoPractice1 = ({
         const isMatchingDisplayKey = key === expectedKeyName;
 
         if (layoutIndex === targetLayoutIndex && isMatchingDisplayKey) {
-            return isLongPressSuccess ? 'bg-green-200' : 'bg-blue-100';
+            return { className: isLongPressSuccess ? 'bg-green-200' : 'bg-blue-100', overrideKey: null };
         }
-        return null;
+        return noHighlight;
     }, [
         isActive, okVisible, expectedKeyName, isLongPressSuccess // internalOkVisible, isRandomMode, hid2Gyou を削除
     ]);
+    // ▲▲▲ 修正完了 ▲▲▲
 
-    // ▼▼▼ isInvalidInputTarget 関数を修正 ▼▼▼
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
         // 記号1はレイヤー6のみ表示・ハイライト対象
@@ -266,7 +254,6 @@ const useKigoPractice1 = ({
             return isKigo1Key && keyIndex === targetKeyIndex;
         }
     }, [isActive, hid2Gyou, currentFunctionKeyMap]);
-    // ▲▲▲ 修正完了 ▲▲▲
 
     return {
         headingChars,

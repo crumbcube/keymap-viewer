@@ -3,6 +3,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
     youhandakuonPracticeData,
     functionKeyMaps,
+    YouhandakuonInputDef,
 } from '../data/keymapData';
 import {
     PracticeHookProps,
@@ -17,35 +18,31 @@ import {
     hid2DanHLeft_Kana,
     hid2DanVRight_Kana,
     hid2DanVLeft_Kana,
-    // KeyboardSide, // 未使用のためコメントアウトまたは削除
-    // KeyboardModel, // 未使用のためコメントアウトまたは削除
+    PracticeHighlightResult,
+    CharInfoYouhandakuon, // CharInfoHandakuon -> CharInfoYouhandakuon
+    allYouhandakuonCharInfos, // allHandakuonCharInfos -> allYouhandakuonCharInfos
 } from './usePracticeCommons';
 
-// ▼▼▼ ステージから dakuonInput1_wait を削除 ▼▼▼
 type YouhandakuonStage = 'gyouInput' | 'youonInput' | 'dakuonInput1' | 'dakuonInput2' | 'danInput';
-// ▲▲▲ 削除 ▲▲▲
 
 const useYouhandakuonPractice = ({
-    gIdx, // gIdx は常に 0 (ぱ行のみ)
+    gIdx, // gIdx は常に 0
     dIdx,
     isActive,
     okVisible,
     side,
     kb,
-    layers,
+    layers, // layers は使わないが props として受け取る
     isRandomMode
 }: PracticeHookProps): PracticeHookResult => {
     const [stage, setStage] = useState<YouhandakuonStage>('gyouInput');
-    // ▼▼▼ 2回目の濁音キーハイライト制御用ステートを追加 ▼▼▼
     const [showHighlightForSecondDakuon, setShowHighlightForSecondDakuon] = useState(true);
-    // ▲▲▲ 追加 ▲▲▲
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
     const prevIsRandomModeRef = useRef(isRandomMode);
     const highlightDelayTimerRef = useRef<number | null>(null);
-
-    // ★ ランダムモードは未実装
+    const [randomTarget, setRandomTarget] = useState<CharInfoYouhandakuon | null>(null);
 
     const hid2Gyou = useMemo(() => {
         if (kb === 'tw-20v') {
@@ -67,92 +64,115 @@ const useYouhandakuonPractice = ({
         return functionKeyMaps[kb]?.[side] ?? {};
     }, [kb, side]);
 
-    // 通常モード用
-    const currentGroup = useMemo(() => {
-        // isRandomMode はこのフックでは未実装なので条件分岐不要
-        if (!isActive) return null;
-        return youhandakuonPracticeData[0];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isActive]); // ★ isRandomMode を削除
-
-    const currentInputDef = useMemo(() => {
-        if (isRandomMode || !currentGroup?.inputs || dIdx < 0 || dIdx >= currentGroup.inputs.length) {
-            return null;
+    const selectNextRandomTarget = useCallback(() => {
+        // allHandakuonCharInfos -> allYouhandakuonCharInfos
+        if (allYouhandakuonCharInfos.length > 0) {
+            const randomIndex = Math.floor(Math.random() * allYouhandakuonCharInfos.length);
+            // allHandakuonCharInfos -> allYouhandakuonCharInfos
+            const nextTarget = allYouhandakuonCharInfos[randomIndex];
+            setRandomTarget(nextTarget);
+            setStage('gyouInput'); // 常に最初のステージから
+            setShowHighlightForSecondDakuon(true); // ハイライト状態もリセット
+            if (highlightDelayTimerRef.current !== null) {
+                clearTimeout(highlightDelayTimerRef.current);
+                highlightDelayTimerRef.current = null;
+            }
+        } else {
+            setRandomTarget(null);
         }
+    }, [setRandomTarget, setStage, setShowHighlightForSecondDakuon]);
+
+    const currentInputDef = useMemo((): YouhandakuonInputDef | null => { // 型注釈を追加
+        if (isRandomMode) {
+            // CharInfoYouhandakuon に inputDef を含めたので、それを直接使う
+            return randomTarget?.inputDef ?? null;
+        }
+        // 通常モードのロジック (変更なし)
+        if (!isActive) return null;
+        const currentGroup = youhandakuonPracticeData[0]; // 常に最初のグループ
+        if (!currentGroup?.inputs || dIdx < 0 || dIdx >= currentGroup.inputs.length) return null;
         return currentGroup.inputs[dIdx];
-    }, [isRandomMode, currentGroup, dIdx]);
+    // randomTarget.inputDef を依存配列に追加
+    }, [isRandomMode, randomTarget, isActive, dIdx]);
 
-    // ヘッダー文字
+    // headingChars (変更なし、前回の修正でOK)
     const headingChars = useMemo(() => {
-        if (!isActive) return [];
-        return currentGroup?.chars ?? [];
-    }, [isActive, isRandomMode, currentGroup]);
+        if (!isActive) return []; // 非アクティブ時は空配列
 
-    // reset 関数
+        if (isRandomMode) {
+            // ランダムモード時はターゲット文字のみ表示
+            return randomTarget ? [randomTarget.char] : [];
+        } else {
+            // 通常モード時は行全体の文字を表示 (ぱ行のみ)
+            const currentGroup = youhandakuonPracticeData[0];
+            return currentGroup?.chars ?? [];
+        }
+    }, [isActive, isRandomMode, randomTarget]);
+
+    // reset (変更なし)
     const reset = useCallback(() => {
         setStage('gyouInput');
-        // ▼▼▼ ハイライト制御ステートをリセット ▼▼▼
         setShowHighlightForSecondDakuon(true);
-        // ▲▲▲ 追加 ▲▲▲
         if (highlightDelayTimerRef.current !== null) {
-            console.log(`[reset] Clearing timer: ${highlightDelayTimerRef.current}`);
             clearTimeout(highlightDelayTimerRef.current);
             highlightDelayTimerRef.current = null;
         }
+        setRandomTarget(null); // ランダムターゲットもリセット
         prevGIdxRef.current = -1;
         prevDIdxRef.current = -1;
         isInitialMount.current = true;
         prevIsRandomModeRef.current = false;
-    // ▼▼▼ 依存配列に setShowHighlightForSecondDakuon を追加 ▼▼▼
-    }, [setStage, setShowHighlightForSecondDakuon]);
-    // ▲▲▲ 追加 ▲▲▲
+    }, [setStage, setShowHighlightForSecondDakuon, setRandomTarget]);
 
+    // useEffect (変更なし)
     useEffect(() => {
         if (isActive) {
-            const indicesChanged = dIdx !== prevDIdxRef.current;
-            // const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current; // ★ 削除
+            const indicesChanged = dIdx !== prevDIdxRef.current; // gIdx は常に 0 なので dIdx のみチェック
+            const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
+            // 通常モードへの切り替え or 通常モードでのインデックス変更
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
                 reset();
-                prevGIdxRef.current = 0;
+                prevGIdxRef.current = 0; // gIdx は 0 固定
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
             }
-            // ★ ランダムモード関連のロジックは未実装なのでコメントアウトまたは削除
-            // if (isRandomMode && (randomModeChangedToTrue || (isInitialMount.current && !randomTarget))) {
-            //      console.log("Selecting initial/next random target for Youhandakuon");
-            //      // selectNextRandomTarget(); // 未実装
-            //      isInitialMount.current = false;
-            //      prevGIdxRef.current = -1;
-            //      prevDIdxRef.current = -1;
-            // }
-            if (!isRandomMode && isInitialMount.current) {
-                 reset(); // 通常モード初期化
+
+            // ランダムモードへの切り替え or ランダムモード初期化/ターゲットなし
+            if (isRandomMode && (randomModeChangedToTrue || (isInitialMount.current && !randomTarget) || !randomTarget)) {
+                 selectNextRandomTarget();
                  isInitialMount.current = false;
-                 prevGIdxRef.current = 0;
+                 prevGIdxRef.current = -1; // ランダムモードでは参照しない
+                 prevDIdxRef.current = -1;
+            } else if (!isRandomMode && isInitialMount.current) {
+                 // 通常モード初期化
+                 reset();
+                 isInitialMount.current = false;
+                 prevGIdxRef.current = 0; // gIdx は 0 固定
                  prevDIdxRef.current = dIdx;
             }
+
             prevIsRandomModeRef.current = isRandomMode;
+
         } else {
-            reset(); // 非アクティブ時もリセット
+            reset(); // 非アクティブになったらリセット
         }
         return () => {
             if (highlightDelayTimerRef.current !== null) {
-                console.log(`[useEffect cleanup] Clearing timer: ${highlightDelayTimerRef.current}`);
                 clearTimeout(highlightDelayTimerRef.current);
                 highlightDelayTimerRef.current = null;
             }
         };
-    }, [isActive, isRandomMode, dIdx, reset]); // ★ randomModeChangedToTrue を削除
+    }, [isActive, isRandomMode, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
     const currentOkVisible = okVisible;
 
+    // handleInput (変更なし)
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
-        console.log(`[handleInput] Start - Stage: ${stage}, Input: 0x${inputInfo.pressCode.toString(16)}`);
 
+        // currentInputDef が null の場合のエラーハンドリングを追加
         if (!isActive || okVisible || !currentInputDef) {
-            console.log(`[handleInput] Ignored - isActive: ${isActive}, okVisible: ${okVisible}, currentInputDef: ${!!currentInputDef}`);
             return { isExpected: false, shouldGoToNext: false };
         }
         if (inputInfo.type !== 'release') {
@@ -165,21 +185,24 @@ const useYouhandakuonPractice = ({
 
         const youonKeyCodeEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '拗音');
         const dakuonKeyCodeEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '濁音');
+        // +1 して押下コードに変換
         const expectedYouonKeyCode = youonKeyCodeEntry ? parseInt(youonKeyCodeEntry[0]) + 1 : -1;
         const expectedDakuonKeyCode = dakuonKeyCodeEntry ? parseInt(dakuonKeyCodeEntry[0]) + 1 : -1;
 
-        // ★ 既存のタイマーがあればクリア (dakuonInput1 以外で)
+        // 濁音/拗音キーコードが見つからない場合のエラー処理
+        if (expectedYouonKeyCode === -1 || expectedDakuonKeyCode === -1) {
+            console.error("Could not find key codes for '拗音' or '濁音'");
+            return { isExpected: false, shouldGoToNext: false };
+        }
+
+
         if (stage !== 'dakuonInput1' && highlightDelayTimerRef.current !== null) {
-            console.log(`[handleInput] Clearing existing timer (not in dakuonInput1): ${highlightDelayTimerRef.current}`);
             clearTimeout(highlightDelayTimerRef.current);
             highlightDelayTimerRef.current = null;
         }
-        // ★ 2回目のハイライト表示をデフォルトでONにする（ミスした場合などに備える）
-        // ただし、dakuonInput1 で正解した直後は OFF のままにする
         if (stage !== 'dakuonInput1') {
             setShowHighlightForSecondDakuon(true);
         }
-
 
         let nextStage: YouhandakuonStage | null = null;
 
@@ -206,24 +229,20 @@ const useYouhandakuonPractice = ({
             case 'dakuonInput1':
                 if (pressCode === expectedDakuonKeyCode) {
                     isExpected = true;
-                    nextStage = 'dakuonInput2'; // ★ dakuonInput2 に直接遷移
-                    setShowHighlightForSecondDakuon(false); // ★ ハイライトを一旦消す
-                    console.log(`[handleInput] Correct dakuon1 -> Setting timer to show highlight for dakuonInput2`);
-                    // ★ 既存のタイマーがあればクリアしてから新しいタイマーをセット
+                    nextStage = 'dakuonInput2';
+                    setShowHighlightForSecondDakuon(false);
                     if (highlightDelayTimerRef.current !== null) {
                         clearTimeout(highlightDelayTimerRef.current);
                     }
                     highlightDelayTimerRef.current = window.setTimeout(() => {
-                        console.log(`[handleInput] Timer fired! Showing highlight for dakuonInput2.`);
                         setShowHighlightForSecondDakuon(true);
                         highlightDelayTimerRef.current = null;
-                    }, 500); // ★ 500ms 遅延
+                    }, 500);
                 } else {
                     isExpected = false;
                     nextStage = 'gyouInput';
                 }
                 break;
-            // dakuonInput1_wait ケースは削除
             case 'dakuonInput2':
                 if (pressCode === expectedDakuonKeyCode) {
                     isExpected = true;
@@ -239,32 +258,40 @@ const useYouhandakuonPractice = ({
                 if (expectedDanKeyCodes.includes(pressCode)) {
                     isExpected = true;
                     nextStage = 'gyouInput'; // 完了して次へ
-                    shouldGoToNext = !isRandomMode; // ランダムモード未実装なので常に true
+                    if (isRandomMode) {
+                        selectNextRandomTarget();
+                        shouldGoToNext = false;
+                    } else {
+                        shouldGoToNext = true;
+                    }
                 } else {
                     nextStage = 'gyouInput';
                 }
                 break;
         }
 
-        if (nextStage) {
-             console.log(`[handleInput] Setting stage from ${stage} to ${nextStage}`);
+        // ステージ遷移がある場合、または不正解でリセットする場合
+        if (nextStage && nextStage !== stage) {
              setStage(nextStage);
+        } else if (!isExpected && stage !== 'gyouInput') {
+             // 不正解で、かつ最初のステージでなければリセット
+             setStage('gyouInput');
         }
 
-        console.log(`[handleInput] End - isExpected: ${isExpected}, shouldGoToNext: ${shouldGoToNext}, Final Stage: ${nextStage ?? stage}`);
+
         return { isExpected, shouldGoToNext };
-    // ▼▼▼ 依存配列に setShowHighlightForSecondDakuon を追加 ▼▼▼
     }, [
         isActive, okVisible, stage, currentInputDef, hid2Gyou, hid2Dan, currentFunctionKeyMap,
-        isRandomMode, setStage, setShowHighlightForSecondDakuon // ★ 追加
+        isRandomMode, setStage, setShowHighlightForSecondDakuon, selectNextRandomTarget
     ]);
-    // ▲▲▲ 追加 ▲▲▲
 
-    const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): string | null => {
-        // console.log(`[getHighlight] Check - keyName: ${keyName}, layoutIndex: ${layoutIndex}, currentStage: ${stage}, showHighlight2: ${showHighlightForSecondDakuon}`);
+    // getHighlightClassName (変更なし)
+    const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
+        const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
 
+        // currentInputDef が null の場合のエラーハンドリングを追加
         if (!isActive || okVisible || !currentInputDef) {
-            return null;
+            return noHighlight;
         }
 
         const indicesJustChanged = !isRandomMode && dIdx !== prevDIdxRef.current;
@@ -275,6 +302,7 @@ const useYouhandakuonPractice = ({
 
         const youonKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '拗音');
         const dakuonKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '濁音');
+        // 機能キーの表示名を取得（存在しない場合はデフォルト名）
         const youonDisplayName = youonKeyEntry ? currentFunctionKeyMap[parseInt(youonKeyEntry[0])] : '拗音';
         const dakuonDisplayName = dakuonKeyEntry ? currentFunctionKeyMap[parseInt(dakuonKeyEntry[0])] : '濁音';
 
@@ -292,20 +320,15 @@ const useYouhandakuonPractice = ({
                 expectedKeyName = dakuonDisplayName;
                 targetLayoutIndex = 2;
                 break;
-            // dakuonInput1_wait ケースは削除
-            // ▼▼▼ dakuonInput2 のハイライト判定を修正 ▼▼▼
             case 'dakuonInput2':
-                // ★ showHighlightForSecondDakuon が true の場合のみハイライト
                 if (showHighlightForSecondDakuon) {
                     expectedKeyName = dakuonDisplayName;
                     targetLayoutIndex = 2;
                 } else {
-                    expectedKeyName = null; // ハイライトしない
+                    expectedKeyName = null;
                     targetLayoutIndex = null;
-                    console.log(`[getHighlight] Stage is dakuonInput2, but highlight is hidden.`);
                 }
                 break;
-            // ▲▲▲ 修正完了 ▲▲▲
             case 'danInput':
                 expectedKeyName = currentInputDef.dan;
                 targetLayoutIndex = 3;
@@ -313,40 +336,34 @@ const useYouhandakuonPractice = ({
         }
 
         if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyName) {
-            return 'bg-blue-100';
+            return { className: 'bg-blue-100', overrideKey: null };
         }
 
-        return null;
-    // ▼▼▼ 依存配列に showHighlightForSecondDakuon を追加 ▼▼▼
+        return noHighlight;
     }, [
-        isActive, okVisible, stage, currentInputDef, isRandomMode, dIdx, currentFunctionKeyMap, showHighlightForSecondDakuon // ★ 追加
+        isActive, okVisible, stage, currentInputDef, isRandomMode, dIdx, currentFunctionKeyMap, showHighlightForSecondDakuon
     ]);
-    // ▲▲▲ 追加 ▲▲▲
 
-    // ▼▼▼ isInvalidInputTarget 関数を修正 ▼▼▼
+    // isInvalidInputTarget (変更なし)
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
         const targetKeyIndex = pressCode - 1;
 
         let expectedLayoutIndex: number | null = null;
-        // 現在のステージに応じて、不正入力が起こりうるレイヤーを特定
         switch (stage) {
             case 'gyouInput':
             case 'youonInput':
             case 'dakuonInput1':
             case 'dakuonInput2':
-                expectedLayoutIndex = 2; // スタートレイヤー
+                expectedLayoutIndex = 2;
                 break;
             case 'danInput':
-                expectedLayoutIndex = 3; // エンドレイヤー
+                expectedLayoutIndex = 3;
                 break;
         }
-
-        // 期待されるレイヤーで、かつキーインデックスが一致する場合のみ true
         const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
         return isTarget;
-    }, [isActive, stage]); // ★ 依存配列に stage を追加
-    // ▲▲▲ 修正完了 ▲▲▲
+    }, [isActive, stage]);
 
     return {
         headingChars,
@@ -354,7 +371,7 @@ const useYouhandakuonPractice = ({
         getHighlightClassName,
         reset,
         isInvalidInputTarget,
-        isOkVisible: currentOkVisible, // ランダムモード未実装のため currentOkVisible をそのまま返す
+        isOkVisible: currentOkVisible,
     };
 };
 

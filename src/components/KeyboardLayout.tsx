@@ -1,7 +1,9 @@
 // src/components/KeyboardLayout.tsx
 import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { PracticeMode, PracticeHookResult } from '../hooks/usePracticeCommons';
+// ▼▼▼ PracticeHighlightResult をインポート ▼▼▼
+import { PracticeMode, PracticeHookResult, PracticeHighlightResult } from '../hooks/usePracticeCommons';
+// ▲▲▲ インポート ▲▲▲
 import { kigoMapping2, kigoMapping3 } from '../data/keymapData';
 import { getKeyStyle, isLargeSymbol } from '../utils/styleUtils';
 
@@ -38,11 +40,11 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
     let originalKey = (key ?? '').trim();
     const isEmptyKey = originalKey === '';
 
-    let k = originalKey;
-    let cName = '';
+    let k = originalKey; // 加工前のキーラベル
+    let highlightResult: PracticeHighlightResult = { className: null, overrideKey: null };
     let isInvalid = false;
 
-    // 練習モードON時のラベル加工
+    // 練習モードON時のラベル加工 (kigoMapping など)
     if (training && showKeyLabels) {
         if (practice === '記号の基本練習１') {
             if (layoutIndex === 6) { // 記号1レイヤー
@@ -87,32 +89,25 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         const isTargetLayout = activePractice.isInvalidInputTarget(pressCode, layoutIndex, idx);
 
         if (isTargetLayout && idx === targetKeyIndex) {
-            cName = 'bg-red-100'; isInvalid = true;
+            highlightResult = { className: 'bg-red-100', overrideKey: null };
+            isInvalid = true;
         }
     }
 
     // 正解キーハイライト処理
     if (!isInvalid && showKeyLabels && !activePractice?.isOkVisible && activePractice) {
-        const highlightTargetKey = k;
-        const shouldHighlight = k !== '____' && k !== '';
-
-        if (shouldHighlight) {
-            const highlightClass = activePractice.getHighlightClassName(highlightTargetKey, layoutIndex);
-            if (highlightClass === 'bg-blue-100') {
-                 cName = highlightClass;
-            }
-            if (practice === '記号の基本練習１' && highlightClass === 'bg-green-200') {
-                cName = highlightClass;
-            }
+        const result = activePractice.getHighlightClassName(k, layoutIndex);
+        if (result.className) {
+            highlightResult = result;
         }
     }
 
     // 表示内容の決定
-    let displayContent: string;
+    let displayContent: string; // displayContent の宣言をここに移動
     if (!training) { // training が false なら練習モードOFF
         // 練習モードOFF時のレンダリング
         return (
-            <motion.div key={idx} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center ${getKeyStyle(originalKey)}`}
+            <motion.div key={idx} className={`bg-white border rounded p-3 text-center text-sm shadow flex justify-center items-center ${getKeyStyle(originalKey)}`}
                 whileHover={{ scale: 1.05 }}
                 style={{ minHeight: '3rem', fontSize: isLargeSymbol(originalKey) ? '1.8rem' : undefined }}>
                 <code style={{ whiteSpace: "pre-line" }}>
@@ -129,7 +124,8 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
 
     // 練習モードON時の表示内容
     if (showKeyLabels) {
-        displayContent = k === '' ? '\n' : k; // 空文字は改行として扱う（高さを維持するため）
+        const finalKeyLabel = highlightResult.overrideKey ?? k;
+        displayContent = finalKeyLabel === '' ? '\n' : finalKeyLabel;
     } else {
         // キー表示OFF時は、元々空だったキー以外は ____ でマスク
         displayContent = isEmptyKey ? '\n' : '____';
@@ -139,7 +135,7 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
     return (
         <div
           key={idx}
-          className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center whitespace-pre-line ${cName}`}
+          className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center whitespace-pre-line ${highlightResult.className ?? ''}`}
           style={{ minHeight: '3rem' }}
         >
             {displayContent}

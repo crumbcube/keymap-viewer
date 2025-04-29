@@ -18,6 +18,7 @@ import {
     hid2DanVRight_Kana,
     hid2DanVLeft_Kana,
     functionKeyMaps,
+    PracticeHighlightResult,
 } from './usePracticeCommons';
 
 // 拗濁音練習の入力ステージ
@@ -80,7 +81,6 @@ const useYoudakuonPractice = ({
         if (allYoudakuonCharInfos.length > 0) {
             const randomIndex = Math.floor(Math.random() * allYoudakuonCharInfos.length);
             const nextTarget = allYoudakuonCharInfos[randomIndex];
-            console.log(">>> Selecting new random target (Youdakuon):", nextTarget);
             setRandomTarget(nextTarget);
             setStage('gyouInput'); // 常に最初のステージから
         } else {
@@ -122,7 +122,6 @@ const useYoudakuonPractice = ({
     }, [setStage, setRandomTarget]);
 
     useEffect(() => {
-        console.log("Youdakuon useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
         if (isActive) {
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
@@ -130,7 +129,6 @@ const useYoudakuonPractice = ({
 
             // 通常モードへの切り替え or 通常モードでのインデックス変更
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                console.log("Resetting Youdakuon to normal mode or index changed");
                 reset();
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
@@ -139,7 +137,6 @@ const useYoudakuonPractice = ({
 
             // ランダムモードへの切り替え or ランダムモード初期化/ターゲットなし
             if (isRandomMode && (randomModeChangedToTrue || (isInitialMount.current && !randomTarget) || !randomTarget)) {
-                 console.log("Selecting initial/next random target for Youdakuon");
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  // ランダムモードでは gIdx/dIdx は参照しない
@@ -147,7 +144,6 @@ const useYoudakuonPractice = ({
                  prevDIdxRef.current = -1;
             } else if (!isRandomMode && isInitialMount.current) {
                  // 通常モード初期化
-                 console.log("Initializing Youdakuon in normal mode");
                  reset();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
@@ -165,10 +161,8 @@ const useYoudakuonPractice = ({
     const currentOkVisible = okVisible;
 
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
-        console.log(`[Youdakuon handleInput] Start - Stage: ${stage}, Input: 0x${inputInfo.pressCode.toString(16)}, Random: ${isRandomMode}`);
 
         if (!isActive || okVisible || !currentInputDef) {
-            console.log(`[Youdakuon handleInput] Ignored`);
             return { isExpected: false, shouldGoToNext: false };
         }
         if (inputInfo.type !== 'release') {
@@ -222,45 +216,40 @@ const useYoudakuonPractice = ({
                     isExpected = true;
                     nextStage = 'gyouInput'; // ステージは最初に戻す
                     if (isRandomMode) {
-                        console.log("[Youdakuon handleInput] Correct input in random mode, selecting next target.");
                         selectNextRandomTarget();
                         shouldGoToNext = false;
                     } else {
-                        console.log("[Youdakuon handleInput] Correct input in normal mode, should go to next.");
                         shouldGoToNext = true;
                     }
                 } else {
-                     nextStage = 'gyouInput'; // ミス時はリセット
+                    nextStage = 'gyouInput'; // ミス時はリセット
                 }
                 break;
         }
 
         if (nextStage !== stage) {
-            console.log(`[Youdakuon handleInput] Setting stage from ${stage} to ${nextStage}`);
             setStage(nextStage);
         } else if (!isExpected) {
-             console.log(`[Youdakuon handleInput] Incorrect input, resetting stage to gyouInput`);
-             setStage('gyouInput'); // ミス時は必ず gyouInput に戻す
+            setStage('gyouInput'); // ミス時は必ず gyouInput に戻す
         }
 
 
-        console.log(`[Youdakuon handleInput] End - isExpected: ${isExpected}, shouldGoToNext: ${shouldGoToNext}, Final Stage: ${nextStage}`);
         return { isExpected, shouldGoToNext };
     }, [
         isActive, okVisible, stage, currentInputDef, hid2Gyou, hid2Dan, currentFunctionKeyMap,
         isRandomMode, selectNextRandomTarget, setStage
     ]);
 
-    const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): string | null => {
+    const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
+        const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive || okVisible || !currentInputDef) {
-            return null;
+            return noHighlight;
         }
 
         const currentStageForHighlight = isRandomMode ? stage : (
             // 通常モードでインデックスが変わった直後なら gyouInput を強制
             (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current) && !isInitialMount.current ? 'gyouInput' : stage
         );
-        // console.log(`[Youdakuon getHighlight] Stage for highlight: ${currentStageForHighlight}`);
 
 
         let expectedKeyName: string | null = null;
@@ -292,11 +281,10 @@ const useYoudakuonPractice = ({
         }
 
         if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyName) {
-            // console.log(`[Youdakuon getHighlight] MATCH! Highlighting ${keyName} on layout ${layoutIndex}`);
-            return 'bg-blue-100';
+            return { className: 'bg-blue-100', overrideKey: null };
         }
 
-        return null;
+        return noHighlight;
     }, [
         isActive, okVisible, stage, currentInputDef, isRandomMode, gIdx, dIdx, currentFunctionKeyMap
     ]);

@@ -17,6 +17,7 @@ import {
   dakuonGyouChars,
   CharInfoDakuon,
   allDakuonCharInfos,
+  PracticeHighlightResult,
 } from './usePracticeCommons';
 import { dakuonDanMapping } from '../data/keymapData';
 
@@ -62,7 +63,6 @@ export default function useDakuonPractice({
   const selectNextRandomTarget = useCallback(() => {
       if (allDakuonCharInfos.length > 0) {
           const randomIndex = Math.floor(Math.random() * allDakuonCharInfos.length);
-          console.log(">>> Selecting new random target (Dakuon):", allDakuonCharInfos[randomIndex]);
           setRandomTarget(allDakuonCharInfos[randomIndex]);
           setStage('gyouInput'); // ステージもリセット
       } else {
@@ -70,9 +70,17 @@ export default function useDakuonPractice({
       }
   }, [setRandomTarget, setStage]);
 
-  useEffect(() => {
+  // reset 関数
+  const reset = useCallback(() => {
+    setStage('gyouInput');
+    setRandomTarget(null);
+    prevGIdxRef.current = -1;
+    prevDIdxRef.current = -1;
+    isInitialMount.current = true;
+    prevIsRandomModeRef.current = false;
+  }, [setStage, setRandomTarget]);
 
-      console.log("Dakuon useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
+  useEffect(() => {
 
       if (isActive) {
           const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
@@ -81,9 +89,7 @@ export default function useDakuonPractice({
 
           // --- リセット条件 ---
           if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-              console.log("Resetting Dakuon to normal mode or index changed");
-              setStage('gyouInput');
-              setRandomTarget(null);
+              reset(); // reset 関数を呼び出す
               prevGIdxRef.current = gIdx;
               prevDIdxRef.current = dIdx;
               isInitialMount.current = false;
@@ -96,6 +102,7 @@ export default function useDakuonPractice({
                prevGIdxRef.current = gIdx;
                prevDIdxRef.current = dIdx;
           } else if (!isRandomMode && isInitialMount.current) {
+               reset(); // 通常モード初期化
                isInitialMount.current = false;
                prevGIdxRef.current = gIdx;
                prevDIdxRef.current = dIdx;
@@ -104,16 +111,10 @@ export default function useDakuonPractice({
           prevIsRandomModeRef.current = isRandomMode;
 
       } else {
-          // 非アクティブになったら全てリセット
-          setStage('gyouInput');
-          setRandomTarget(null);
-          prevGIdxRef.current = -1;
-          prevDIdxRef.current = -1;
-          isInitialMount.current = true;
-          prevIsRandomModeRef.current = isRandomMode;
+          reset(); // 非アクティブ時もリセット
       }
 
-  }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, selectNextRandomTarget]);
+  }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
   // 通常モード用の現在行・段キー (変更なし)
   const currentGyouKey = useMemo(() => {
@@ -148,11 +149,8 @@ export default function useDakuonPractice({
   // handleInput
   const handleInput = useCallback(
     (input: PracticeInputInfo): PracticeInputResult => {
-      console.log("Dakuon Input:", input, "Stage:", stage, "Expected Gyou:", expectedGyouKey, "Expected Dan:", expectedDanKey, "RandomMode:", isRandomMode, "PropOK:", okVisible);
-      console.log("Expected Dakuon Key Code:", dakuonKeyCode);
 
       if (!isActive || okVisible || !expectedGyouKey || !expectedDanKey || dakuonKeyCode === null) {
-          console.log("Dakuon Input Ignored: Inactive, Prop OK visible, or keys/code invalid");
           return { isExpected: false, shouldGoToNext: false };
       }
       if (input.type !== 'release') {
@@ -170,24 +168,18 @@ export default function useDakuonPractice({
           const expectedGyouKeyCodes = Object.entries(hid2Gyou)
               .filter(([_, name]) => name === expectedGyouKey)
               .map(([codeStr, _]) => parseInt(codeStr));
-          console.log("Stage: gyouInput, Input Gyou:", inputGyou, "Expected Gyou:", expectedGyouKey, "Input Code:", pressCode, "Expected Codes:", expectedGyouKeyCodes);
           if (expectedGyouKeyCodes.includes(pressCode)) {
               setStage('dakuonInput');
               isExpected = true;
-              console.log("Transition to dakuonInput stage");
           } else {
-              console.log("Incorrect gyou input");
               isExpected = false;
           }
           break;
         case 'dakuonInput':
-          console.log("Stage: dakuonInput, Input Code:", pressCode, "Expected Code (dakuonKeyCode):", dakuonKeyCode);
           if (pressCode === dakuonKeyCode) {
             setStage('danInput');
             isExpected = true;
-            console.log("Transition to danInput stage");
           } else {
-              console.log("Incorrect dakuon key input");
               isExpected = false;
           }
           break;
@@ -195,7 +187,6 @@ export default function useDakuonPractice({
           const expectedDanKeyCodes = Object.entries(hid2Dan)
               .filter(([_, name]) => name === expectedDanKey)
               .map(([codeStr, _]) => parseInt(codeStr));
-          console.log("Stage: danInput, Input Dan:", inputDan, "Expected Dan:", expectedDanKey, "Input Code:", pressCode, "Expected Codes:", expectedDanKeyCodes);
           if (expectedDanKeyCodes.includes(pressCode)) {
             isExpected = true;
             if (isRandomMode) {
@@ -204,9 +195,7 @@ export default function useDakuonPractice({
             } else {
                 shouldGoToNext = true;
             }
-            console.log("Correct dan input");
           } else {
-              console.log("Incorrect dan input");
               isExpected = false;
           }
           break;
@@ -216,17 +205,16 @@ export default function useDakuonPractice({
           setStage('gyouInput');
       }
 
-      console.log("Dakuon Result:", { isExpected, shouldGoToNext });
       return { isExpected, shouldGoToNext };
     }, [
         isActive, okVisible, stage, expectedGyouKey, expectedDanKey,
         hid2Gyou, hid2Dan, dakuonKeyCode, isRandomMode, selectNextRandomTarget, setStage
     ]);
 
-  // getHighlightClassName
-  const getHighlightClassName = useCallback((key: string, layoutIndex: number): string | null => {
+  const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
+      const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
       if (!isActive || okVisible || !expectedGyouKey || !expectedDanKey) {
-          return null;
+          return noHighlight;
       }
 
       // 問題切り替え直後は強制的に 'gyouInput' として扱う (通常モードのみ)
@@ -252,21 +240,10 @@ export default function useDakuonPractice({
       }
 
       if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && key === expectedKeyName) {
-          return 'bg-blue-100';
+          return { className: 'bg-blue-100', overrideKey: null };
       }
-      return null;
+      return noHighlight;
     }, [isActive, okVisible, stage, expectedGyouKey, expectedDanKey, gIdx, dIdx, isRandomMode]);
-
-  // reset
-  const reset = useCallback(() => {
-    console.log("Resetting Dakuon Practice Hook");
-    setStage('gyouInput');
-    setRandomTarget(null);
-    prevGIdxRef.current = -1;
-    prevDIdxRef.current = -1;
-    isInitialMount.current = true;
-    prevIsRandomModeRef.current = false;
-  }, [setStage, setRandomTarget]);
 
   // isInvalidInputTarget
   const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {

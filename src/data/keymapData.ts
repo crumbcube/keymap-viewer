@@ -108,12 +108,14 @@ export const kigoPractice3Data: Kigo3PracticeGroup[] = [
 ];
 export interface YoudakuonInputDef { gyouKey: string; youonKey: string; dakuonKey: string; dan: string; }
 export interface YoudakuonPracticeGroup { groupName: string; chars: string[]; inputs: YoudakuonInputDef[]; }
+// ▼▼▼ 拗濁音データの youonKey を修正 ▼▼▼
 export const youdakuonPracticeData: YoudakuonPracticeGroup[] = [
-  { groupName: 'が行拗音', chars: ['ぎゃ', 'ぎゅ', 'ぎょ'], inputs: [ { gyouKey: 'か行', youonKey: '拗1', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'か行', youonKey: '拗1', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'か行', youonKey: '拗1', dakuonKey: '濁音', dan: 'お段' }, ] },
-  { groupName: 'ざ行拗音', chars: ['じゃ', 'じゅ', 'じょ'], inputs: [ { gyouKey: 'さ行', youonKey: '拗2', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'さ行', youonKey: '拗2', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'さ行', youonKey: '拗2', dakuonKey: '濁音', dan: 'お段' }, ] },
-  { groupName: 'だ行拗音', chars: ['ぢゃ', 'ぢゅ', 'ぢょ'], inputs: [ { gyouKey: 'た行', youonKey: '拗3', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'た行', youonKey: '拗3', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'た行', youonKey: '拗3', dakuonKey: '濁音', dan: 'お段' }, ] },
-    { groupName: 'ば行拗音', chars: ['びゃ', 'びゅ', 'びょ'], inputs: [ { gyouKey: 'は行', youonKey: '拗4', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'は行', youonKey: '拗4', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'は行', youonKey: '拗4', dakuonKey: '濁音', dan: 'お段' }, ] },
+  { groupName: 'が行拗音', chars: ['ぎゃ', 'ぎゅ', 'ぎょ'], inputs: [ { gyouKey: 'か行', youonKey: '拗音', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'か行', youonKey: '拗音', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'か行', youonKey: '拗音', dakuonKey: '濁音', dan: 'お段' }, ] },
+  { groupName: 'ざ行拗音', chars: ['じゃ', 'じゅ', 'じょ'], inputs: [ { gyouKey: 'さ行', youonKey: '拗音', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'さ行', youonKey: '拗音', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'さ行', youonKey: '拗音', dakuonKey: '濁音', dan: 'お段' }, ] },
+  { groupName: 'だ行拗音', chars: ['ぢゃ', 'ぢゅ', 'ぢょ'], inputs: [ { gyouKey: 'た行', youonKey: '拗音', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'た行', youonKey: '拗音', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'た行', youonKey: '拗音', dakuonKey: '濁音', dan: 'お段' }, ] },
+  { groupName: 'ば行拗音', chars: ['びゃ', 'びゅ', 'びょ'], inputs: [ { gyouKey: 'は行', youonKey: '拗音', dakuonKey: '濁音', dan: 'あ段' }, { gyouKey: 'は行', youonKey: '拗音', dakuonKey: '濁音', dan: 'う段' }, { gyouKey: 'は行', youonKey: '拗音', dakuonKey: '濁音', dan: 'お段' }, ] },
 ];
+// ▲▲▲ 修正完了 ▲▲▲
 export interface YouhandakuonInputDef { gyouKey: string; youonKey: string; dakuonKey1: string; dakuonKey2: string; dan: string; }
 export interface YouhandakuonPracticeGroup { groupName: string; chars: string[]; inputs: YouhandakuonInputDef[]; }
 export const youhandakuonPracticeData: YouhandakuonPracticeGroup[] = [
@@ -123,7 +125,8 @@ export const basicPracticeMenuItems = [ '清音の基本練習', '拗音の基�
 export const stepUpPracticeMenuItems = [
   '拗濁音の練習',
   '拗半濁音の練習',
-  '拗音拡張', // ← 追加済み
+  '拗音拡張',
+  '外来語の発音補助', // ← 追加済み
 ];
 export const practiceMenuItems = [ ...basicPracticeMenuItems, ...stepUpPracticeMenuItems, ];
 
@@ -151,8 +154,88 @@ export const youonKakuchoDanMapping: Record<string, string[]> = {
 };
 // ▲▲▲ 追加完了 ▲▲▲
 
+// ▼▼▼ 外来語練習用のデータ構造とデータを修正 ▼▼▼
+export interface GairaigoPracticeTarget {
+  char: string;
+  headerIndex: number;
+  // keys: [string, string, string]; // 変更前
+  keys: [string, string, string]; // 1番目: 1打目キー, 2番目: 2打目"表示"キー, 3番目: 3打目キー
+  // ▼▼▼ 2打目の実際の入力キーを追加 ▼▼▼
+  actualSecondKey: string; // 2打目の実際の入力キー名 (例: "さ行")
+  // ▲▲▲ 追加 ▲▲▲
+}
+
+export interface GairaigoPracticeGroup {
+  headerChars: string[];
+  targets: GairaigoPracticeTarget[];
+}
+
+export const gairaigoPracticeData: GairaigoPracticeGroup[] = [
+  { // グループ1: いぁいぃいぅいぇいぉ (変更なし)
+    headerChars: ["いぁ", "いぃ", "いぅ", "いぇ", "いぉ"],
+    targets: [
+      { char: "いぇ", headerIndex: 3, keys: ["あ行", "拗音", "え段"], actualSecondKey: "拗音" } // 2打目は拗音
+    ]
+  },
+  { // グループ2: うぁうぃうぅうぇうぉ (2打目を 拗2 に変更)
+    headerChars: ["うぁ", "うぃ", "うぅ", "うぇ", "うぉ"],
+    targets: [
+      { char: "うぃ", headerIndex: 1, keys: ["あ行", "拗2", "い段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "うぇ", headerIndex: 3, keys: ["あ行", "拗2", "え段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "うぉ", headerIndex: 4, keys: ["あ行", "拗2", "お段"], actualSecondKey: "さ行" }  // 表示: 拗2, 入力: さ行
+    ]
+  },
+  { // グループ3: くぁくぃくぅくぇくぉ (2打目を 拗2 に変更)
+    headerChars: ["くぁ", "くぃ", "くぅ", "くぇ", "くぉ"],
+    targets: [
+      { char: "くぁ", headerIndex: 0, keys: ["か行", "拗2", "あ段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "くぃ", headerIndex: 1, keys: ["か行", "拗2", "い段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "くぇ", headerIndex: 3, keys: ["か行", "拗2", "え段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "くぉ", headerIndex: 4, keys: ["か行", "拗2", "お段"], actualSecondKey: "さ行" }  // 表示: 拗2, 入力: さ行
+    ]
+  },
+  { // グループ4: すぁすぃすぅすぇすぉ (2打目を 拗2 に変更)
+    headerChars: ["すぁ", "すぃ", "すぅ", "すぇ", "すぉ"],
+    targets: [
+      { char: "すぃ", headerIndex: 1, keys: ["さ行", "拗2", "い段"], actualSecondKey: "さ行" } // 表示: 拗2, 入力: さ行
+    ]
+  },
+  { // グループ5: つぁつぃつぅつぇつぉ (2打目を 拗2 に変更)
+    headerChars: ["つぁ", "つぃ", "つぅ", "つぇ", "つぉ"],
+    targets: [
+      { char: "つぁ", headerIndex: 0, keys: ["た行", "拗2", "あ段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "つぃ", headerIndex: 1, keys: ["た行", "拗2", "い段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "つぇ", headerIndex: 3, keys: ["た行", "拗2", "え段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "つぉ", headerIndex: 4, keys: ["た行", "拗2", "お段"], actualSecondKey: "さ行" }  // 表示: 拗2, 入力: さ行
+    ]
+  },
+  { // グループ6: てぁてぃてぅてぇてぉ (2打目を 拗3 に変更)
+    headerChars: ["てぁ", "てぃ", "てぅ", "てぇ", "てぉ"],
+    targets: [
+      { char: "てぃ", headerIndex: 1, keys: ["た行", "拗3", "い段"], actualSecondKey: "ま行" } // 表示: 拗3, 入力: ま行
+    ]
+  },
+  { // グループ7: とぁとぃとぅとぇとぉ (2打目を 拗4 に変更)
+    headerChars: ["とぁ", "とぃ", "とぅ", "とぇ", "とぉ"],
+    targets: [
+      { char: "とぅ", headerIndex: 2, keys: ["た行", "拗4", "う段"], actualSecondKey: "ら行" } // 表示: 拗4, 入力: ら行
+    ]
+  },
+  { // グループ8: ふぁふぃふぅふぇふぉ (2打目を 拗2 に変更)
+    headerChars: ["ふぁ", "ふぃ", "ふぅ", "ふぇ", "ふぉ"],
+    targets: [
+      { char: "ふぁ", headerIndex: 0, keys: ["は行", "拗2", "あ段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "ふぃ", headerIndex: 1, keys: ["は行", "拗2", "い段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "ふぇ", headerIndex: 3, keys: ["は行", "拗2", "え段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
+      { char: "ふぉ", headerIndex: 4, keys: ["は行", "拗2", "お段"], actualSecondKey: "さ行" }  // 表示: 拗2, 入力: さ行
+    ]
+  },
+];
+// ▲▲▲ 修正完了 ▲▲▲
+
 
 /* --- キーボードレイアウトデータ --- */
+// ▼▼▼ sampleJson を置き換え ▼▼▼
 export const sampleJson = {
   "tw-20h": {
   right: {
@@ -177,9 +260,9 @@ export const sampleJson = {
     ],
     [ // layers[3] かなモード（エンド）
       "____", "____", "____", "____", "____",
-      "____", "拗1", "う段", "拗2", "____", // 半角数字に修正済み
+      "____", "____", "う段", "____", "____", // 半角数字に修正済み
       "____", "い段", "あ段", "え段", "____",
-      "____", "拗3", "お段", "拗4", "____"  // 半角数字に修正済み
+      "____", "____", "お段", "____", "____"  // 半角数字に修正済み
     ],
     [ // layers[4] 英字モード（スタート）
       "IME ",     "____",     "Caps\nLock", "a&lt;&gt;A",  " BS",
@@ -277,9 +360,9 @@ export const sampleJson = {
     ],
     [ // layers[3] かなモード（エンド）
       "____", "____", "____", "____", "____",
-      "____", "拗1", "う段", "拗2", "____", // 半角数字に修正済み
+      "____", "____", "う段", "____", "____", // 半角数字に修正済み
       "____", "い段", "あ段", "え段", "____",
-      "____", "拗3", "お段", "拗4", "____"  // 半角数字に修正済み
+      "____", "____", "お段", "____", "____"  // 半角数字に修正済み
     ],
     [ // layers[4] 英字モード（スタート）
       " BS", "____",     "Caps\nLock", "a&lt;&gt;A",  "IME ",
@@ -398,9 +481,9 @@ export const sampleJson = {
     ],
     [ // layers[3] かなモード（エンド）
       "____", "____", "____", "____",
-      "拗1", "う段", "拗2", "____", // 半角数字に修正済み
+      "____", "う段", "____", "____", // 半角数字に修正済み
       "い段", "あ段", "え段", "____",
-      "拗3", "お段", "拗4", "____", // 半角数字に修正済み
+      "____", "お段", "____", "____", // 半角数字に修正済み
       "____", "____", "____", "____"
     ],
     [ // layers[4] 英字モード（スタート）
@@ -514,9 +597,9 @@ export const sampleJson = {
     ],
     [ // layers[3] かなモード（エンド）
       "____", "____", "____", "____",
-      "____", "拗1", "う段", "拗2", // 半角数字に修正済み
+      "____", "____", "う段", "____", // 半角数字に修正済み
       "____", "い段", "あ段", "え段",
-      "____", "拗3", "お段", "拗4", // 半角数字に修正済み
+      "____", "____", "お段", "____", // 半角数字に修正済み
       "____", "____", "____", "____"
     ],
     [ // layers[4] 英字モード（スタート）
@@ -622,6 +705,7 @@ export const sampleJson = {
   }
   }
 };
+// ▲▲▲ 置き換え完了 ▲▲▲
 
 /* --- レイヤー名 --- */
 // layerNames の定義を修正

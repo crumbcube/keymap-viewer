@@ -18,6 +18,7 @@ import {
     hid2DanVLeft_Kana,
     CharInfoYouon,
     allYouonCharInfos,
+    PracticeHighlightResult,
 } from './usePracticeCommons';
 
 type YouonStage = 'gyouInput' | 'youonInput' | 'danInput';
@@ -40,7 +41,9 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
         const gyouMap = kb === 'tw-20v'
             ? (side === 'left' ? hid2GyouVLeft_Kana : hid2GyouVRight_Kana)
             : (side === 'left' ? hid2GyouHLeft_Kana : hid2GyouHRight_Kana);
-        const entry = Object.entries(gyouMap).find(([codeStr, name]) => name === '拗音' && parseInt(codeStr) <= (kb === 'tw-20v' ? 0x10 : 0x14));
+        // 押下コードのみを対象とする (<= 0x14 or 0x10)
+        const maxPressCode = kb === 'tw-20v' ? 0x10 : 0x14;
+        const entry = Object.entries(gyouMap).find(([codeStr, name]) => name === '拗音' && parseInt(codeStr) <= maxPressCode);
         return entry ? parseInt(entry[0]) : null;
     }, [side, kb]);
 
@@ -53,7 +56,6 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
     const selectNextRandomTarget = useCallback(() => {
         if (allYouonCharInfos.length > 0) {
             const randomIndex = Math.floor(Math.random() * allYouonCharInfos.length);
-            console.log(">>> Selecting new random target (Youon):", allYouonCharInfos[randomIndex]);
             setRandomTarget(allYouonCharInfos[randomIndex]);
             setStage('gyouInput'); // ステージもリセット
         } else {
@@ -63,8 +65,6 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
 
     useEffect(() => {
 
-        console.log("Youon useEffect run. isActive:", isActive, "isRandomMode:", isRandomMode, "randomTarget:", randomTarget?.char);
-
         if (isActive) {
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
@@ -72,7 +72,6 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
 
             // --- リセット条件 ---
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                console.log("Resetting Youon to normal mode or index changed");
                 setStage('gyouInput');
                 setRandomTarget(null);
                 prevGIdxRef.current = gIdx;
@@ -137,14 +136,11 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
 
     // handleInput
     const handleInput = useCallback((info: PracticeInputInfo): PracticeInputResult => {
-        console.log("Youon Input:", info, "Stage:", stage, "Expected Gyou:", expectedGyouKey, "Expected Dan:", expectedDanKey, "RandomMode:", isRandomMode, "PropOK:", okVisible);
 
         if (!isActive || okVisible) {
-            console.log("Youon Input Ignored: Inactive or Prop OK visible");
             return { isExpected: false, shouldGoToNext: false };
         }
         if (!expectedGyouKey || !expectedDanKey || youonKeyCode === null) {
-             console.log("Youon Input Ignored: Expected keys invalid or youonKeyCode missing");
              return { isExpected: false, shouldGoToNext: false };
         }
 
@@ -159,21 +155,16 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
                 if (expectedGyouKeyCodes.includes(info.pressCode)) {
                     setStage('youonInput');
                     isExpected = true;
-                    console.log("Transition to youonInput stage");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect gyou input");
                 }
             } else if (stage === 'youonInput') {
                 if (info.pressCode === youonKeyCode) {
                     setStage('danInput');
                     isExpected = true;
-                    console.log("Transition to danInput stage");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect youon input");
                     setStage('gyouInput');
-                    console.log("Resetting to gyouInput stage due to incorrect youon key");
                 }
             } else if (stage === 'danInput') {
                 const expectedDanKeyCodes = Object.entries(hid2Dan)
@@ -187,29 +178,26 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
                     } else {
                         shouldGoToNext = true;
                     }
-                    console.log("Correct dan input");
                 } else {
                     isExpected = false;
-                    console.log("Incorrect dan input");
                     setStage('gyouInput');
-                    console.log("Resetting to gyouInput stage due to incorrect dan key");
                 }
             }
         }
 
-        console.log("Youon Result:", { isExpected, shouldGoToNext });
         return { isExpected, shouldGoToNext };
     }, [
         isActive, okVisible, stage, expectedGyouKey, expectedDanKey, youonKeyCode,
         hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage
     ]);
 
-    const getHighlightClassName = useCallback((key: string, layoutIndex: number): string | null => {
+    const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
+        const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive || okVisible) {
-            return null;
+            return noHighlight;
         }
         if (!expectedGyouKey || !expectedDanKey) {
-            return null;
+            return noHighlight;
         }
 
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
@@ -232,14 +220,13 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
         }
 
         if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && key === expectedKeyName) {
-            return 'bg-blue-100';
+            return { className: 'bg-blue-100', overrideKey: null };
         }
-        return null;
+        return noHighlight;
     }, [isActive, okVisible, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
 
     // reset
     const reset = useCallback(() => {
-        console.log("Resetting Youon Practice Hook");
         setStage('gyouInput');
         setRandomTarget(null);
         prevGIdxRef.current = -1;
@@ -262,7 +249,6 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
 
         const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
         return isTarget;
-    // ★ ESLint 警告対応: kb を削除
     }, [isActive, stage]);
 
     return {
