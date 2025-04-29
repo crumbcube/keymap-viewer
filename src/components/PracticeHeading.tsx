@@ -4,36 +4,33 @@ import { PracticeMode, PracticeHookResult } from '../hooks/usePracticeCommons';
 import {
     youdakuonPracticeData,
     kigoPractice3Data,
-} from '../data/keymapData'; // ハイライトに必要なデータをインポート
+} from '../data/keymapData';
 
 interface PracticeHeadingProps {
   activePractice: PracticeHookResult | null;
   isRandomMode: boolean;
   practice: PracticeMode;
   gIdx: number;
-  dIdx: number;
+  dIdx: number; // dIdx を受け取る
   currentFunctionKeyMap: Record<number, string>;
-  // cols: number; // useMemo の依存配列から削除したため不要
-  fixedWidthNum: number; // OKマーク位置計算用
+  fixedWidthNum: number;
 }
 
 const keyWidthRem = 5.5;
-const gapRem = 0.5; // gap-2 = 0.5rem
+const gapRem = 0.5;
 
 const PracticeHeading: React.FC<PracticeHeadingProps> = ({
   activePractice,
   isRandomMode,
   practice,
   gIdx,
-  dIdx,
+  dIdx, // dIdx を受け取る
   currentFunctionKeyMap,
-  // cols, // 不要
   fixedWidthNum,
 }) => {
   const headingChars = activePractice?.headingChars ?? [];
   const okVisible = activePractice?.isOkVisible ?? false;
 
-  // OKマークの位置計算ロジック
   const okLeftPosition = useMemo(() => {
     const bsKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === 'BS');
     const bsKeyIndex = bsKeyEntry ? parseInt(bsKeyEntry[0]) : -1;
@@ -46,31 +43,51 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
       position = `calc(50% + ${offsetFromCenter}rem)`;
     }
     return position;
-  // ▼▼▼ 依存配列から cols を削除済み ▼▼▼
   }, [currentFunctionKeyMap, fixedWidthNum]);
-  // ▲▲▲ 修正完了 ▲▲▲
-
 
   return (
     <div className="relative flex justify-center mb-6">
       {/* 練習文字を表示する部分 */}
       <div className="flex justify-center">
         {headingChars.map((char: string, index: number) => {
-          let className = 'text-2xl font-bold';
+          let className = 'text-2xl'; // デフォルトは太字なし
+          let style: React.CSSProperties = { padding: '0.25rem' };
+
+          // ▼▼▼ 太字表示ロジックを修正 ▼▼▼
+          // 拗音拡張の場合、練習対象の文字(index 1 と 3)のみ太字にする
+          if (practice === '拗音拡張' && (index === 1 || index === 3)) {
+              className += ' font-bold';
+          } else if (practice !== '拗音拡張') {
+              // 拗音拡張以外はデフォルトで太字
+              className += ' font-bold';
+          }
+          // ▲▲▲ 修正完了 ▲▲▲
+
+          // ハイライト処理 (ランダムモードでない場合)
           if (!isRandomMode) {
-              // ヘッダ文字のハイライトロジック
+              let shouldHighlight = false;
               if (practice === '拗濁音の練習') {
-                  if (gIdx >= 0 && gIdx < youdakuonPracticeData.length && youdakuonPracticeData[gIdx]?.chars && index === dIdx) { className += ' bg-blue-100'; }
+                  shouldHighlight = (gIdx >= 0 && gIdx < youdakuonPracticeData.length && youdakuonPracticeData[gIdx]?.chars && index === dIdx);
               } else if (practice === '拗半濁音の練習') {
-                  if (index === dIdx) { className += ' bg-blue-100'; }
+                  shouldHighlight = (index === dIdx);
               } else if (practice === '記号の基本練習３') {
-                  if (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx) { className += ' bg-blue-100'; }
-              } else if (index === dIdx) { // 清音、拗音、濁音、半濁音、小文字、記号1, 2
-                className += ' bg-blue-100';
+                  shouldHighlight = (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx);
+              // ▼▼▼ 拗音拡張のハイライト条件を修正 ▼▼▼
+              } else if (practice === '拗音拡張') {
+                  // dIdx (App.tsx から渡される値) が 1 または 3 の場合にハイライト
+                  shouldHighlight = (index === dIdx && (dIdx === 1 || dIdx === 3));
+              // ▲▲▲ 修正完了 ▲▲▲
+              } else { // 清音、拗音、濁音、半濁音、小文字、記号1, 2
+                  shouldHighlight = (index === dIdx);
+              }
+
+              if (shouldHighlight) {
+                  className += ' bg-blue-100';
               }
           }
+
           return (
-            <span key={index} className={className} style={{ padding: '0.25rem' }}>
+            <span key={index} className={className} style={style}>
               {char}
             </span>
           );

@@ -17,10 +17,14 @@ import {
     kigoPractice2Data,
     kigoPractice3Data,
     functionKeyMaps,
+    youdakuonPracticeData, // 拗濁音データもインポート
+    youhandakuonPracticeData, // 拗半濁音データもインポート
 } from '../data/keymapData';
 
 /* 練習モードの型定義 */
+// ▼▼▼ PracticeMode に '拗音拡張' を追加 ▼▼▼
 export type PracticeMode =
+    | ''
     | '清音の基本練習'
     | '拗音の基本練習'
     | '濁音の基本練習'
@@ -31,13 +35,19 @@ export type PracticeMode =
     | '記号の基本練習３'
     | '拗濁音の練習'
     | '拗半濁音の練習'
-    | ''; // 未選択状態
+    | '拗音拡張'; // ← 追加
+// ▲▲▲ 修正完了 ▲▲▲
 
 /* 左右の型 */
 export type KeyboardSide = 'left' | 'right';
 
 /* キーボードモデルの型定義 */
 export type KeyboardModel = 'tw-20h' | 'tw-20v';
+
+// ▼▼▼ PracticeStage 型を追加・エクスポート ▼▼▼
+export type PracticeStage = 'line' | 'youon' | 'dan' | 'middle' | 'kigo' | 'longPressWait' | 'longPressCheck' | 'gyouInput' | 'dakuonInput' | 'handakuonInput' | 'dakuonInput1' | 'dakuonInput2' | 'kigoInput' | 'kigoInputWait' | 'tsuInput'; // 既存のステージも網羅
+// ▲▲▲ 修正完了 ▲▲▲
+
 
 /* --- TW-20H マッピング --- */
 
@@ -431,6 +441,80 @@ export const allKigo3CharInfos: CharInfoKigo3[] = kigoPractice3Data.flatMap(grou
 );
 // ------------------------------------
 
+// ▼▼▼ getHidKeyCodes 関数を追加・エクスポート ▼▼▼
+/**
+ * 指定されたキー名に対応するHIDキーコードの配列を取得する
+ * @param keyName キー名 (例: "あ行", "あ段", "拗音", "{")
+ * @param layers 現在のキーボードレイアウトデータ
+ * @param kb キーボードモデル
+ * @param side 左右どちらか
+ * @returns 対応するHIDキーコード(1-based)の配列
+ */
+export const getHidKeyCodes = (keyName: string, layers: string[][], kb: KeyboardModel, side: KeyboardSide): number[] => {
+    if (!keyName) return [];
+    const codes: number[] = [];
+    const funcMap = functionKeyMaps[kb]?.[side] ?? {};
+
+    layers.forEach((layer, layerIndex) => {
+        layer.forEach((key, keyIndex) => {
+            const currentKeyName = (key ?? '').trim();
+            const hidCode = keyIndex + 1;
+
+            // 機能キーのマッピングを優先する場合 (練習モードでの表示名と一致させる)
+            let effectiveKeyName = currentKeyName;
+            if (layerIndex === 2 || layerIndex === 3 || layerIndex === 6) { // かな関連レイヤー、記号長押し
+                 if (funcMap[keyIndex]) {
+                     effectiveKeyName = funcMap[keyIndex];
+                 }
+            }
+            // 拗音キーは '拗音' または '拗1'～'拗4' を同一視する (必要なら)
+            if (keyName === '拗音' && ['拗音', '拗1', '拗2', '拗3', '拗4'].includes(effectiveKeyName)) {
+                 codes.push(hidCode);
+            } else if (effectiveKeyName === keyName) {
+                codes.push(hidCode);
+            }
+        });
+    });
+    // console.log(`getHidKeyCodes for "${keyName}" (kb=${kb}, side=${side}):`, codes.map(c => `0x${c.toString(16)}`));
+    //return [...new Set(codes)]; // 重複を除去
+    return Array.from(new Set(codes)); // ← 修正後 (Array.from を使用)
+};
+// ▲▲▲ 修正完了 ▲▲▲
+
+
+// ▼▼▼ hid2Gyou, hid2Dan, hid2Youon 関数を追加・エクスポート ▼▼▼
+export const hid2Gyou = (hidCode: number, kb: KeyboardModel, side: KeyboardSide): string | undefined => {
+    if (kb === 'tw-20v') {
+        return side === 'right' ? hid2GyouVRight_Kana[hidCode] : hid2GyouVLeft_Kana[hidCode];
+    } else { // tw-20h
+        return side === 'right' ? hid2GyouHRight_Kana[hidCode] : hid2GyouHLeft_Kana[hidCode];
+    }
+};
+
+export const hid2Dan = (hidCode: number, kb: KeyboardModel, side: KeyboardSide): string | undefined => {
+     if (kb === 'tw-20v') {
+        return side === 'right' ? hid2DanVRight_Kana[hidCode] : hid2DanVLeft_Kana[hidCode];
+    } else { // tw-20h
+        return side === 'right' ? hid2DanHRight_Kana[hidCode] : hid2DanHLeft_Kana[hidCode];
+    }
+};
+
+// 拗音キーのマッピング (hid2YouonVRight_Kana などは未定義のため、ここで定義)
+const hid2YouonVRight_Kana: Record<number, string> = { 0x05: '拗1', 0x07: '拗2', 0x0D: '拗3', 0x0F: '拗4', 0x02: '拗音' };
+const hid2YouonVLeft_Kana: Record<number, string> = { 0x05: '拗1', 0x07: '拗2', 0x0D: '拗3', 0x0F: '拗4', 0x03: '拗音' };
+const hid2YouonHRight_Kana: Record<number, string> = { 0x07: '拗1', 0x09: '拗2', 0x11: '拗3', 0x13: '拗4', 0x03: '拗音' };
+const hid2YouonHLeft_Kana: Record<number, string> = { 0x07: '拗1', 0x09: '拗2', 0x11: '拗3', 0x13: '拗4', 0x03: '拗音' };
+
+export const hid2Youon = (hidCode: number, kb: KeyboardModel, side: KeyboardSide): string | undefined => {
+     if (kb === 'tw-20v') {
+        return side === 'right' ? hid2YouonVRight_Kana[hidCode] : hid2YouonVLeft_Kana[hidCode];
+    } else { // tw-20h
+        return side === 'right' ? hid2YouonHRight_Kana[hidCode] : hid2YouonHLeft_Kana[hidCode];
+    }
+};
+// ▲▲▲ 修正完了 ▲▲▲
+
+
 // 各練習モードのデータ (再エクスポート)
 export {
     gyouList,
@@ -450,4 +534,6 @@ export {
     kigoPractice2Data,
     kigoPractice3Data,
     functionKeyMaps,
+    youdakuonPracticeData, // 拗濁音データもエクスポート
+    youhandakuonPracticeData, // 拗半濁音データもエクスポート
 };

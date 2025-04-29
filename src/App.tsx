@@ -24,6 +24,8 @@ import {
     // kigoMapping2, // KeyboardLayout に移動
     // kigoMapping3, // KeyboardLayout に移動
     functionKeyMaps,
+    youonKakuchoChars, // 拗音拡張のデータも依存配列に含めるためインポート
+    youonKakuchoDanMapping, // 拗音拡張のデータも依存配列に含めるためインポート
 } from './data/keymapData';
 // import { getKeyStyle, isLargeSymbol } from './utils/styleUtils'; // KeyboardLayout に移動
 import {
@@ -44,6 +46,7 @@ import useKigoPractice2 from './hooks/useKigoPractice2';
 import useKigoPractice3 from './hooks/useKigoPractice3';
 import useYoudakuonPractice from './hooks/useYoudakuonPractice';
 import useYouhandakuonPractice from './hooks/useYouhandakuonPractice';
+import useYouonKakuchoPractice from './hooks/useYouonKakuchoPractice'; // ← 追加
 
 // 作成したコンポーネントをインポート
 import PracticeMenu from './components/PracticeMenu';
@@ -68,7 +71,7 @@ export default function App() {
 
     /* 現在の行/段/文字インデックス */
     const [gIdx, setGIdx] = useState(0);
-    const [dIdx, setDIdx] = useState(0);
+    const [dIdx, setDIdx] = useState(1); // 拗音拡張の初期値を 1 (ぃ) に変更
 
     /* UIフィードバック */
     const [okVisible, setOK] = useState(false);
@@ -86,7 +89,7 @@ export default function App() {
         gIdx, dIdx, isActive: false, okVisible, side, layers, kb, isRandomMode
     }), [gIdx, dIdx, okVisible, side, layers, kb, isRandomMode]);
 
-    // 各練習フックの呼び出し (変更なし)
+    // 各練習フックの呼び出し
     const seionPractice = useSeionPractice({ ...commonHookProps, isActive: practice === '清音の基本練習' });
     const youonPractice = useYouonPractice({ ...commonHookProps, isActive: practice === '拗音の基本練習' });
     const dakuonPractice = useDakuonPractice({ ...commonHookProps, isActive: practice === '濁音の基本練習' });
@@ -97,8 +100,9 @@ export default function App() {
     const kigoPractice3 = useKigoPractice3({ ...commonHookProps, isActive: practice === '記号の基本練習３' });
     const youdakuonPractice = useYoudakuonPractice({ ...commonHookProps, isActive: practice === '拗濁音の練習' });
     const youhandakuonPractice = useYouhandakuonPractice({ ...commonHookProps, isActive: practice === '拗半濁音の練習' });
+    const youonKakuchoPractice = useYouonKakuchoPractice({ ...commonHookProps, isActive: practice === '拗音拡張' }); // ← 追加
 
-    // --- 現在アクティブな練習フックを選択 --- (変更なし)
+    // --- 現在アクティブな練習フックを選択 ---
     const activePractice: PracticeHookResult | null = useMemo(() => {
         switch (practice) {
             case '清音の基本練習': return seionPractice;
@@ -111,9 +115,10 @@ export default function App() {
             case '記号の基本練習３': return kigoPractice3;
             case '拗濁音の練習': return youdakuonPractice;
             case '拗半濁音の練習': return youhandakuonPractice;
+            case '拗音拡張': return youonKakuchoPractice; // ← 追加
             default: return null;
         }
-    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice]);
+    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice]); // ← 依存配列に追加
 
     // キーボード表示の固定幅 (変更なし)
     const keyWidthRem = 5.5;
@@ -155,7 +160,10 @@ export default function App() {
     // --- 次のステージへ --- (依存配列修正済み)
     const nextStage = useCallback(() => {
         if (isRandomMode) {
-            console.warn("nextStage called in random mode. This should not happen.");
+            // ランダムモードの場合は activePractice?.reset() を呼ぶ (フック内で次のターゲット生成)
+            activePractice?.reset?.();
+            setOK(true);
+            setTimeout(() => setOK(false), 1000); // OK表示だけ行う
             return;
         }
         setOK(true);
@@ -248,12 +256,29 @@ export default function App() {
                 }
                 nextGIdx = 0;
             }
+            // ▼▼▼ 拗音拡張のロジックを修正 ▼▼▼
+            else if (practice === '拗音拡張') {
+                if (dIdx === 1) { // 現在「ぃ」を練習していた場合
+                    nextDIdx = 3; // 次は「ぇ」
+                } else if (dIdx === 3) { // 現在「ぇ」を練習していた場合
+                    nextDIdx = 1; // 次は次の行の「ぃ」
+                    nextGIdx = (gIdx + 1) % youonGyouList.length;
+                } else {
+                    // dIdx が 1, 3 以外の場合は強制的に 1 に戻す
+                    console.warn(`Invalid dIdx ${dIdx} in nextStage for 拗音拡張. Resetting to 1.`);
+                    nextDIdx = 1;
+                    // gIdx はそのまま or 必要ならリセット
+                }
+            }
+            // ▲▲▲ 修正完了 ▲▲▲
+
 
             setGIdx(nextGIdx);
             setDIdx(nextDIdx);
             setOK(false);
         }, 1000);
-    }, [practice, gIdx, dIdx, setOK, setGIdx, setDIdx, isRandomMode, gyouList, danOrder, youonGyouList, youonGyouChars, dakuonGyouList, dakuonGyouChars, handakuonGyouList, handakuonGyouChars, sokuonKomojiData, kigoPractice1Data, kigoPractice2Data, kigoPractice3Data, youdakuonPracticeData, youhandakuonPracticeData]); // 依存配列を修正
+    // 依存配列に youonGyouList を追加
+    }, [practice, gIdx, dIdx, setOK, setGIdx, setDIdx, isRandomMode, activePractice, /* ...他の練習データ... */ gyouList, danOrder, youonGyouList, youonGyouChars, dakuonGyouList, dakuonGyouChars, handakuonGyouList, handakuonGyouChars, sokuonKomojiData, kigoPractice1Data, kigoPractice2Data, kigoPractice3Data, youdakuonPracticeData, youhandakuonPracticeData, youonKakuchoChars]);
 
     // onInput (依存配列修正済み)
     const onInput: (ev: HIDInputReportEvent) => void = useCallback((ev) => {
@@ -443,12 +468,14 @@ export default function App() {
         };
      }, [onInput, setTitle, setCols, setLayers, setFW, setSN, setShowTrainingButton, setSide, setKb, sampleJson]); // 依存配列に sampleJson を追加
 
-    // 練習モード選択時のリセット処理 (useCallback 不要な場合がある)
+    // 練習モード選択時のリセット処理
     const handlePracticeSelect = (item: PracticeMode) => {
         console.log(`Practice mode selected: ${item}`);
         activePractice?.reset?.();
         setPractice(item);
-        setGIdx(0); setDIdx(0);
+        setGIdx(0);
+        // 拗音拡張選択時は dIdx を 1 に初期化
+        setDIdx(item === '拗音拡張' ? 1 : 0);
         setOK(false);
         setLastInvalidKeyCode(null);
         if (invalidInputTimeoutRef.current !== null) {
@@ -458,7 +485,7 @@ export default function App() {
         pressedKeysRef.current.clear();
         setShowKeyLabels(true);
         setIsRandomMode(false);
-     }; // useCallback は不要な場合がある
+     };
 
     // ランダムモード切り替えハンドラ (依存配列修正済み)
     const toggleRandomMode = useCallback(() => {
@@ -536,7 +563,7 @@ export default function App() {
                             isRandomMode={isRandomMode}
                             practice={practice}
                             gIdx={gIdx}
-                            dIdx={dIdx}
+                            dIdx={dIdx} // dIdx をそのまま渡す (フック内で補正 or Heading で利用)
                             currentFunctionKeyMap={currentFunctionKeyMap}
                             // cols={cols} // PracticeHeadingProps から削除したため渡さない
                             fixedWidthNum={fixedWidthNum}
@@ -551,40 +578,9 @@ export default function App() {
                         />
 
                         {/* 練習モードに応じたキーボード表示 */}
-                        {practice === '記号の基本練習１' ? (
-                            <div className="col-start-2 justify-self-center">
-                                <KeyboardLayout
-                                    layerData={layers[6]}
-                                    layoutIndex={6}
-                                    layoutTitle="記号１ (長押し)"
-                                    cols={cols}
-                                    fixedWidth={fixedWidth}
-                                    showKeyLabels={showKeyLabels}
-                                    lastInvalidKeyCode={lastInvalidKeyCode}
-                                    activePractice={activePractice}
-                                    practice={practice}
-                                    currentFunctionKeyMap={currentFunctionKeyMap}
-                                    training={training} // training を渡す
-                                />
-                            </div>
-                        ) : ['記号の基本練習２', '記号の基本練習３'].includes(practice) ? (
-                            <div className="col-start-2 justify-self-center">
-                                <KeyboardLayout
-                                    layerData={layers[2]}
-                                    layoutIndex={2}
-                                    layoutTitle={practice === '記号の基本練習２' ? '記号２ (後押し)' : '記号３（先押し）'}
-                                    cols={cols}
-                                    fixedWidth={fixedWidth}
-                                    showKeyLabels={showKeyLabels}
-                                    lastInvalidKeyCode={lastInvalidKeyCode}
-                                    activePractice={activePractice}
-                                    practice={practice}
-                                    currentFunctionKeyMap={currentFunctionKeyMap}
-                                    training={training} // training を渡す
-                                />
-                            </div>
-                        ) : practice ? (
-                            <>
+                        {/* 記号練習1, 2, 3 以外の場合にかなスタート/エンドを表示 */}
+                        {(practice && !['記号の基本練習１', '記号の基本練習２', '記号の基本練習３'].includes(practice)) ? (
+                             <>
                                 {/* かなモード（スタート） */}
                                 <div className="justify-self-center">
                                     <KeyboardLayout
@@ -598,7 +594,7 @@ export default function App() {
                                         activePractice={activePractice}
                                         practice={practice}
                                         currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training} // training を渡す
+                                        training={training}
                                     />
                                 </div>
 
@@ -615,10 +611,44 @@ export default function App() {
                                         activePractice={activePractice}
                                         practice={practice}
                                         currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training} // training を渡す
+                                        training={training}
                                     />
                                 </div>
                             </>
+                        ) : ['記号の基本練習２', '記号の基本練習３'].includes(practice) ? (
+                             // 記号練習2, 3 の場合はかなスタートのみ表示
+                             <div className="col-start-2 justify-self-center">
+                                <KeyboardLayout
+                                    layerData={layers[2]}
+                                    layoutIndex={2}
+                                    layoutTitle={practice === '記号の基本練習２' ? '記号２ (後押し)' : '記号３（先押し）'}
+                                    cols={cols}
+                                    fixedWidth={fixedWidth}
+                                    showKeyLabels={showKeyLabels}
+                                    lastInvalidKeyCode={lastInvalidKeyCode}
+                                    activePractice={activePractice}
+                                    practice={practice}
+                                    currentFunctionKeyMap={currentFunctionKeyMap}
+                                    training={training}
+                                />
+                            </div>
+                        ) : practice === '記号の基本練習１' ? (
+                             // 記号練習1 の場合は記号長押しレイヤーのみ表示
+                             <div className="col-start-2 justify-self-center">
+                                <KeyboardLayout
+                                    layerData={layers[6]}
+                                    layoutIndex={6}
+                                    layoutTitle="記号１ (長押し)"
+                                    cols={cols}
+                                    fixedWidth={fixedWidth}
+                                    showKeyLabels={showKeyLabels}
+                                    lastInvalidKeyCode={lastInvalidKeyCode}
+                                    activePractice={activePractice}
+                                    practice={practice}
+                                    currentFunctionKeyMap={currentFunctionKeyMap}
+                                    training={training}
+                                />
+                            </div>
                         ) : null}
                     </div>
                 </>
