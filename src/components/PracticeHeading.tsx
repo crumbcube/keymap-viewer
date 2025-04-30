@@ -9,7 +9,7 @@ import {
 
 interface PracticeHeadingProps {
   activePractice: PracticeHookResult | null;
-  isRandomMode: boolean;
+  isRandomMode: boolean; // isRandomMode はチャレンジモードでは true 扱いされる
   practice: PracticeMode;
   gIdx: number;
   dIdx: number; // dIdx を受け取る
@@ -61,34 +61,53 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
       return null;
   }, [currentGairaigoGroup, dIdx]);
 
+  // ▼▼▼ チャレンジモードの特殊表示判定 ▼▼▼
+  const isChallengeCountdown = practice === 'かな入力１分間トレーニング' && headingChars.length === 1 && headingChars[0].endsWith('秒');
+  const isChallengeResult = practice === 'かな入力１分間トレーニング' && headingChars.length === 1 && headingChars[0].startsWith('終了!');
+  // ▲▲▲ 追加 ▲▲▲
+
   return (
     <div className="relative flex justify-center mb-6">
       {/* 練習文字を表示する部分 */}
       <div className="flex justify-center">
         {headingChars.map((char: string, index: number) => {
-          let className = 'text-2xl';
+          // ▼▼▼ クラスとスタイルの初期化を修正 ▼▼▼
+          let className = '';
           let style: React.CSSProperties = { padding: '0.25rem' };
+
+          // チャレンジモードのカウントダウン/結果表示は特別なスタイル
+          if (isChallengeCountdown || isChallengeResult) {
+              className = 'text-3xl font-bold'; // 少し大きめに
+              if (isChallengeResult) {
+                  className += ' text-blue-600'; // 結果は青色など
+              }
+          } else {
+              // 通常の練習文字表示
+              className = 'text-2xl';
+          }
+          // ▲▲▲ 修正 ▲▲▲
 
           // --- 太字表示ロジック ---
           let isBoldTarget = false;
-          // ▼▼▼ 拗音拡張 または 外来語の発音補助 のランダムモード時のみ太字にする ▼▼▼
-          if (isRandomMode && (practice === '拗音拡張' || practice === '外来語の発音補助')) {
-              isBoldTarget = true;
-          // ▲▲▲ 修正 ▲▲▲
-          } else if (practice === '外来語の発音補助' && currentGairaigoGroup) { // 通常モードの外来語
-              // グループ内の練習対象文字のヘッダインデックスと一致するか (通常モードでは headingChars は複数表示される可能性があるため)
-              isBoldTarget = currentGairaigoGroup.targets.some(target => target.headerIndex === index);
-          } else if (practice !== '拗音拡張' && practice !== '外来語の発音補助') { // 上記以外の通常モード
-              // デフォルトで太字
-              isBoldTarget = true;
+          // ▼▼▼ チャレンジモードの特殊表示以外の場合に太字判定 ▼▼▼
+          if (!isChallengeCountdown && !isChallengeResult) {
+              if (isRandomMode && (practice === '拗音拡張' || practice === '外来語の発音補助' || practice === 'かな入力１分間トレーニング')) { // チャレンジもランダム扱い
+                  isBoldTarget = true;
+              } else if (practice === '外来語の発音補助' && currentGairaigoGroup) {
+                  isBoldTarget = currentGairaigoGroup.targets.some(target => target.headerIndex === index);
+              } else if (practice !== '拗音拡張' && practice !== '外来語の発音補助') {
+                  isBoldTarget = true;
+              }
           }
+          // ▲▲▲ 修正 ▲▲▲
 
           if (isBoldTarget) {
               className += ' font-bold';
           }
 
           // --- ハイライト処理 (ランダムモードでない場合) ---
-          if (!isRandomMode) {
+          // ▼▼▼ チャレンジモードではハイライトしない ▼▼▼
+          if (!isRandomMode && practice !== 'かな入力１分間トレーニング') {
               let shouldHighlight = false;
               if (practice === '拗濁音の練習') {
                   shouldHighlight = (gIdx >= 0 && gIdx < youdakuonPracticeData.length && youdakuonPracticeData[gIdx]?.chars && index === dIdx);
@@ -110,16 +129,18 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
                   className += ' bg-blue-100';
               }
           }
+          // ▲▲▲ 修正 ▲▲▲
 
           return (
-            <span key={index} className={className} style={style}>
+            <span key={index} className={className.trim()} style={style}>
               {char}
             </span>
           );
         })}
       </div>
       {/* OKマーク */}
-      {okVisible && (
+      {/* ▼▼▼ チャレンジモードではOKマークを表示しない ▼▼▼ */}
+      {okVisible && practice !== 'かな入力１分間トレーニング' && (
           <div
               className="absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2"
               style={{
@@ -130,6 +151,7 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
               <span className='text-3xl font-bold text-green-600' style={{ padding: '0.25rem' }}>OK</span>
           </div>
       )}
+      {/* ▲▲▲ 修正 ▲▲▲ */}
     </div>
   );
 };

@@ -212,36 +212,50 @@ const useKigoPractice2 = ({
         isRandomMode, selectNextRandomTarget, setStage
     ]);
 
+    // ▼▼▼ getHighlightClassName を修正 ▼▼▼
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive || okVisible) {
-            return noHighlight; //
+            return noHighlight;
         }
-        // 問題切り替え直後は強制的に 'gyouInput' として扱う (通常モードのみ)
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
         const currentStageForHighlight = indicesJustChanged ? 'gyouInput' : stage;
 
-        let expectedKeyDisplayName: string | null = null;
+        let expectedKeyDisplayName: string | null = null; // ハイライトすべきキーの「表示名」
         const targetLayoutIndex = 2; // 記号2はスタートレイヤーのみ
 
         switch (currentStageForHighlight) {
             case 'gyouInput':
-                expectedKeyDisplayName = highlightTargetDisplayName;
+                // ハイライトすべきキーの「本来のキー名」（例: 'あ行'）を取得
+                expectedKeyDisplayName = currentTargetOriginalKey; // ★★★ 修正: 本来のキー名を使う ★★★
                 break;
             case 'kigoInput':
-                const kigoKeyIndex = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '記号')?.[0];
-                expectedKeyDisplayName = kigoKeyIndex !== undefined ? currentFunctionKeyMap[parseInt(kigoKeyIndex)] : '記号'; // 機能キー名 or デフォルト
+                // ハイライトすべき「記号」キーの「表示名」を取得
+                const layer2 = layers[2] ?? [];
+                // hid2Gyou マッピングから '記号' キーの HID コード (1-based) を検索
+                const kigoKeyEntry = Object.entries(hid2Gyou)
+                    .find(([_, name]) => name === '記号');
+                const kigoHidCode = kigoKeyEntry ? parseInt(kigoKeyEntry[0]) : null;
+                // HID コードからインデックス (0-based) を計算
+                const kigoKeyIndex = kigoHidCode !== null ? kigoHidCode - 1 : -1;
+
+                // sampleJson (layers[2]) から実際の表示名を取得
+                expectedKeyDisplayName = (kigoKeyIndex !== -1 && layer2[kigoKeyIndex])
+                    ? layer2[kigoKeyIndex]
+                    : '記号'; // 見つからない場合のデフォルト
                 break;
         }
 
+        // レンダリング中のキーの表示名 (keyName) と、期待される表示名 (expectedKeyDisplayName) を比較
         if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyDisplayName) {
             return { className: 'bg-blue-100', overrideKey: null };
         }
         return noHighlight;
     }, [
-        isActive, okVisible, stage, highlightTargetDisplayName,
-        isRandomMode, gIdx, dIdx, currentFunctionKeyMap
+        isActive, okVisible, stage, currentTargetOriginalKey, // highlightTargetDisplayName は不要に
+        isRandomMode, gIdx, dIdx, layers, hid2Gyou // layers, hid2Gyou を依存配列に追加
     ]);
+    // ▲▲▲ 修正完了 ▲▲▲
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;

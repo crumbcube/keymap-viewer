@@ -96,7 +96,10 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
 
     // 正解キーハイライト処理
     if (!isInvalid && showKeyLabels && !activePractice?.isOkVisible && activePractice) {
-        const result = activePractice.getHighlightClassName(k, layoutIndex);
+        // ▼▼▼ getHighlightClassName に渡すキー名を originalKey に変更 ▼▼▼
+        // const result = activePractice.getHighlightClassName(k, layoutIndex);
+        const result = activePractice.getHighlightClassName(originalKey, layoutIndex);
+        // ▲▲▲ 変更完了 ▲▲▲
         if (result.className) {
             highlightResult = result;
         }
@@ -106,8 +109,21 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
     let displayContent: string; // displayContent の宣言をここに移動
     if (!training) { // training が false なら練習モードOFF
         // 練習モードOFF時のレンダリング
+        const defaultStyle = 'bg-white'; // デフォルトの背景クラス
+        let keyStyleClass = getKeyStyle(originalKey); // まず styleUtils から取得
+
+        // ▼▼▼ 「＝\n記号」の条件を追加 ▼▼▼
+        if (originalKey === '記号' || originalKey === '＝\n記号') {
+            // もしキーが「記号」または「＝\n記号」なら、強制的にデフォルトスタイルにする
+            keyStyleClass = defaultStyle;
+        } else if (!keyStyleClass.includes('bg-')) {
+             // getKeyStyle が背景色クラスを返さなかった場合もデフォルトを適用
+             keyStyleClass = `${keyStyleClass} ${defaultStyle}`.trim();
+        }
+        // ▲▲▲ 修正完了 ▲▲▲
+
         return (
-            <motion.div key={idx} className={`bg-white border rounded p-3 text-center text-sm shadow flex justify-center items-center ${getKeyStyle(originalKey)}`}
+            <motion.div key={idx} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center ${keyStyleClass}`} // ← 修正したクラスを適用
                 whileHover={{ scale: 1.05 }}
                 style={{ minHeight: '3rem', fontSize: isLargeSymbol(originalKey) ? '1.8rem' : undefined }}>
                 <code style={{ whiteSpace: "pre-line" }}>
@@ -124,7 +140,9 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
 
     // 練習モードON時の表示内容
     if (showKeyLabels) {
+        // ▼▼▼ overrideKey があればそれを、なければ加工後の k を表示 ▼▼▼
         const finalKeyLabel = highlightResult.overrideKey ?? k;
+        // ▲▲▲ 変更完了 ▲▲▲
         displayContent = finalKeyLabel === '' ? '\n' : finalKeyLabel;
     } else {
         // キー表示OFF時は、元々空だったキー以外は ____ でマスク

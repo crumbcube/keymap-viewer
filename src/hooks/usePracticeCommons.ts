@@ -3,6 +3,7 @@ import {
     gyouList,
     danOrder,
     gyouChars,
+    danList, // danList をインポート
     youonGyouList,
     youonGyouChars,
     youonDanMapping,
@@ -38,7 +39,10 @@ export type PracticeMode =
     | '拗濁音の練習'
     | '拗半濁音の練習'
     | '拗音拡張'
-    | '外来語の発音補助';
+    | '外来語の発音補助'
+    | 'かな入力１分間トレーニング'
+    | '記号入力１分間トレーニング' // (将来用)
+    | '短文入力３分間トレーニング'; // (将来用)
 
 /* 左右の型 */
 export type KeyboardSide = 'left' | 'right';
@@ -371,14 +375,27 @@ export interface CharInfoYouhandakuon {
 
 
 // 全清音文字情報
+// ▼▼▼ 修正: danKey を danList から取得するように変更 ▼▼▼
 export const allSeionCharInfos: CharInfoSeion[] = gyouList.flatMap(gyou =>
-  danOrder[gyou]?.map((dan, index) => ({
-    type: 'seion' as const,
-    char: gyouChars[gyou]?.[index] ?? '?',
-    gyouKey: gyou,
-    danKey: dan,
-  })).filter(info => info.char !== '?') ?? []
+  danOrder[gyou]?.map((charInDanOrder, index) => {
+    // danOrder のインデックスを使って danList から正しい段名を取得
+    const danKey = danList[index];
+    // gyouChars から実際の文字を取得 (danOrder と gyouChars の整合性が前提)
+    const actualChar = gyouChars[gyou]?.[index];
+
+    // danKey と actualChar が取得できた場合のみオブジェクトを生成
+    if (danKey && actualChar) {
+      return {
+        type: 'seion' as const,
+        char: actualChar,
+        gyouKey: gyou,
+        danKey: danKey, // ★★★ ここが 'あ段', 'い段', ... になるように修正 ★★★
+      };
+    }
+    return null; // 不整合がある場合は null を返す
+  }).filter((info): info is CharInfoSeion => info !== null) ?? [] // null を除去
 );
+// ▲▲▲ 修正完了 ▲▲▲
 
 // 全拗音文字情報
 export const allYouonCharInfos: CharInfoYouon[] = youonGyouList.flatMap(gyou =>

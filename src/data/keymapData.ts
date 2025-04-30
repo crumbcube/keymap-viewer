@@ -4,16 +4,16 @@
 export const gyouList = ['あ行', 'か行', 'さ行', 'た行', 'な行', 'は行', 'ま行', 'や行', 'ら行', 'わ行'];
 export const danList = ['あ段', 'い段', 'う段', 'え段', 'お段'];
 export const danOrder: Record<string, string[]> = {
-  'あ行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'か行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'さ行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'た行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'な行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'は行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'ま行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'や行': ['あ段', 'う段', 'お段'],
-  'ら行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
-  'わ行': ['あ段', 'い段', 'う段'],
+  'あ行': ['あ', 'い', 'う', 'え', 'お'],
+  'か行': ['か', 'き', 'く', 'け', 'こ'],
+  'さ行': ['さ', 'し', 'す', 'せ', 'そ'],
+  'た行': ['た', 'ち', 'つ', 'て', 'と'],
+  'な行': ['な', 'に', 'ぬ', 'ね', 'の'],
+  'は行': ['は', 'ひ', 'ふ', 'へ', 'ほ'],
+  'ま行': ['ま', 'み', 'む', 'め', 'も'],
+  'や行': ['や', 'ゆ', 'よ'], // や行の「い」「え」は通常練習しないため削除
+  'ら行': ['ら', 'り', 'る', 'れ', 'ろ'],
+  'わ行': ['わ', 'を', 'ん'], // わ行の「い」「う」「え」は通常練習しないため削除・変更
 };
 export const gyouChars: Record<string, string[]> = {
     'あ行': ['あ', 'い', 'う', 'え', 'お'],
@@ -78,13 +78,30 @@ export interface SokuonKomojiPracticeGroup {
     inputs: (SokuonKomojiInputDef | null)[];
 }
 export const sokuonKomojiData: SokuonKomojiPracticeGroup[] = [
-    { groupName: '促音', chars: ['っ'], inputs: [null], },
-    { groupName: '小文字あ行', chars: ['ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ'], inputs: [ { gyouKey: 'あ行', dan: 'あ段' }, { gyouKey: 'あ行', dan: 'い段' }, { gyouKey: 'あ行', dan: 'う段' }, { gyouKey: 'あ行', dan: 'え段' }, { gyouKey: 'あ行', dan: 'お段' }, ], },
-    { groupName: '小文字や行', chars: ['ゃ', 'ゅ', 'ょ'], inputs: [ { gyouKey: 'や行', dan: 'あ段' }, { gyouKey: 'や行', dan: 'う段' }, { gyouKey: 'や行', dan: 'お段' }, ], },
-    { groupName: '小文字わ行', chars: ['ゎ'], inputs: [ { gyouKey: 'わ行', dan: 'あ段' }, ], },
-    { groupName: '小文字か行', chars: ['ヵ', 'ヶ'], inputs: [ { gyouKey: 'か行', dan: 'あ段' }, { gyouKey: 'か行', dan: 'え段' }, ], },
-    { groupName: '小文字た行', chars: ['っ'], inputs: [null], },
-    { groupName: 'ヴ', chars: ['ヴ'], inputs: [ { gyouKey: 'わ行', middleKey: '濁音', dan: 'う段' }, ], },
+  { groupName: '促音', chars: ['っ'], inputs: [null], }, // 促音は middleKey 不要
+  { groupName: '小文字あ行', chars: ['ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ'], inputs: [
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'あ段' }, // ← middleKey 追加
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'い段' }, // ← middleKey 追加
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'う段' }, // ← middleKey 追加
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'え段' }, // ← middleKey 追加
+      { gyouKey: 'あ行', middleKey: '濁音', dan: 'お段' }, // ← middleKey 追加
+  ], },
+  { groupName: '小文字や行', chars: ['ゃ', 'ゅ', 'ょ'], inputs: [
+      { gyouKey: 'や行', middleKey: '濁音', dan: 'あ段' }, // ← middleKey 追加
+      { gyouKey: 'や行', middleKey: '濁音', dan: 'う段' }, // ← middleKey 追加
+      { gyouKey: 'や行', middleKey: '濁音', dan: 'お段' }, // ← middleKey 追加
+  ], },
+  { groupName: '小文字わ行', chars: ['ゎ'], inputs: [
+      { gyouKey: 'わ行', middleKey: '濁音', dan: 'あ段' }, // ← middleKey 追加
+  ], },
+  { groupName: '小文字か行', chars: ['ヵ', 'ヶ'], inputs: [
+      { gyouKey: 'か行', middleKey: '濁音', dan: 'あ段' }, // ← middleKey 追加
+      { gyouKey: 'か行', middleKey: '濁音', dan: 'え段' }, // ← middleKey 追加
+  ], },
+  // { groupName: '小文字た行', chars: ['っ'], inputs: [null], }, // 「っ」は促音グループにあるので不要
+  { groupName: 'ヴ', chars: ['ヴ'], inputs: [
+      { gyouKey: 'わ行', middleKey: '濁音', dan: 'う段' }, // ヴは元々 middleKey がある
+  ], },
 ];
 export interface Kigo1InputDef { keyName: string; }
 export interface Kigo1PracticeGroup { groupName: string; chars: string[]; inputs: Kigo1InputDef[]; }
@@ -127,6 +144,11 @@ export const stepUpPracticeMenuItems = [
   '拗半濁音の練習',
   '拗音拡張',
   '外来語の発音補助', // ← 追加済み
+];
+export const challengeMenuItems = [
+  'かな入力１分間トレーニング',
+  '記号入力１分間トレーニング',
+  '短文入力３分間トレーニング',
 ];
 export const practiceMenuItems = [ ...basicPracticeMenuItems, ...stepUpPracticeMenuItems, ];
 
@@ -265,10 +287,10 @@ export const sampleJson = {
       "____", "____", "お段", "____", "____"  // 半角数字に修正済み
     ],
     [ // layers[4] 英字モード（スタート）
-      "IME ",     "____",     "Caps\nLock", "a&lt;&gt;A",  " BS",
-      "変換",     "@ - _ \\", "abc",          "def",  "TAB",
-      ". , ? !",  "ghi",      "jkl",          "mno",  " SP",
-      "' \" : ;", "pqrs",     "tuv",          "wxyz", "ENT"
+      "IME ",     "____",     "Caps\nLock", "訂正",  " BS",
+      "変換",     "@ - _ \\", "abc",        "def",  "TAB",
+      ". , ? !",  "ghi",      "jkl",        "mno",  " SP",
+      "' \" : ;", "pqrs",     "tuv",        "wxyz", "ENT"
     ],
     [ // layers[5] 英字モード（エンド）
       "____", "____", "____", "____", "____",
@@ -278,7 +300,7 @@ export const sampleJson = {
     ],
     [ // layers[6] 記号・長押し - right (変更なし)
       "____", "____", "____", "____", "____", // 0-4
-      "{",  "}",  "&lt;",  "&gt;",  "____", // 5, 6, 7, 8, 9
+      "{",  "}",  "<",  ">",  "____", // 5, 6, 7, 8, 9
       "'",  "\"", "(",  ")",  "____", // 10, 11, 12, 13, 14
       ":",  ";",  "「", "」", "____"  // 15, 16, 17, 18, 19
     ],
@@ -365,10 +387,10 @@ export const sampleJson = {
       "____", "____", "お段", "____", "____"  // 半角数字に修正済み
     ],
     [ // layers[4] 英字モード（スタート）
-      " BS", "____",     "Caps\nLock", "a&lt;&gt;A",  "IME ",
-      "TAB", "@ - _ \\", "abc",          "def",  "変換",
-      " SP", "ghi",      "jkl",          "mno",  ". , ? !",
-      "ENT", "pqrs",     "tuv",          "wxyz", "' \" : ;"
+      " BS", "____",     "Caps\nLock", "訂正",  "IME ",
+      "TAB", "@ - _ \\", "abc",        "def",  "変換",
+      " SP", "ghi",      "jkl",        "mno",  ". , ? !",
+      "ENT", "pqrs",     "tuv",        "wxyz", "' \" : ;"
     ],
     [ // layers[5] 英字モード（エンド）
       "____", "____", "____", "____", "____",
@@ -385,8 +407,8 @@ export const sampleJson = {
       "____", // 5: '
       "{",    // 18: {
       "}",    // 19: }
-      "&lt;",    // 6: &lt;
-      "&gt;",    // 7: &gt;
+      "<",    // 6: <
+      ">",    // 7: >
       "____", // 8: SP
       "'",    // 9: "
       "\"",   // 10: (
@@ -412,9 +434,9 @@ export const sampleJson = {
     ],
     [ // layers[9] 英字モード記号1
       "____", "____", "____", "____", "____",
-      "____", "記号", "＿",   "",     "",
+      "____", "記号", "＿",    "",     "",
       "____", "ー",   "＠",    "／",   "",
-      "____", "",     "",     "",     ""
+      "____", "",     "",      "",     ""
     ],
     [ // layers[10] 英字モード記号2
       "____", "____", "____", "____", "____",
@@ -435,7 +457,7 @@ export const sampleJson = {
       "ENT",    "Win+S(T)",   "Win(↓)",  "Win+T",    "Win+X"
     ],
     [ // layers[13] ショートカット3（Webブラウザ）
-      "ESC",    "",           "",      "ホールド",  "テンキー",
+      "ESC",    "ホールド",    "",      "",
       "S(Tab)", "Ctl+S(Tab)", "Ctl+W", "Ctl+Tab",  "更新",
       "S(SP)",  "Ctl+L",      "Ctl+T", "Ctl+S(T)", "履歴",
       "ENT",    "",           "",      "",         "検索"
@@ -487,7 +509,7 @@ export const sampleJson = {
       "____", "____", "____", "____"
     ],
     [ // layers[4] 英字モード（スタート）
-      "____",     "Caps\nLock", "a&lt;&gt;A",     " BS",
+      "____",     "Caps\nLock", "訂正",     " BS",
       "@ - _ \\", "abc",         "def",     "TAB",
       "ghi",      "jkl",         "mno",     " SP",
       "pqrs",     "tuv",         "wxyz",    "ENT",
@@ -502,7 +524,7 @@ export const sampleJson = {
     ],
     [ // layers[6] 記号・長押し
       "____", "____", "____", "____", // 0-3
-      "'",   "&lt;",  "&gt;", "____",       // 4, 5, 6, 7
+      "'",   "<",  ">", "____",       // 4, 5, 6, 7
       "\"", "(",   ")", "____",       // 8, 9, 10, 11
       ":",  "「",  "」", "____",      // 12, 13, 14, 15
       ";",  "{",   "}",  "____"      // 16-19
@@ -603,7 +625,7 @@ export const sampleJson = {
       "____", "____", "____", "____"
     ],
     [ // layers[4] 英字モード（スタート）
-      " BS", "a&lt;&gt;A",     "Caps\nLock", "____",
+      " BS", "訂正",     "Caps\nLock", "____",
       "TAB", "@ - _ \\", "abc",        "def",
       " SP", "ghi",      "jkl",        "mno",
       "ENT", "pqrs",     "tuv",        "wxyz",
@@ -623,8 +645,8 @@ export const sampleJson = {
       "____", // 3: 促音
       "____", // 4: TAB
       "'",    // 5: '
-      "&lt;",    // 6: &lt;
-      "&gt;",    // 7: &gt;
+      "<",    // 6: <
+      ">",    // 7: >
       "____", // 8: SP
       "\"",   // 9: "
       "(",    // 10: (
