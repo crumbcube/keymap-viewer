@@ -412,10 +412,17 @@ export interface CharInfoYouhandakuon {
 // ▼▼▼ 修正: danKey を danList から取得するように変更 ▼▼▼
 export const allSeionCharInfos: CharInfoSeion[] = gyouList.flatMap(gyou =>
   danOrder[gyou]?.map((charInDanOrder, index) => {
-    // danOrder のインデックスを使って danList から正しい段名を取得
-    const danKey = danList[index];
     // gyouChars から実際の文字を取得 (danOrder と gyouChars の整合性が前提)
     const actualChar = gyouChars[gyou]?.[index];
+    let danKey: string | undefined;
+    // ▼▼▼ や行の特別処理を追加 ▼▼▼
+    if (gyou === 'や行') {
+        if (index === 0) danKey = 'あ段'; // や
+        else if (index === 1) danKey = 'う段'; // ゆ
+        else if (index === 2) danKey = 'お段'; // よ
+    } else {
+        danKey = danList[index]; // や行以外は danOrder のインデックスで danList から取得
+    }
 
     // danKey と actualChar が取得できた場合のみオブジェクトを生成
     if (danKey && actualChar) {

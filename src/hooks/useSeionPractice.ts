@@ -49,6 +49,14 @@ const useSeionPractice = ({
         // 通常モード: 内部状態の gIdx, dIdx を使用
         if (gIdx < 0 || gIdx >= gyouList.length) return null;
         const currentGyouKey = gyouList[gIdx];
+        // ▼▼▼ や行の特別処理 ▼▼▼
+        if (currentGyouKey === 'や行') {
+            if (dIdx === 0) return 'あ段'; // や
+            if (dIdx === 1) return 'う段'; // ゆ
+            if (dIdx === 2) return 'お段'; // よ
+            return null; // や行にはこれ以外の dIdx はないはず
+        }
+        // ▲▲▲ や行の特別処理 ▲▲▲
         const list = danOrder[currentGyouKey]; // ['あ', 'い', 'う', 'え', 'お'] など
         const charsForGyou = gyouChars[currentGyouKey]; // ['あ', 'い', 'う', 'え', 'お'] など
         if (!list || !charsForGyou || dIdx < 0 || dIdx >= list.length || dIdx >= charsForGyou.length) return null;
@@ -284,9 +292,20 @@ const useSeionPractice = ({
                 return { className: 'bg-blue-100', overrideKey: null };
             }
         } else if (currentStageForHighlight === 'danInput') {
-            if (keyName === expectedDanKey && layoutIndex === 3) {
-                 return { className: 'bg-blue-100', overrideKey: null };
+            // ▼▼▼ や行の特別処理 ▼▼▼
+            if (expectedGyouKey === 'や行') {
+                // や行の場合、期待される段キー（あ段、う段、お段）のみハイライト
+                if (keyName === expectedDanKey && layoutIndex === 3) {
+                    return { className: 'bg-blue-100', overrideKey: null };
+                }
+                // や行の danInput ステージでは、い段キーはハイライトしない
+            } else {
+                // や行以外は通常通り、期待される段キーをハイライト
+                if (keyName === expectedDanKey && layoutIndex === 3) {
+                     return { className: 'bg-blue-100', overrideKey: null };
+                }
             }
+            // ▲▲▲ や行の特別処理 ▲▲▲
         }
 
         return noHighlight;
@@ -323,9 +342,22 @@ const useSeionPractice = ({
         reset,
         isInvalidInputTarget,
         isOkVisible: currentOkVisible,
+        // ▼▼▼ targetChar を追加 ▼▼▼
+        targetChar: targetChar ?? '',
+        // ▲▲▲ 追加完了 ▲▲▲
+        // ▼▼▼ getHighlight を追加 ▼▼▼
+        getHighlight: () => { // 基本的な実装
+            let start: string | null = null;
+            let end: string | null = null;
+            if (stage === 'gyouInput') start = expectedGyouKey;
+            else if (stage === 'danInput') end = expectedDanKey;
+            return { start, end };
+        },
+        // ▲▲▲ 追加完了 ▲▲▲
     }), [
         headingChars,
-        handleInput, getHighlightClassName, reset, isInvalidInputTarget, currentOkVisible
+        handleInput, getHighlightClassName, reset, isInvalidInputTarget, currentOkVisible,
+        targetChar, stage, expectedGyouKey, expectedDanKey // getHighlight 用の依存関係を追加
     ]);
 };
 

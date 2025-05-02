@@ -132,7 +132,7 @@ const useKanaChallengePractice = ({
                     const accuracy = totalTyped > 0 ? correct / totalTyped : 0;
                     const missRate = 1 - accuracy;
                     const cps = correct / CHALLENGE_DURATION_SECONDS;
-                    const score = Math.round(cps * Math.pow(1 - missRate, 2) * 100);
+                    const score = Math.round(cps * Math.pow(1 - missRate, 2) * 1000);
                     const rankMessage = getRankMessage(score);
 
                     const results: ChallengeResult = {
