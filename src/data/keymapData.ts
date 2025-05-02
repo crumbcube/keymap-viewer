@@ -119,9 +119,9 @@ export const kigoPractice2Data: Kigo2PracticeGroup[] = [
 export interface Kigo3InputDef { gyouKey?: string; }
 export interface Kigo3PracticeGroup { groupName: string; chars: string[]; inputs: Kigo3InputDef[]; }
 export const kigoPractice3Data: Kigo3PracticeGroup[] = [
-    { groupName: '記号３－１', chars: ['「', '」', '（', '）', '｛'], inputs: [ { gyouKey: 'あ行' }, { gyouKey: 'か行' }, { gyouKey: 'さ行' }, { gyouKey: 'た行' }, { gyouKey: 'な行' }, ], },
-    { groupName: '記号３－２', chars: ['｝', '［', '］', '＜', '＞'], inputs: [ { gyouKey: 'は行' }, { gyouKey: 'ま行' }, { gyouKey: 'や行' }, { gyouKey: 'ら行' }, { gyouKey: 'わ行' }, ], },
-    { groupName: '記号３－３', chars: ['＝'], inputs: [ {}, ], },
+  { groupName: '記号３－１', chars: ['`', '？', '＾', '。', '、'], inputs: [ { gyouKey: 'あ行' }, { gyouKey: 'か行' }, { gyouKey: 'さ行' }, { gyouKey: 'た行' }, { gyouKey: 'な行' }, ], },
+  { groupName: '記号３－２', chars: ['！', '＄', '...', '＃', '～'], inputs: [ { gyouKey: 'は行' }, { gyouKey: 'ま行' }, { gyouKey: 'や行' }, { gyouKey: 'ら行' }, { gyouKey: 'わ行' }, ], },
+  { groupName: '記号３－３', chars: ['＝'], inputs: [ {}, ], },
 ];
 export interface YoudakuonInputDef { gyouKey: string; youonKey: string; dakuonKey: string; dan: string; }
 export interface YoudakuonPracticeGroup { groupName: string; chars: string[]; inputs: YoudakuonInputDef[]; }
@@ -313,7 +313,7 @@ export const sampleJson = {
     [ // layers[8] 記号・先押し
       "____",  "____",  "____", "____", "____",
       "____",  " ` ",   " ? ", " ^ ",   "____",
-      "＝\n記号", "。(,)", "、(.)", "！",  "____",
+      "＝\n記号", "。", "、", "！",  "____",
       "～",   "＄",  " ... ", "＃",  "____"
     ],
     [ // layers[9] 英字モード記号1
@@ -429,7 +429,7 @@ export const sampleJson = {
     [ // layers[8] 記号・先押し
       "____", "____", "____",  "____", "____",
       "____", "`",    "？",    "＾",   "____", // ‘ を ` に変更
-      "____", "。(,)", "、(.)", "！",  "＝\n記号",
+      "____", "。", "、", "！",  "＝\n記号",
       "____", "＄",    " ... ", "＃",  "～"
     ],
     [ // layers[9] 英字モード記号1
@@ -539,7 +539,7 @@ export const sampleJson = {
     [ // layers[8] 記号・先押し
       "____",  "____", "____",     "____" ,
       "`",     "？",   "＾",       "____", // ‘ を ` に変更
-      "。(,)", "、(.)", "！",      "____",
+      "。", "、", "！",      "____",
       "＄",    " ... ", "＃",      "____",
       "～",    "____",  "＝\n記号", "____"
     ],
@@ -670,7 +670,7 @@ export const sampleJson = {
     [ // layers[8] 記号・先押し
       "____", "____",  "____",    "____",
       "____", "`",     "？",      "＾", // ‘ を ` に変更
-      "____", "。(,)", "、(.)",   "！",
+      "____", "。", "、",   "！",
       "____", "＄",    " ... ",   "＃",
       "____", "～",    "＝\n記号", "____",
     ],

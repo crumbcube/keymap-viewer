@@ -326,6 +326,8 @@ export interface PracticeHookResult {
     isInvalidInputTarget: (pressCode: number, layoutIndex: number, keyIndex: number) => boolean;
     isOkVisible: boolean; // OK表示の状態をフックから受け取る
     challengeResults?: ChallengeResult | null; // Ensure this line exists and is correct
+    targetLayerIndex?: number | null; // ★★★ 表示すべきターゲットレイヤーインデックス (オプション) ★★★
+    displayLayers?: string[][]; // ★★★ 練習モードに応じて表示を差し替えるためのレイヤーデータ (オプション) ★★★
 }
 
 /* handleInput の戻り値 */

@@ -43,6 +43,7 @@ import useYouhandakuonPractice from './hooks/useYouhandakuonPractice';
 import useYouonKakuchoPractice from './hooks/useYouonKakuchoPractice';
 import useGairaigoPractice from './hooks/useGairaigoPractice'; // ← 追加
 import useKanaChallengePractice from './hooks/useKanaChallengePractice';
+import useKigoChallengePractice from './hooks/useKigoChallengePractice'; // ★★★ 記号チャレンジフックをインポート ★★★
 
 
 // 作成したコンポーネントをインポート
@@ -108,6 +109,7 @@ export default function App() {
     const youonKakuchoPractice = useYouonKakuchoPractice({ ...commonHookProps, isActive: practice === '拗音拡張' });
     const gairaigoPractice = useGairaigoPractice({ ...commonHookProps, isActive: practice === '外来語の発音補助' }); // ← 追加
     const kanaChallengePractice = useKanaChallengePractice({ ...commonHookProps, isActive: practice === 'かな入力１分間トレーニング' });
+    const kigoChallengePractice = useKigoChallengePractice({ ...commonHookProps, isActive: practice === '記号入力１分間トレーニング' }); // ★★★ 記号チャレンジフック呼び出し ★★★
 
 
     // --- 現在アクティブな練習フックを選択 ---
@@ -126,15 +128,17 @@ export default function App() {
             case '拗音拡張': return youonKakuchoPractice;
             case '外来語の発音補助': return gairaigoPractice; // ← 追加
             case 'かな入力１分間トレーニング': return kanaChallengePractice;
+            case '記号入力１分間トレーニング': return kigoChallengePractice; // ★★★ 記号チャレンジフックを返す ★★★
             default: return null;
         }
-    // 依存配列に kanaChallengePractice を追加
-    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice, gairaigoPractice, kanaChallengePractice]);
+    // 依存配列に kanaChallengePractice, kigoChallengePractice を追加
+    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice, gairaigoPractice, kanaChallengePractice, kigoChallengePractice]);
 
     // ▼▼▼ チャレンジ終了状態を判定する変数 (結果オブジェクトの存在で判定) ▼▼▼
     const isChallengeFinished = useMemo(() => {
         // return practice === 'かな入力１分間トレーニング' && activePractice?.headingChars?.[0]?.startsWith('終了!');
-        return practice === 'かな入力１分間トレーニング' && !!activePractice?.challengeResults;
+        // ★★★ 記号チャレンジも判定対象に含める ★★★
+        return (practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング') && !!activePractice?.challengeResults;
     }, [practice, activePractice]);
 
     useEffect(() => {
@@ -424,7 +428,8 @@ export default function App() {
 
                     if (result.isExpected) {
                         console.log(`[App.onInput] Input is expected. shouldGoToNext: ${result.shouldGoToNext}`);
-                        if (result.shouldGoToNext && practiceRef.current !== 'かな入力１分間トレーニング') { // ← ref を使用
+                        // ★★★ チャレンジモードでは nextStage を呼ばない ★★★
+                        if (result.shouldGoToNext && practiceRef.current !== 'かな入力１分間トレーニング' && practiceRef.current !== '記号入力１分間トレーニング') { // ← ref を使用
                             console.log('[App.onInput] >>> Conditions met, calling nextStage and showOkFeedback <<<'); // ★追加
                             console.log(`[App.onInput] Calling nextStage() and showOkFeedback()`);
                             nextStage(); // 次の練習問題へ
@@ -479,7 +484,7 @@ export default function App() {
         setTraining(on);
         if (on) {
             setShowKeyLabels(true);
-            console.log(`[sendHid ON] Setting isRandomMode to: false`);
+            // console.log(`[sendHid ON] Setting isRandomMode to: false`); // この行は存在しないはず
             setIsRandomMode(false);
         } else {
             setPractice('');
@@ -576,7 +581,7 @@ export default function App() {
                 devRef.current = null;
             }
         };
-     }, [setTitle, setCols, setLayers, setFW, setSN, setShowTrainingButton, setSide, setKb, sampleJson, isRandomMode]);
+     }, [setTitle, setCols, setLayers, setFW, setSN, setShowTrainingButton, setSide, setKb, sampleJson, isRandomMode, onInput]); // onInput を依存配列に追加
 
     // 練習モード選択時のリセット処理
     const handlePracticeSelect = (item: PracticeMode) => {
@@ -589,7 +594,8 @@ export default function App() {
             clearTimeout(okTimerRef.current);
             okTimerRef.current = null;
         }
-        if (item === 'かな入力１分間トレーニング') { // ← item を使用
+        // ★★★ チャレンジモードも判定に含める ★★★
+        if (item === 'かな入力１分間トレーニング' || item === '記号入力１分間トレーニング') { // ← item を使用
             // 特有の初期化があればここに追加
             setDIdx(0); // dIdx は使わないかもしれないが念のためリセット
         } else if (item === '拗音拡張') {
@@ -612,7 +618,8 @@ export default function App() {
     // ランダムモード切り替えハンドラ
     const toggleRandomMode = useCallback(() => {
         console.log(`[toggleRandomMode] Called. Current isRandomMode: ${isRandomMode}, practice: ${practiceRef.current}`); // ← ref を使用
-        if (practiceRef.current === 'かな入力１分間トレーニング') { // ← ref を使用
+        // ★★★ チャレンジモードも判定に含める ★★★
+        if (practiceRef.current === 'かな入力１分間トレーニング' || practiceRef.current === '記号入力１分間トレーニング') { // ← ref を使用
             console.warn("Cannot toggle random mode during challenge.");
             return;
         }
@@ -630,6 +637,37 @@ export default function App() {
         minWidth: '120px',
         textAlign: 'center',
      };
+
+    // ★★★ トレーニングモード中に表示するレイヤーインデックスを決定 ★★★
+    const displayLayerIndex = useMemo(() => {
+        if (training) {
+            // 記号入力１分間トレーニングの場合、フックから返された targetLayerIndex を優先
+            console.log(`[displayLayerIndex] Checking for Kigo Challenge. Practice: ${practice}, activePractice?.targetLayerIndex: ${activePractice?.targetLayerIndex}`); // ログ追加
+            if (practice === '記号入力１分間トレーニング' && activePractice?.targetLayerIndex !== null && activePractice?.targetLayerIndex !== undefined) {
+                console.log(`[displayLayerIndex] Kigo Challenge: Using targetLayerIndex from hook: ${activePractice.targetLayerIndex}`); // ログ追加
+                 return activePractice.targetLayerIndex;
+            }
+            // 記号の基本練習１はレイヤー6 ★★★ else if に変更 ★★★
+            else if (practice === '記号の基本練習１') return 6;
+            // 記号の基本練習２はレイヤー2 ★★★ else if に変更 ★★★
+            else if (practice === '記号の基本練習２') return 2;
+            else if (practice === '記号の基本練習３') return 8; // ★★★ 記号の基本練習３はレイヤー8を表示 ★★★
+            // その他の練習モードはデフォルトでレイヤー2（かなスタート）
+            // ★★★ 記号入力チャレンジで targetLayerIndex がない場合のフォールバックを追加 ★★★
+            else if (practice === '記号入力１分間トレーニング') {
+                console.log(`[displayLayerIndex] Kigo Challenge: targetLayerIndex not available, defaulting to layer 2`);
+                // targetLayerIndex が null/undefined でも、記号チャレンジ中は記号レイヤーを表示したい
+                // ここでは仮にレイヤー2をデフォルトとする
+                return 2;
+            } else {
+                // 上記以外の練習モード（清音、濁音など）はレイヤー2（かなスタート）
+                return 2;
+            }
+        }
+        // トレーニングモードでなければ、現在のレイヤー（これは現状の実装では使われていないかも？）
+        // 練習モードOFF時は全レイヤー表示なので、この値は KeyboardLayout には直接渡さない
+        return 0; // デフォルト値として0を返す（実際には使われない）
+    }, [training, practice, activePractice]);
 
     // コンポーネント全体のJSX
     return (
@@ -656,7 +694,8 @@ export default function App() {
                             >
                                 {showKeyLabels ? 'キー表示 OFF' : 'キー表示 ON'}
                             </button>
-                            {practice !== 'かな入力１分間トレーニング' && (
+                            {/* ★★★ チャレンジモードも判定に含める ★★★ */}
+                            {practice !== 'かな入力１分間トレーニング' && practice !== '記号入力１分間トレーニング' && (
                                 <>
                                     {console.log(`[Render Button] Rendering random mode button. isRandomMode: ${isRandomMode}`)}
                                     <button
@@ -685,14 +724,15 @@ export default function App() {
             {/* 練習モードON時の表示 */}
             {training ? (
                 <>
-                    {/* ヘッダ表示 */}
+                    {/* ヘッダ表示 (練習選択時のみ) */}
                     {practice && (
                         // mt-16 (4rem) を追加。必要に応じて mt-20 などに調整してください。
                         // <div className="mt-16">  // ← 方法1のみの場合
                         <div> {/* 方法2の pt-20 と併用する場合は mt-* は不要な場合が多い */}
                             <PracticeHeading
                                 activePractice={activePractice}
-                                isRandomMode={practice === 'かな入力１分間トレーニング' ? true : isRandomMode}
+                                // ★★★ 記号チャレンジも判定に含める ★★★
+                                isRandomMode={(practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング') ? true : isRandomMode}
                                 practice={practice}
                                 gIdx={gIdx}
                                 dIdx={dIdx}
@@ -703,155 +743,76 @@ export default function App() {
                         </div>
                     )}
 
-                    <div className='grid grid-cols-3 gap-4 items-start'>
-                        {/* メニュー表示 */}
-                        <PracticeMenu
-                            practice={practice}
-                            handlePracticeSelect={handlePracticeSelect}
-                        />
+                    {/* ★★★ 練習選択時のみメニューとキーボードを表示 ★★★ */}
+                    {practice ? (
+                        <div className='grid grid-cols-3 gap-4 items-start'>
+                            {/* メニュー表示 */}
+                            <PracticeMenu
+                                practice={practice}
+                                handlePracticeSelect={handlePracticeSelect}
+                            />
 
-                        {/* 練習モードに応じたキーボード表示 */}
-                        <div className="col-span-2 grid grid-cols-2 gap-4 justify-items-center">
-                            {/* ▼▼▼ チャレンジ終了時は結果を表示 ▼▼▼ */}
-                            {isChallengeFinished ? (
-                                // ▼▼▼ col-span-2 に変更し、中央揃えにする ▼▼▼
-                                <div className="col-span-2 flex items-center justify-center p-4 border rounded bg-gray-50" style={{ minHeight: '15rem' }}>
-                                    {/* ▼▼▼ 結果をフォーマットして表示 ▼▼▼ */}
-                                    {activePractice?.challengeResults && (
-                                        <pre className="text-lg text-left font-semibold">
-                                            {'【タイピング結果】\n'}
-                                            {`問題数：${activePractice.challengeResults.totalQuestions}問クリ\n`}
-                                            {`入力文字数：${activePractice.challengeResults.totalCharsTyped}文字\n`}
-                                            {`正答率：${(activePractice.challengeResults.accuracy * 100).toFixed(1)}%\n`}
-                                            {`スコア：${activePractice.challengeResults.score}点\n`}
-                                            {`\n${activePractice.challengeResults.rankMessage}`}
-                                        </pre>
-                                    )}
-                                    {/* ▲▲▲ 表示フォーマット修正 ▲▲▲ */}
-                                </div>
-                            ) : (
-                                /* ▼▼▼ チャレンジ終了時以外はキーボードを表示 ▼▼▼ */
-                                <>
-                                {/* ... (既存のキーボードレイアウト表示ロジック) ... */}
-                                {(practice === 'かな入力１分間トレーニング') ? (
-                                <>
-                                    {/* かなモード（スタート） */}
-                                    {/* ▼▼▼ isChallengeFinished でない場合のみ表示 ▼▼▼ */}
-                                    {/* {!isChallengeFinished && ( */}
-                                    <KeyboardLayout
-                                        layerData={layers[2]}
-                                        layoutIndex={2}
-                                        layoutTitle="かなモード（スタート）"
-                                        cols={cols}
-                                        fixedWidth={fixedWidth}
-                                        showKeyLabels={showKeyLabels}
-                                        lastInvalidKeyCode={lastInvalidKeyCode}
-                                        activePractice={activePractice}
-                                        practice={practice}
-                                        currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training}
-                                    />
-                                    {/* )} */}
-
-                                    {/* かなモード（エンド） */}
-                                    {/* ▼▼▼ isChallengeFinished でない場合のみ表示 ▼▼▼ */}
-                                    {/* {!isChallengeFinished && ( */}
-                                    <KeyboardLayout
-                                        layerData={layers[3]}
-                                        layoutIndex={3}
-                                        layoutTitle="かなモード（エンド）"
-                                        cols={cols}
-                                        fixedWidth={fixedWidth}
-                                        showKeyLabels={showKeyLabels}
-                                        lastInvalidKeyCode={lastInvalidKeyCode}
-                                        activePractice={activePractice}
-                                        practice={practice}
-                                        currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training}
-                                    />
-                                    {/* )} */}
-                                </>
-                            ) : (practice && !['記号の基本練習１', '記号の基本練習２', '記号の基本練習３'].includes(practice)) ? (
-                                <>
-                                    {/* ▼▼▼ isChallengeFinished でない場合のみ表示 ▼▼▼ */}
-                                    {/* {!isChallengeFinished && ( */}
-                                    {/* かなモード（スタート） */}
-                                    <KeyboardLayout
-                                        layerData={layers[2]}
-                                        layoutIndex={2}
-                                        layoutTitle="かなモード（スタート）"
-                                        cols={cols}
-                                        fixedWidth={fixedWidth}
-                                        showKeyLabels={showKeyLabels}
-                                        lastInvalidKeyCode={lastInvalidKeyCode}
-                                        activePractice={activePractice}
-                                        practice={practice}
-                                        currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training}
-                                    />
-                                    {/* )} */}
-
-                                    {/* かなモード（エンド） */}
-                                    {/* ▼▼▼ isChallengeFinished でない場合のみ表示 ▼▼▼ */}
-                                    {/* {!isChallengeFinished && ( */}
-                                    <KeyboardLayout
-                                        layerData={layers[3]}
-                                        layoutIndex={3}
-                                        layoutTitle="かなモード（エンド）"
-                                        cols={cols}
-                                        fixedWidth={fixedWidth}
-                                        showKeyLabels={showKeyLabels}
-                                        lastInvalidKeyCode={lastInvalidKeyCode}
-                                        activePractice={activePractice}
-                                        practice={practice}
-                                        currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training}
-                                    />
-                                    {/* )} */}
-                                </>
-                            ) : ['記号の基本練習２', '記号の基本練習３'].includes(practice) ? (
-                                <div className="col-span-2 flex justify-center">
-                                    {/* ▼▼▼ isChallengeFinished でない場合のみ表示 ▼▼▼ */}
-                                    {/* {!isChallengeFinished && ( */}
-                                    <KeyboardLayout
-                                        layerData={layers[2]}
-                                        layoutIndex={2}
-                                        layoutTitle={practice === '記号の基本練習２' ? '記号２ (後押し)' : '記号３（先押し）'}
-                                        cols={cols}
-                                        fixedWidth={fixedWidth}
-                                        showKeyLabels={showKeyLabels}
-                                        lastInvalidKeyCode={lastInvalidKeyCode}
-                                        activePractice={activePractice}
-                                        practice={practice}
-                                        currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training}
-                                    />
-                                    {/* )} */}
-                                </div>
-                            ) : practice === '記号の基本練習１' ? (
-                                <div className="col-span-2 flex justify-center">
-                                    {/* ▼▼▼ isChallengeFinished でない場合のみ表示 ▼▼▼ */}
-                                    {/* {!isChallengeFinished && ( */}
-                                    <KeyboardLayout
-                                        layerData={layers[6]}
-                                        layoutIndex={6}
-                                        layoutTitle="記号１ (長押し)"
-                                        cols={cols}
-                                        fixedWidth={fixedWidth}
-                                        showKeyLabels={showKeyLabels}
-                                        lastInvalidKeyCode={lastInvalidKeyCode}
-                                        activePractice={activePractice}
-                                        practice={practice}
-                                        currentFunctionKeyMap={currentFunctionKeyMap}
-                                        training={training}
-                                    />
-                                    {/* )} */}
-                                </div>
-                            ) : null}
-                            </>
-                            )}
+                            {/* 練習モードに応じたキーボード表示 */}
+                            <div className="col-span-2 grid grid-cols-1 gap-4 justify-items-center"> {/* ★★★ grid-cols-1 に変更 ★★★ */}
+                                {/* ▼▼▼ チャレンジ終了時は結果を表示 ▼▼▼ */}
+                                {isChallengeFinished ? (
+                                    // ▼▼▼ col-span-1 (親がgrid-cols-1なので不要) に変更し、中央揃えにする ▼▼▼
+                                    <div className="flex items-center justify-center p-4 border rounded bg-gray-50" style={{ minHeight: '15rem' }}>
+                                        {/* ▼▼▼ 結果をフォーマットして表示 ▼▼▼ */}
+                                        {activePractice?.challengeResults && (
+                                            <pre className="text-lg text-left font-semibold">
+                                                {/* ★★★ 練習モード名を表示 ★★★ */}
+                                                {`【${practice} 結果】\n`}
+                                                {`問題数：${activePractice.challengeResults.totalQuestions}問クリ\n`}
+                                                {`入力文字数：${activePractice.challengeResults.totalCharsTyped}文字\n`}
+                                                {`正答率：${(activePractice.challengeResults.accuracy * 100).toFixed(1)}%\n`}
+                                                {`スコア：${activePractice.challengeResults.score}点\n`}
+                                                {`\n${activePractice.challengeResults.rankMessage}`}
+                                            </pre>
+                                        )}
+                                        {/* ▲▲▲ 表示フォーマット修正 ▲▲▲ */}
+                                    </div>
+                                ) : (
+                                    /* ▼▼▼ チャレンジ終了時以外はキーボードを表示 ▼▼▼ */
+                                    <>
+                                        {/* ★★★ displayLayerIndex を使って単一の KeyboardLayout を表示 ★★★ */}
+                                        {/* ★★★ activePractice に displayLayers があればそちらを使う ★★★ */}
+                                        {(activePractice?.displayLayers ?? layers)[displayLayerIndex] ? (
+                                            <KeyboardLayout
+                                                // ★★★ activePractice に displayLayers があればそちらを使う ★★★
+                                                layerData={(activePractice?.displayLayers ?? layers)[displayLayerIndex]}
+                                                layoutIndex={displayLayerIndex}
+                                                // ★★★ タイトルも動的に設定 ★★★
+                                                layoutTitle={layerNames[displayLayerIndex] ?? `レイヤー ${displayLayerIndex}`}
+                                                cols={cols}
+                                                fixedWidth={fixedWidth}
+                                                showKeyLabels={showKeyLabels}
+                                                lastInvalidKeyCode={lastInvalidKeyCode}
+                                                activePractice={activePractice}
+                                                practice={practice}
+                                                currentFunctionKeyMap={currentFunctionKeyMap}
+                                                training={training}
+                                            />
+                                        ) : (
+                                            // レイヤーデータが見つからない場合のフォールバック
+                                            <div>レイヤー {displayLayerIndex} のデータが見つかりません。</div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        // ★★★ 練習が選択されていない場合はメニューのみ表示 ★★★
+                        <div className='grid grid-cols-3 gap-4 items-start'>
+                            <PracticeMenu
+                                practice={practice}
+                                handlePracticeSelect={handlePracticeSelect}
+                            />
+                            <div className="col-span-2">
+                                {/* 練習が選択されていない場合、キーボードエリアは空 */}
+                            </div>
+                        </div>
+                    )}
                 </>
             ) : ( // 練習モードOFF時の表示
                  <div className='grid grid-cols-2 gap-4'>

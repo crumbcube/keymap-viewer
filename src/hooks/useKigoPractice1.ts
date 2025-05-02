@@ -184,6 +184,8 @@ const useKigoPractice1 = ({
                 const releaseTimestamp = inputInfo.timestamp;
                 const duration = releaseTimestamp - pressTimestamp;
 
+                // ★★★ デバッグログ追加 ★★★
+                console.log(`[Kigo1 handleInput Release] Key: ${inputKeyName}, Duration: ${duration}ms, isLongPressSuccess: ${isLongPressSuccess}, Expected: ${expectedKeyName}`);
                 clearLongPressTimer();
 
                 if (inputKeyName === expectedKeyName && duration >= LONG_PRESS_DURATION && isLongPressSuccess) {

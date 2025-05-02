@@ -58,6 +58,13 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         return !!currentInputDef && !currentInputDef.gyouKey;
     }, [isRandomMode, randomTarget, currentInputDef]);
 
+    // ▼▼▼ 追加: 現在のターゲット文字を取得する useMemo ▼▼▼
+    const currentTargetChar = useMemo(() => {
+        if (isRandomMode) return randomTarget?.char ?? null;
+        if (!currentGroup?.chars || dIdx < 0 || dIdx >= currentGroup.chars.length) return null;
+        return currentGroup.chars[dIdx];
+    }, [isRandomMode, randomTarget, currentGroup, dIdx]);
+    // ▲▲▲ 追加完了 ▲▲▲
 
     const expectedGyouKey = useMemo(() => {
         // 「=」の場合は2打目がないので null
@@ -273,6 +280,7 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
             return noHighlight;
         }
         // 「=」以外の場合のみ expectedGyouKey をチェック
+        // ★★★ 修正: expectedGyouKey が null でも isTargetEqualSign が true ならOK ★★★
         if (!isTargetEqualSign && !expectedGyouKey) {
              console.warn("getHighlightClassName: expectedGyouKey is null for non-equal sign target");
              return noHighlight;
@@ -283,50 +291,46 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         const currentStageForHighlight = (indicesJustChanged && stage !== 'kigoInputWait') ? 'kigoInput' : stage;
 
         let expectedKeyDisplayName: string | null = null;
-        const targetLayoutIndex = 2; // 記号3はスタートレイヤーのみ
+        // ★★★ 修正: targetLayoutIndex を 8 に変更 ★★★
+        const targetLayoutIndex = 8;
 
-        // --- 「記号」キーの実際の表示名を取得するロジック ---
-        const layer2 = layers[2] ?? [];
-        const kigoKeyEntry = Object.entries(hid2Gyou)
-            .find(([_, name]) => name === '記号');
-        const kigoHidCode = kigoKeyEntry ? parseInt(kigoKeyEntry[0]) : null;
-        const kigoKeyIndex = kigoHidCode !== null ? kigoHidCode - 1 : -1;
-        const actualKigoKeyDisplayName = (kigoKeyIndex !== -1 && layer2[kigoKeyIndex])
-            ? layer2[kigoKeyIndex]
-            : '記号'; // 見つからない場合のデフォルト
+        // --- 「＝\n記号」キーの実際の表示名を取得するロジック (レイヤー8から) ---
+        // const layer8 = layers[targetLayoutIndex] ?? []; // layers[8] を参照 (今回は直接文字列を使うので不要)
+        // '＝\n記号' という表示名で直接検索
+        const equalSignKeyName = '＝\n記号';
         // --- ここまで ---
 
         if (currentStageForHighlight === 'kigoInputWait') {
-            // 「=」の2打目待ち中は actualKigoKeyDisplayName をハイライト (点滅制御あり)
-            if (keyName === actualKigoKeyDisplayName && layoutIndex === targetLayoutIndex) {
+            // 「=」の2打目待ち中は equalSignKeyName をハイライト (点滅制御あり)
+            // ★★★ 修正: equalSignKeyName と targetLayoutIndex=8 を使用 ★★★
+            if (keyName === equalSignKeyName && layoutIndex === targetLayoutIndex) {
                 return { className: showHighlightAfterWait ? 'bg-blue-100' : null, overrideKey: null };
             }
             return noHighlight;
         }
 
-        switch (currentStageForHighlight) {
-            case 'kigoInput':
-                // 1打目は常に「記号」キー (実際の表示名を使用)
-                expectedKeyDisplayName = actualKigoKeyDisplayName;
-                break;
-            case 'gyouInput':
-                // 2打目 (「=」以外) は行キー
-                // ★★★ 修正: expectedGyouKey を直接使用 ★★★
-                expectedKeyDisplayName = expectedGyouKey;
-                break;
+        // ▼▼▼ 修正: ステージごとの expectedKeyDisplayName 設定 ▼▼▼
+        if (currentStageForHighlight === 'kigoInput') {
+            // 1打目は常に「＝\n記号」キー
+            expectedKeyDisplayName = equalSignKeyName;
+        } else if (currentStageForHighlight === 'gyouInput') {
+            // 2打目 (「=」以外) は行キーに対応する記号
+            // ★★★ 修正: expectedGyouKey ではなく currentTargetChar を使用 ★★★
+            expectedKeyDisplayName = currentTargetChar; // 例: ' ` '
         }
+        // ▲▲▲ 修正完了 ▲▲▲
 
+        // ★★★ 修正: targetLayoutIndex=8 を使用 ★★★
         if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyDisplayName) {
             return { className: 'bg-blue-100', overrideKey: null };
         }
 
         return noHighlight;
     }, [
-        isActive, okVisible, stage, showHighlightAfterWait, isTargetEqualSign, expectedGyouKey,
+        isActive, okVisible, stage, showHighlightAfterWait, isTargetEqualSign, expectedGyouKey, currentTargetChar, // ★★★ currentTargetChar を追加 ★★★
         isRandomMode, gIdx, dIdx,
-        // highlightTargetGyouKeyDisplayName は不要に
-        // highlightTargetGyouKeyDisplayName, // ← 削除
-        layers, hid2Gyou // layers, hid2Gyou を依存配列に追加
+        layers, // ★★★ layers を依存配列に追加 ★★★
+        // hid2Gyou は不要になったので削除
     ]);
     // ▲▲▲ 修正完了 ▲▲▲
 
@@ -334,10 +338,11 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
         const targetKeyIndex = pressCode - 1;
-        // 記号3はスタートレイヤー(layoutIndex=2)のみ対象
-        const isTarget = layoutIndex === 2 && keyIndex === targetKeyIndex;
+        // ★★★ 修正: 記号3はレイヤー8のみ対象 ★★★
+        const isTarget = layoutIndex === 8 && keyIndex === targetKeyIndex;
         return isTarget;
     }, [isActive]);
+
 
     return {
         headingChars,
