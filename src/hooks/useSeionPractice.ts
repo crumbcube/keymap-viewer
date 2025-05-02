@@ -295,9 +295,23 @@ const useSeionPractice = ({
 
     // --- 不正入力ターゲット判定 ---
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
-        // 清音練習では App.tsx 側で不正入力のフィードバックを行うため、ここでは常に false
-        return false;
-    }, []);
+        if (!isActive) return false; // 非アクティブ時は常に false
+
+        const targetKeyIndex = pressCode - 1;
+        let expectedLayoutIndex: number | null = null;
+
+        // 現在のステージに応じて、不正入力が起こりうるレイヤーを特定
+        if (stage === 'gyouInput') {
+            expectedLayoutIndex = 2; // スタートレイヤー
+        } else if (stage === 'danInput') {
+            expectedLayoutIndex = 3; // エンドレイヤー
+        }
+
+        // 期待されるレイヤーで、かつキーインデックスが一致する場合のみ true
+        const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
+        return isTarget;
+    // stage と isActive を依存配列に追加
+    }, [isActive, stage]);
 
     const currentOkVisible = okVisible;
 

@@ -1,9 +1,7 @@
 // src/components/KeyboardLayout.tsx
 import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
-// ▼▼▼ PracticeHighlightResult をインポート ▼▼▼
 import { PracticeMode, PracticeHookResult, PracticeHighlightResult } from '../hooks/usePracticeCommons';
-// ▲▲▲ インポート ▲▲▲
 import { kigoMapping2, kigoMapping3 } from '../data/keymapData';
 import { getKeyStyle, isLargeSymbol } from '../utils/styleUtils';
 
@@ -34,13 +32,15 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
   currentFunctionKeyMap,
   training,
 }) => {
+console.log(`[KeyboardLayout ${layoutIndex}] Rendered. lastInvalidKeyCode prop: ${lastInvalidKeyCode === null ? 'null' : `0x${lastInvalidKeyCode.toString(16)}`}`);
 
-  // キー描画ロジック (renderKey)
-  const renderKey = useCallback((key: string, idx: number) => {
+// キー描画ロジック (renderKey)
+const renderKey = useCallback((key: string, idx: number) => {
     let originalKey = (key ?? '').trim();
     const isEmptyKey = originalKey === '';
 
     let k = originalKey; // 加工前のキーラベル
+    console.log(`[renderKey ${layoutIndex}-${idx}] Start. key: "${originalKey}", lastInvalidKeyCode: ${lastInvalidKeyCode === null ? 'null' : `0x${lastInvalidKeyCode.toString(16)}`}`);
     let highlightResult: PracticeHighlightResult = { className: null, overrideKey: null };
     let isInvalid = false;
 
@@ -84,6 +84,7 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
 
     // 不正入力ハイライト処理
     if (lastInvalidKeyCode !== null && activePractice) {
+        console.log(`[renderKey ${layoutIndex}-${idx}] Checking invalid highlight. lastInvalidKeyCode is NOT null.`); // ★修正: ログ内容を明確化
         const pressCode = lastInvalidKeyCode;
         const targetKeyIndex = pressCode - 1;
         const isTargetLayout = activePractice.isInvalidInputTarget(pressCode, layoutIndex, idx);
@@ -93,13 +94,11 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
             isInvalid = true;
         }
     }
+    console.log(`[renderKey ${layoutIndex}-${idx}] After invalid check. highlightResult:`, highlightResult);
 
     // 正解キーハイライト処理
     if (!isInvalid && showKeyLabels && !activePractice?.isOkVisible && activePractice) {
-        // ▼▼▼ getHighlightClassName に渡すキー名を originalKey に変更 ▼▼▼
-        // const result = activePractice.getHighlightClassName(k, layoutIndex);
         const result = activePractice.getHighlightClassName(originalKey, layoutIndex);
-        // ▲▲▲ 変更完了 ▲▲▲
         if (result.className) {
             highlightResult = result;
         }
@@ -112,15 +111,13 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         const defaultStyle = 'bg-white'; // デフォルトの背景クラス
         let keyStyleClass = getKeyStyle(originalKey); // まず styleUtils から取得
 
-        // ▼▼▼ 「＝\n記号」の条件を追加 ▼▼▼
         if (originalKey === '記号' || originalKey === '＝\n記号') {
             // もしキーが「記号」または「＝\n記号」なら、強制的にデフォルトスタイルにする
             keyStyleClass = defaultStyle;
         } else if (!keyStyleClass.includes('bg-')) {
-             // getKeyStyle が背景色クラスを返さなかった場合もデフォルトを適用
-             keyStyleClass = `${keyStyleClass} ${defaultStyle}`.trim();
+            // getKeyStyle が背景色クラスを返さなかった場合もデフォルトを適用
+            keyStyleClass = `${keyStyleClass} ${defaultStyle}`.trim();
         }
-        // ▲▲▲ 修正完了 ▲▲▲
 
         return (
             <motion.div key={idx} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center ${keyStyleClass}`} // ← 修正したクラスを適用
@@ -140,9 +137,7 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
 
     // 練習モードON時の表示内容
     if (showKeyLabels) {
-        // ▼▼▼ overrideKey があればそれを、なければ加工後の k を表示 ▼▼▼
         const finalKeyLabel = highlightResult.overrideKey ?? k;
-        // ▲▲▲ 変更完了 ▲▲▲
         displayContent = finalKeyLabel === '' ? '\n' : finalKeyLabel;
     } else {
         // キー表示OFF時は、元々空だったキー以外は ____ でマスク

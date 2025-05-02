@@ -303,15 +303,49 @@ export interface PracticeHighlightResult {
     overrideKey: string | null; // 上書き表示するキー名 (null なら上書きしない)
 }
 
-/* 各練習フックが返すオブジェクトの共通インターフェース */
+// ▼▼▼ かなチャレンジ結果の型定義 ▼▼▼
+export interface ChallengeResult {
+    totalQuestions: number; // 問題数（クリアした数）
+    totalCharsTyped: number; // 総入力文字数
+    correctCount: number; // 正解タイプ数
+    missCount: number; // ミスタイプ数
+    accuracy: number; // 正答率 (0-1)
+    score: number; // 計算後のスコア
+    rankMessage: string; // ランクメッセージ
+}
+// ▲▲▲ 追加完了 ▲▲▲
+
+/* 練習フックの戻り値 */
 export interface PracticeHookResult {
-    handleInput: (info: PracticeInputInfo) => PracticeInputResult;
+    headingChars: string[]; // 見出しに表示する文字配列
+    targetChar?: string; // 現在のターゲット文字 (オプション)
     getHighlightClassName: (key: string, layoutIndex: number) => PracticeHighlightResult;
-    headingChars: string[];
+    getHighlight?: () => HighlightInfo; // スタート/エンドキーのハイライト情報 (オプション)
+    handleInput: (info: PracticeInputInfo) => PracticeInputResult;
     reset?: () => void;
     isInvalidInputTarget: (pressCode: number, layoutIndex: number, keyIndex: number) => boolean;
-    isOkVisible: boolean;
+    isOkVisible: boolean; // OK表示の状態をフックから受け取る
+    challengeResults?: ChallengeResult | null; // Ensure this line exists and is correct
 }
+
+/* handleInput の戻り値 */
+// export interface PracticeInputResult { // 上に移動
+//     isExpected: boolean;
+//     shouldGoToNext: boolean;
+// }
+
+/* getHighlightClassName の戻り値 */
+// export interface PracticeHighlightResult { // 上に移動
+//     className: string | null;
+//     overrideKey: string | null;
+// }
+
+/* getHighlight の戻り値 */
+export interface HighlightInfo {
+    start: string | null; // スタートキー名 (例: 'あ行')
+    end: string | null;   // エンドキー名 (例: 'あ段')
+}
+
 
 export interface CharInfoSeion {
   type: 'seion';

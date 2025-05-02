@@ -12,9 +12,10 @@ interface PracticeHeadingProps {
   isRandomMode: boolean; // isRandomMode はチャレンジモードでは true 扱いされる
   practice: PracticeMode;
   gIdx: number;
-  dIdx: number; // dIdx を受け取る
+  dIdx: number;
   currentFunctionKeyMap: Record<number, string>;
   fixedWidthNum: number;
+  okVisible: boolean;
 }
 
 const keyWidthRem = 5.5;
@@ -25,7 +26,7 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
   isRandomMode,
   practice,
   gIdx,
-  dIdx, // dIdx を受け取る
+  dIdx,
   currentFunctionKeyMap,
   fixedWidthNum,
 }) => {
@@ -61,37 +62,34 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
       return null;
   }, [currentGairaigoGroup, dIdx]);
 
-  // ▼▼▼ チャレンジモードの特殊表示判定 ▼▼▼
   const isChallengeCountdown = practice === 'かな入力１分間トレーニング' && headingChars.length === 1 && headingChars[0].endsWith('秒');
   const isChallengeResult = practice === 'かな入力１分間トレーニング' && headingChars.length === 1 && headingChars[0].startsWith('終了!');
-  // ▲▲▲ 追加 ▲▲▲
 
   return (
     <div className="relative flex justify-center mb-6">
       {/* 練習文字を表示する部分 */}
       <div className="flex justify-center">
         {headingChars.map((char: string, index: number) => {
-          // ▼▼▼ クラスとスタイルの初期化を修正 ▼▼▼
           let className = '';
           let style: React.CSSProperties = { padding: '0.25rem' };
 
           // チャレンジモードのカウントダウン/結果表示は特別なスタイル
-          if (isChallengeCountdown || isChallengeResult) {
+          // ▼▼▼ isChallengeResult の条件を削除 ▼▼▼
+          if (isChallengeCountdown /* || isChallengeResult */) {
               className = 'text-3xl font-bold'; // 少し大きめに
-              if (isChallengeResult) {
+              /* if (isChallengeResult) {
                   className += ' text-blue-600'; // 結果は青色など
-              }
+              } */
           } else {
               // 通常の練習文字表示
               className = 'text-2xl';
           }
-          // ▲▲▲ 修正 ▲▲▲
 
           // --- 太字表示ロジック ---
           let isBoldTarget = false;
-          // ▼▼▼ チャレンジモードの特殊表示以外の場合に太字判定 ▼▼▼
           if (!isChallengeCountdown && !isChallengeResult) {
-              if (isRandomMode && (practice === '拗音拡張' || practice === '外来語の発音補助' || practice === 'かな入力１分間トレーニング')) { // チャレンジもランダム扱い
+              // ▼▼▼ チャレンジモードの結果表示はここでは太字にしない ▼▼▼
+              if (isRandomMode && (practice === '拗音拡張' || practice === '外来語の発音補助' /* || practice === 'かな入力１分間トレーニング' */)) { // チャレンジもランダム扱い
                   isBoldTarget = true;
               } else if (practice === '外来語の発音補助' && currentGairaigoGroup) {
                   isBoldTarget = currentGairaigoGroup.targets.some(target => target.headerIndex === index);
@@ -99,14 +97,12 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
                   isBoldTarget = true;
               }
           }
-          // ▲▲▲ 修正 ▲▲▲
 
           if (isBoldTarget) {
               className += ' font-bold';
           }
 
           // --- ハイライト処理 (ランダムモードでない場合) ---
-          // ▼▼▼ チャレンジモードではハイライトしない ▼▼▼
           if (!isRandomMode && practice !== 'かな入力１分間トレーニング') {
               let shouldHighlight = false;
               if (practice === '拗濁音の練習') {
@@ -129,11 +125,11 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
                   className += ' bg-blue-100';
               }
           }
-          // ▲▲▲ 修正 ▲▲▲
 
+          // ▼▼▼ チャレンジ結果の場合は何も表示しない ▼▼▼
           return (
             <span key={index} className={className.trim()} style={style}>
-              {char}
+              {isChallengeResult ? '' : char}
             </span>
           );
         })}
