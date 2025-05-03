@@ -1,4 +1,4 @@
-// src/hooks/useKanaChallengePractice.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useKanaChallengePractice.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     PracticeHookProps,
@@ -123,7 +123,6 @@ const useKanaChallengePractice = ({
                 if (newRemaining === 0) {
                     setStatus('finished');
                     setIsFinished(true); // 終了状態をセット
-                    console.log('[KanaChallenge] Timer finished. Setting status to finished.'); // ★追加
                     if (trainingTimerRef.current) clearInterval(trainingTimerRef.current); // タイマー停止
 
                     const correct = correctCountRef.current;
@@ -144,7 +143,6 @@ const useKanaChallengePractice = ({
                         score: score,
                         rankMessage: rankMessage,
                     };
-                    console.log('[KanaChallenge] Calculated results:', results); // ★追加
                     setChallengeResults(results); // 計算結果を state にセット
                     setHeadingChars([]); // ヘッダーはクリア（結果は App.tsx で表示するため）
                 }
@@ -167,8 +165,7 @@ const useKanaChallengePractice = ({
         } else if (status === 'running' && currentTarget) {
             setHeadingChars([currentTarget.char]);
         } else if (status === 'finished') {
-            // 結果計算後にヘッダーはクリアされるので、ここでは何もしない
-            // setHeadingChars([]); // 以前のロジックは削除
+            setHeadingChars(['終了！']);
         } else if (status === 'idle') {
             setHeadingChars([]);
         }
