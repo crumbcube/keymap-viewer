@@ -41,9 +41,10 @@ import useKigoPractice3 from './hooks/useKigoPractice3';
 import useYoudakuonPractice from './hooks/useYoudakuonPractice';
 import useYouhandakuonPractice from './hooks/useYouhandakuonPractice';
 import useYouonKakuchoPractice from './hooks/useYouonKakuchoPractice';
-import useGairaigoPractice from './hooks/useGairaigoPractice'; // ← 追加
+import useGairaigoPractice from './hooks/useGairaigoPractice';
 import useKanaChallengePractice from './hooks/useKanaChallengePractice';
 import useKigoChallengePractice from './hooks/useKigoChallengePractice';
+import useTanbunChallengePractice from './hooks/useTanbunChallengePractice';
 
 
 // 作成したコンポーネントをインポート
@@ -66,7 +67,6 @@ export default function App() {
     const [showKeyLabels, setShowKeyLabels] = useState(true);
     const [isRandomMode, setIsRandomMode] = useState(false);
 
-    console.log(`[App Init] Initial isRandomMode state: ${isRandomMode}`);
 
     /* 現在の行/段/文字インデックス */
     const [gIdx, setGIdx] = useState(0); // 初期値は 0 に戻す
@@ -107,9 +107,10 @@ export default function App() {
     const youdakuonPractice = useYoudakuonPractice({ ...commonHookProps, isActive: practice === '拗濁音の練習' });
     const youhandakuonPractice = useYouhandakuonPractice({ ...commonHookProps, isActive: practice === '拗半濁音の練習' });
     const youonKakuchoPractice = useYouonKakuchoPractice({ ...commonHookProps, isActive: practice === '拗音拡張' });
-    const gairaigoPractice = useGairaigoPractice({ ...commonHookProps, isActive: practice === '外来語の発音補助' }); // ← 追加
+    const gairaigoPractice = useGairaigoPractice({ ...commonHookProps, isActive: practice === '外来語の発音補助' });
     const kanaChallengePractice = useKanaChallengePractice({ ...commonHookProps, isActive: practice === 'かな入力１分間トレーニング' });
     const kigoChallengePractice = useKigoChallengePractice({ ...commonHookProps, isActive: practice === '記号入力１分間トレーニング' });
+    const tanbunChallengePractice = useTanbunChallengePractice({ ...commonHookProps, isActive: practice === '短文入力３分間トレーニング' });
 
 
     // --- 現在アクティブな練習フックを選択 ---
@@ -126,17 +127,16 @@ export default function App() {
             case '拗濁音の練習': return youdakuonPractice;
             case '拗半濁音の練習': return youhandakuonPractice;
             case '拗音拡張': return youonKakuchoPractice;
-            case '外来語の発音補助': return gairaigoPractice; // ← 追加
+            case '外来語の発音補助': return gairaigoPractice;
             case 'かな入力１分間トレーニング': return kanaChallengePractice;
             case '記号入力１分間トレーニング': return kigoChallengePractice;
+            case '短文入力３分間トレーニング': return tanbunChallengePractice;
             default: return null;
         }
-    // 依存配列に kanaChallengePractice, kigoChallengePractice を追加
-    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice, gairaigoPractice, kanaChallengePractice, kigoChallengePractice]);
+    }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice, gairaigoPractice, kanaChallengePractice, kigoChallengePractice, tanbunChallengePractice]);
 
     const isChallengeFinished = useMemo(() => {
-        // return practice === 'かな入力１分間トレーニング' && activePractice?.headingChars?.[0]?.startsWith('終了!');
-        return (practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング') && !!activePractice?.challengeResults;
+        return (practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング' || practice === '短文入力３分間トレーニング') && !!activePractice?.challengeResults;
     }, [practice, activePractice]);
 
     useEffect(() => {
@@ -170,7 +170,6 @@ export default function App() {
         }
         lastInvalidInputTime.current = now;
         setLastInvalidKeyCode(pressCode);
-        console.log(`Invalid input detected. Setting lastInvalidKeyCode to: 0x${pressCode.toString(16)}`);
 
         if (invalidInputTimeoutRef.current !== null) {
             clearTimeout(invalidInputTimeoutRef.current);
@@ -179,7 +178,6 @@ export default function App() {
         const timerId = window.setTimeout((codeToClear: number) => {
             setLastInvalidKeyCode(prevCode => {
                 if (prevCode === codeToClear) {
-                    console.log(`Clearing lastInvalidKeyCode: 0x${codeToClear.toString(16)}`);
                     return null;
                 }
                 return prevCode;
@@ -217,7 +215,6 @@ export default function App() {
         let nextDIdx = currentDIdx;
 
         if (practiceRef.current === '清音の基本練習') {
-            console.log(`[nextStage - 清音] Current state from ref: gIdx=${currentGIdx}, dIdx=${currentDIdx}`); // ログ追加
             const currentGyouKey = gyouList[currentGIdx]; // currentGIdx を使用
             if (!currentGyouKey || !gyouList.includes(currentGyouKey)) {
                 console.error("清音練習で無効な gIdx または currentGyouKey");
@@ -229,7 +226,6 @@ export default function App() {
                     nextDIdx = 0;
                     nextGIdx = (currentGIdx + 1) % gyouList.length; // currentGIdx を使用
                 }
-                console.log(`[nextStage - 清音] Calculated next: nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}`); // ログ追加
             }
         }
         else if (practiceRef.current === '拗音の基本練習') {
@@ -353,10 +349,8 @@ export default function App() {
              }
         }
 
-        console.log(`[nextStage Before Set State] Final next: nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}`);
         setGIdx(nextGIdx);
         setDIdx(nextDIdx);
-        console.log(`[nextStage After Set State] State update requested.`);
 
     }, [isRandomMode, gyouList, danOrder, youonGyouList, youonGyouChars, dakuonGyouList, dakuonGyouChars, handakuonGyouList, handakuonGyouChars, sokuonKomojiData, kigoPractice1Data, kigoPractice2Data, kigoPractice3Data, youdakuonPracticeData, youhandakuonPracticeData, youonKakuchoChars, gairaigoPracticeData]);
 
@@ -367,43 +361,33 @@ export default function App() {
         const keyCode = data[1];
         const timestamp = Date.now();
 
-        console.log(`[App.onInput] Start - kb: ${kb}, reportId: 0x${reportId.toString(16)}, keyCode: 0x${keyCode.toString(16)}`);
 
         if (reportId === 0x14 && keyCode === 0x03) {
             if (!trainingRef.current) { // ← ref を使用
-                console.log("Forcing training mode ON");
                 setTraining(true);
                 setShowKeyLabels(true);
-                console.log(`[onInput Force Training] Setting isRandomMode to: false`);
                 setIsRandomMode(false);
             }
             return;
         }
 
-        console.log(`[App.onInput] Checking condition: reportId === 0x15 (${reportId === 0x15}), trainingRef.current (${trainingRef.current}), practiceRef.current ('${practiceRef.current}'), activePracticeRef.current (${!!activePracticeRef.current})`);
 
         if (reportId === 0x15 && trainingRef.current && practiceRef.current && activePracticeRef.current) { // ← ref を使用
-            console.log(`[App.onInput] Processing reportId 0x15. Practice: ${practiceRef.current}`); // ← ref を使用
             const releaseOffset = 0x14;
             const maxStartLayoutKeyCode = 0x14;
             const isPressEventAdjusted = keyCode <= maxStartLayoutKeyCode;
             const isReleaseEventAdjusted = keyCode >= (releaseOffset + 1);
 
-            console.log(`[App.onInput] maxStart: 0x${maxStartLayoutKeyCode.toString(16)}, releaseOffset: 0x${releaseOffset.toString(16)}`);
-            console.log(`[App.onInput] isPress: ${isPressEventAdjusted}, isRelease: ${isReleaseEventAdjusted}`);
 
             if (isPressEventAdjusted) {
                 const pressCode = keyCode;
-                console.log(`[App.onInput] Press event detected. Recording pressCode: 0x${pressCode.toString(16)}`);
                 pressedKeysRef.current.set(pressCode, timestamp);
 
                 const inputInfo: PracticeInputInfo = { type: 'press', timestamp, pressCode };
-                console.log(`[App.onInput] Calling activePracticeRef.current.handleInput (press):`, inputInfo);
                 activePracticeRef.current.handleInput(inputInfo); // ← ref を使用
 
             } else if (isReleaseEventAdjusted) {
                 const pressCode = keyCode - releaseOffset;
-                console.log(`[App.onInput] Release event detected. Calculated pressCode: 0x${pressCode.toString(16)} (keyCode: 0x${keyCode.toString(16)})`);
 
                 if (pressCode <= 0) {
                     console.warn(`[App.onInput] Invalid calculated pressCode: 0x${pressCode.toString(16)}. Ignoring release event.`);
@@ -412,36 +396,28 @@ export default function App() {
 
                 const pressTimestamp = pressedKeysRef.current.get(pressCode);
                 if (pressTimestamp) {
-                    console.log(`[App.onInput] Found matching press event for pressCode: 0x${pressCode.toString(16)}`);
                     pressedKeysRef.current.delete(pressCode);
 
                     const inputInfo: PracticeInputInfo = { type: 'release', timestamp, pressCode };
-                    console.log(`[App.onInput] Calling activePracticeRef.current.handleInput (release):`, inputInfo);
                     const result = activePracticeRef.current.handleInput(inputInfo); // ← ref を使用
-                    console.log(`[App.onInput] activePracticeRef.current.handleInput result:`, result);
 
                     if (result.isExpected) {
-                        console.log(`[App.onInput] Input is expected. shouldGoToNext: ${result.shouldGoToNext}`);
-                        if (result.shouldGoToNext && practiceRef.current !== 'かな入力１分間トレーニング' && practiceRef.current !== '記号入力１分間トレーニング') { // ← ref を使用
+                        if (result.shouldGoToNext && practiceRef.current !== 'かな入力１分間トレーニング' && practiceRef.current !== '記号入力１分間トレーニング' && practiceRef.current !== '短文入力３分間トレーニング') { // ★★★ 短文チャレンジも除外 ★★★
                             nextStage(); // 次の練習問題へ
                             showOkFeedback(); // OK表示を開始/延長
                         }
                     } else {
-                        console.log(`[App.onInput] Input is NOT expected. Calling handleInvalidInput(0x${pressCode.toString(16)})`);
                         handleInvalidInput(pressCode);
                     }
                 } else {
                     console.warn(`[App.onInput] Matching press event NOT FOUND for calculated pressCode: 0x${pressCode.toString(16)}. Current pressedKeys:`, Array.from(pressedKeysRef.current.keys()).map(k => `0x${k.toString(16)}`));
                 }
             }
-        } else {
-             console.log(`[App.onInput] Ignoring input because condition was false.`);
         }
      }, [handleInvalidInput, nextStage, showOkFeedback, setTraining, setShowKeyLabels, setIsRandomMode, kb, side]); // showOkFeedback を追加
 
     /* HID send (練習 ON/OFF) */ // (依存配列修正済み)
     const sendHid: (on: boolean) => Promise<void> = useCallback(async (on) => {
-        console.log(`[sendHid] Called with on=${on}`);
 
         const filters = [{ usagePage: 0xff60, usage: 0x61 }];
         let dev = devRef.current;
@@ -464,18 +440,14 @@ export default function App() {
         if (!(dev as any).opened) { console.error("HIDデバイスが開いていません。"); return; }
 
         try {
-            console.log(`[sendHid] Attempting to send report: 0x02, ${on ? '0x01' : '0x00'}`);
             await dev.sendReport(0, new Uint8Array([0x02, on ? 0x01 : 0x00]));
-            console.log(`[sendHid] Report sent successfully.`);
         } catch (err) {
             console.error("[sendHid] Failed to send HID report:", err);
         }
 
-        console.log(`[sendHid] Calling setTraining(${on})`);
         setTraining(on);
         if (on) {
             setShowKeyLabels(true);
-            // console.log(`[sendHid ON] Setting isRandomMode to: false`); // この行は存在しないはず
             setIsRandomMode(false);
         } else {
             setPractice('');
@@ -494,9 +466,7 @@ export default function App() {
                 clearTimeout(okTimerRef.current);
                 okTimerRef.current = null;
             }
-            console.log(`[sendHid OFF] Setting isRandomMode to: false`);
             setIsRandomMode(false);
-            console.log(`[sendHid] Practice mode turned OFF. Resetting states.`); // ログ追加
         }
      }, [setTraining, setPractice, setGIdx, setDIdx, setOK, setLastInvalidKeyCode, setShowKeyLabels, setIsRandomMode]);
 
@@ -508,7 +478,6 @@ export default function App() {
 
         const currentKb: KeyboardModel = kbRaw === 'tw-20h' ? 'tw-20h' : 'tw-20v';
         setKb(currentKb);
-        console.log(`Initialized kb model to: ${currentKb}`);
 
         const currentSide: KeyboardSide = sideRaw === 'left' ? 'left' : 'right';
         setSide(currentSide);
@@ -536,23 +505,18 @@ export default function App() {
             try {
                 const ds = await navigator.hid?.getDevices();
                 if (!ds || !ds.length) {
-                    console.log("No HID devices found on init.");
                     return;
                 }
                 const device = ds[0];
-                console.log("Found existing HID device:", device);
                 if (!opening.current && !(device as any).opened) {
                     opening.current = true;
                     try {
-                        console.log("Opening existing HID device...");
                         await device.open();
-                        console.log("Existing HID device opened.");
                         device.oninputreport = onInput; // ここは変更なし (onInput の参照自体は変わらない)
                         devRef.current = device;
                     } catch (err) { console.error("既存のHIDデバイスを開けませんでした:", err); }
                     finally { opening.current = false; }
                 } else if ((device as any).opened) {
-                    console.log("Existing HID device already opened. Setting oninputreport.");
                     device.oninputreport = onInput; // ここは変更なし (onInput の参照自体は変わらない)
                     devRef.current = device;
                 }
@@ -560,13 +524,11 @@ export default function App() {
         };
         initHid();
 
-        console.log(`[useEffect End] isRandomMode after init: ${isRandomMode}`);
 
         return () => {
             const dev = devRef.current;
             // devRef.current を null に設定する前にローカル変数に保持
             if (dev) {
-                console.log("Closing HID device on cleanup.");
                 // イベントハンドラを確実に解除
                 dev.oninputreport = null;
                 devRef.current = null;
@@ -576,7 +538,6 @@ export default function App() {
 
     // 練習モード選択時のリセット処理
     const handlePracticeSelect = (item: PracticeMode) => {
-        console.log(`[handlePracticeSelect] Called with item: ${item}. Current isRandomMode: ${isRandomMode}`);
         activePracticeRef.current?.reset?.(); // ← ref を使用
         setPractice(item);
         setGIdx(0);
@@ -585,7 +546,7 @@ export default function App() {
             clearTimeout(okTimerRef.current);
             okTimerRef.current = null;
         }
-        if (item === 'かな入力１分間トレーニング' || item === '記号入力１分間トレーニング') { // ← item を使用
+        if (item === 'かな入力１分間トレーニング' || item === '記号入力１分間トレーニング' || item === '短文入力３分間トレーニング') {
             // 特有の初期化があればここに追加
             setDIdx(0); // dIdx は使わないかもしれないが念のためリセット
         } else if (item === '拗音拡張') {
@@ -601,19 +562,16 @@ export default function App() {
         }
         pressedKeysRef.current.clear();
         setShowKeyLabels(true);
-        console.log(`[handlePracticeSelect] Setting isRandomMode to: false`);
         setIsRandomMode(false); // デフォルトは OFF
      };
 
     // ランダムモード切り替えハンドラ
     const toggleRandomMode = useCallback(() => {
-        console.log(`[toggleRandomMode] Called. Current isRandomMode: ${isRandomMode}, practice: ${practiceRef.current}`); // ← ref を使用
-        if (practiceRef.current === 'かな入力１分間トレーニング' || practiceRef.current === '記号入力１分間トレーニング') { // ← ref を使用
+        if (practiceRef.current === 'かな入力１分間トレーニング' || practiceRef.current === '記号入力１分間トレーニング' || practiceRef.current === '短文入力３分間トレーニング') {
             console.warn("Cannot toggle random mode during challenge.");
             return;
         }
         const nextIsRandomMode = !isRandomMode;
-        console.log(`[toggleRandomMode] Setting isRandomMode to: ${nextIsRandomMode}`);
         setIsRandomMode(nextIsRandomMode);
         activePracticeRef.current?.reset?.(); // ← ref を使用
      }, [setIsRandomMode, isRandomMode]);
@@ -630,26 +588,25 @@ export default function App() {
     const displayLayerIndices = useMemo(() => {
         if (training) {
             // 記号入力１分間トレーニングの場合、フックから返された targetLayerIndex を優先
-            console.log(`[displayLayerIndex] Checking for Kigo Challenge. Practice: ${practice}, activePractice?.targetLayerIndex: ${activePractice?.targetLayerIndex}`); // ログ追加
             if (practice === '記号入力１分間トレーニング' && activePractice?.targetLayerIndex !== null && activePractice?.targetLayerIndex !== undefined) {
-                console.log(`[displayLayerIndex] Kigo Challenge: Using targetLayerIndex from hook: ${activePractice.targetLayerIndex}`); // ログ追加
                 return [activePractice.targetLayerIndex];
             }
             else if (practice === '記号の基本練習１') return [6];
             else if (practice === '記号の基本練習２') return [7];
             else if (practice === '記号の基本練習３') return [8];
-            else if (practice && practice !== '記号入力１分間トレーニング') { // 練習モードが選択されている、かつ記号チャレンジでない場合
-                console.log(`[displayLayerIndices] Displaying layers 0, 2, 3 for non-kigo mode: ${practice}`);
+            else if (practice && practice !== '記号入力１分間トレーニング' && practice !== '短文入力３分間トレーニング') {
                 return [2, 3];
             }
             // その他の練習モードはデフォルトでレイヤー2（かなスタート）
             else if (practice === '記号入力１分間トレーニング') {
-                console.log(`[displayLayerIndex] Kigo Challenge: targetLayerIndex not available, defaulting to layer 2`);
                 // targetLayerIndex が null/undefined でも、記号チャレンジ中は記号レイヤーを表示したい
                 // ここでは仮にレイヤー2をデフォルトとする
                 // (あるいは、チャレンジ開始前は何も表示しない、など仕様に応じて変更)
                 return [2];
             } else {
+                if (practice === '短文入力３分間トレーニング') {
+                    return [];
+                }
                 // 練習モードが選択されていない場合など (デフォルト)
                 return []; // 何も表示しない、または [0] など仕様に応じて
             }
@@ -657,13 +614,12 @@ export default function App() {
         // トレーニングモードでなければ、現在のレイヤー（これは現状の実装では使われていないかも？）
         // 練習モードOFF時は全レイヤー表示なので、この値は KeyboardLayout には直接渡さない
         return []; // トレーニングOFF時は空配列
-    }, [training, practice, activePractice]);
+    }, [training, practice, activePractice?.targetLayerIndex]);
 
     const keyboardLayers = useMemo(() => {
         // 現在選択されているキーボードモデルと言語サイドのレイヤーデータを取得
         const baseLayers = sampleJson[kb]?.[side]?.layers ?? [];
 
-        // 記号チャレンジモードの場合 (useKigoChallengePractice から displayLayers を受け取る想定)
         if (practice === '記号入力１分間トレーニング' && activePractice?.displayLayers) {
             // useKigoChallengePractice が加工済みのレイヤーを返すので、それをそのまま使う
             return activePractice.displayLayers;
@@ -699,7 +655,6 @@ export default function App() {
                     <button
                         className={`px-4 py-1 rounded shadow text-white ${training ? 'bg-gray-600' : 'bg-green-600'}`}
                         onClick={() => {
-                            console.log(`[Button Click] Training ${training ? 'OFF' : 'ON'} button clicked. Current training state: ${training}`);
                             sendHid(!training);
                         }}
                         style={buttonStyle}
@@ -715,7 +670,7 @@ export default function App() {
                             >
                                 {showKeyLabels ? 'キー表示 OFF' : 'キー表示 ON'}
                             </button>
-                            {practice !== 'かな入力１分間トレーニング' && practice !== '記号入力１分間トレーニング' && (
+                            {practice !== 'かな入力１分間トレーニング' && practice !== '記号入力１分間トレーニング' && practice !== '短文入力３分間トレーニング' && (
                                 <>
                                     {console.log(`[Render Button] Rendering random mode button. isRandomMode: ${isRandomMode}`)}
                                     <button
@@ -766,7 +721,7 @@ export default function App() {
                                 }`}>
                                     <PracticeHeading
                                         activePractice={activePractice}
-                                        isRandomMode={(practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング') ? true : isRandomMode}
+                                        isRandomMode={(practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング' || practice === '短文入力３分間トレーニング') ? true : isRandomMode}
                                         practice={practice}
                                         gIdx={gIdx}
                                         dIdx={dIdx}
@@ -781,13 +736,12 @@ export default function App() {
                                         ? 'col-start-1' // 横並び時は1列目に配置
                                         : '' // 縦並び時は親が中央揃えなので指定不要
                                     }`} style={{ minHeight: '15rem' }}>
-                                        {/* ▼▼▼ 結果をフォーマットして表示 ▼▼▼ */}
                                         {activePractice?.challengeResults && (
                                             <pre className="text-lg text-left font-semibold">
                                                 {`【${practice} 結果】\n`}
                                                 {`問題数：${activePractice.challengeResults.totalQuestions}問クリア\n`}
                                                 {practice !== '記号入力１分間トレーニング' && `入力文字数：${activePractice.challengeResults.totalCharsTyped}文字\n`}
-                                                {`正答率：${(activePractice.challengeResults.accuracy * 100).toFixed(1)}%\n`}
+                                                {`正答率：${(activePractice.challengeResults.accuracy * 100).toFixed(1)}%\n`} {/* ★★★ 正答率の表示を統一 ★★★ */}
                                                 {`スコア：${activePractice.challengeResults.score}点\n`}
                                                 {`\n${activePractice.challengeResults.rankMessage}`}
                                             </pre>
@@ -823,7 +777,7 @@ export default function App() {
                                             // レイヤーデータが見つからない場合のフォールバック
                                             <div key={layerIndex}>レイヤー {layerIndex} のデータが見つかりません。</div>
                                         )
-                                    );})} 
+                                    );})}
                                     </>
                                 )}
                             </div>
@@ -843,7 +797,6 @@ export default function App() {
             ) : ( // 練習モードOFF時の表示
                  <div className='grid grid-cols-2 gap-4'>
                      {layers.map((layer: string[], li: number) => {
-                        console.log(`Rendering KeyboardLayout (OFF mode) - layerIndex: ${li}, training prop: ${training}`);
                         return (
                             <div key={li} className="justify-self-center">
                                 <KeyboardLayout

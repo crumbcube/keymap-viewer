@@ -1,6 +1,10 @@
 // /home/coffee/my-keymap-viewer/src/components/PracticeHeading.tsx
 import React, { useMemo } from 'react';
-import { PracticeMode, PracticeHookResult } from '../hooks/usePracticeCommons';
+import {
+    PracticeMode,
+    PracticeHookResult,
+    TanbunProgressInfo 
+} from '../hooks/usePracticeCommons';
 import {
     youdakuonPracticeData,
     kigoPractice3Data,
@@ -62,16 +66,35 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
       return null;
   }, [currentGairaigoGroup, dIdx]);
 
-  const isChallengeCountdown = (practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング') && headingChars.length === 1 && headingChars[0].endsWith('秒');
+  const isChallengeCountdown = (practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング' || practice === '短文入力３分間トレーニング') && headingChars.length === 1 && headingChars[0].endsWith('秒');
   const isChallengeResult = !!activePractice?.challengeResults;
 
+    const progressData = activePractice?.getProgressInfo?.();
+    const tanbunProgress: TanbunProgressInfo | null =
+        practice === '短文入力３分間トレーニング' ? progressData ?? null : null;
+
+    const getNextCharLength = (sentence: string, index: number): number => {
+        // (ここに拗音などを判定して 1 or 2 を返すロジックを実装 - 簡易版)
+        const firstChar = sentence[index];
+        const secondChar = sentence[index + 1];
+        const smallYouonChars = ['ゃ', 'ゅ', 'ょ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ'];
+        const isBaseForYouon = ['き', 'し', 'ち', 'に', 'ひ', 'み', 'り', 'ぎ', 'じ', 'ぢ', 'び', 'ぴ'].includes(firstChar);
+        if (isBaseForYouon && secondChar && smallYouonChars.includes(secondChar)) {
+            return 2;
+        }
+        return 1;
+    };
+
   return (
-    <div className="relative flex justify-center mb-6">
+    <div className="relative flex justify-start mb-6"> {/* justify-center を justify-start に変更 */}
       {/* 練習文字を表示する部分 */}
-      <div className="flex justify-center">
+      <div className="flex"> {/* ここも justify-center を削除 (親要素で制御) */}
         {headingChars.map((char: string, index: number) => {
           let className = '';
           let style: React.CSSProperties = { padding: '0.25rem' };
+
+          const sentenceChars = practice === '短文入力３分間トレーニング' ? char.split('') : [char];
+          const isTanbunMode = practice === '短文入力３分間トレーニング';
 
           // チャレンジモードのカウントダウンは特別なスタイル
           if (isChallengeCountdown) {
@@ -121,9 +144,43 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
               }
           }
 
+          if (isTanbunMode) {
+            if (isChallengeCountdown) {
+                return (
+                  <span key={index} className={className.trim()} style={style}>
+                    {char} {/* カウントダウン文字をそのまま表示 */}
+                  </span>
+                );
+              } else {
+                // カウントダウン後（短文表示中）は文字ごとのスタイルを適用
+                return (
+                  <span key={index} className={`${className.trim()} whitespace-pre`} style={style}> {/* whitespace-pre を追加 */}
+                    {sentenceChars.map((c, charIndex) => {
+                      let charClassName = '';
+                      if (tanbunProgress) {
+                        const typedEndIndex = tanbunProgress.typedEndIndex;
+                        if (charIndex < typedEndIndex) {
+                          // 入力済み
+                          charClassName = 'text-gray-400'; // 例: グレー文字
+                        } else if (charIndex >= typedEndIndex) {
+                          // 次の入力対象か判定
+                          const nextCharLen = getNextCharLength(char, typedEndIndex);
+                          if (charIndex < typedEndIndex + nextCharLen) {
+                            charClassName = 'bg-blue-200 rounded px-1'; // 例: 青背景
+                          }
+                        }
+                    }
+                    return ( <span key={charIndex} className={charClassName}>
+                        {c}
+                      </span>
+                    );})}
+                  </span>
+                );
+              }
+            }
           return (
             <span key={index} className={className.trim()} style={style}>
-              {char}
+              {char} {/* 通常モード */}
               </span>
           );
         })}

@@ -1,9 +1,9 @@
-// src/hooks/usePracticeCommons.ts
+// /home/coffee/my-keymap-viewer/src/hooks/usePracticeCommons.ts
 import {
     gyouList,
     danOrder,
     gyouChars,
-    danList, // danList をインポート
+    danList, // danList をインポート (下で export する)
     youonGyouList,
     youonGyouChars,
     youonDanMapping,
@@ -19,6 +19,10 @@ import {
     kigoPractice3Data,
     functionKeyMaps,
     youdakuonPracticeData,
+    youdakuonGyouChars,
+    youdakuonDanMapping,
+    youhandakuonGyouChars,
+    youhandakuonDanMapping,
     youhandakuonPracticeData,
     YouhandakuonInputDef,
     gairaigoPracticeData,
@@ -320,14 +324,15 @@ export interface PracticeHookResult {
     headingChars: string[]; // 見出しに表示する文字配列
     targetChar?: string; // 現在のターゲット文字 (オプション)
     getHighlightClassName: (key: string, layoutIndex: number) => PracticeHighlightResult;
-    getHighlight?: () => HighlightInfo; // スタート/エンドキーのハイライト情報 (オプション)
+    getHighlight?: () => HighlightInfo;
+    getProgressInfo?: () => TanbunProgressInfo;
     handleInput: (info: PracticeInputInfo) => PracticeInputResult;
     reset?: () => void;
     isInvalidInputTarget: (pressCode: number, layoutIndex: number, keyIndex: number) => boolean;
     isOkVisible: boolean; // OK表示の状態をフックから受け取る
     challengeResults?: ChallengeResult | null; // Ensure this line exists and is correct
-    targetLayerIndex?: number | null; // ★★★ 表示すべきターゲットレイヤーインデックス (オプション) ★★★
-    displayLayers?: string[][]; // ★★★ 練習モードに応じて表示を差し替えるためのレイヤーデータ (オプション) ★★★
+    targetLayerIndex?: number | null;
+    displayLayers?: string[][];
 }
 
 /* handleInput の戻り値 */
@@ -348,6 +353,14 @@ export interface HighlightInfo {
     end: string | null;   // エンドキー名 (例: 'あ段')
 }
 
+export interface TanbunHighlightInfo {
+    start: number | null;
+    end: number | null;
+}
+
+export interface TanbunProgressInfo {
+    typedEndIndex: number;
+}
 
 export interface CharInfoSeion {
   type: 'seion';
@@ -411,13 +424,11 @@ export interface CharInfoYouhandakuon {
 
 
 // 全清音文字情報
-// ▼▼▼ 修正: danKey を danList から取得するように変更 ▼▼▼
 export const allSeionCharInfos: CharInfoSeion[] = gyouList.flatMap(gyou =>
   danOrder[gyou]?.map((charInDanOrder, index) => {
     // gyouChars から実際の文字を取得 (danOrder と gyouChars の整合性が前提)
     const actualChar = gyouChars[gyou]?.[index];
     let danKey: string | undefined;
-    // ▼▼▼ や行の特別処理を追加 ▼▼▼
     if (gyou === 'や行') {
         if (index === 0) danKey = 'あ段'; // や
         else if (index === 1) danKey = 'う段'; // ゆ
@@ -432,13 +443,12 @@ export const allSeionCharInfos: CharInfoSeion[] = gyouList.flatMap(gyou =>
         type: 'seion' as const,
         char: actualChar,
         gyouKey: gyou,
-        danKey: danKey, // ★★★ ここが 'あ段', 'い段', ... になるように修正 ★★★
+        danKey: danKey,
       };
     }
     return null; // 不整合がある場合は null を返す
   }).filter((info): info is CharInfoSeion => info !== null) ?? [] // null を除去
 );
-// ▲▲▲ 修正完了 ▲▲▲
 
 // 全拗音文字情報
 export const allYouonCharInfos: CharInfoYouon[] = youonGyouList.flatMap(gyou =>
@@ -602,6 +612,7 @@ export const hid2Youon = (hidCode: number, kb: KeyboardModel, side: KeyboardSide
 export {
     gyouList,
     danOrder,
+    danList,
     gyouChars,
     youonGyouList,
     youonGyouChars,
@@ -618,6 +629,10 @@ export {
     kigoPractice3Data,
     functionKeyMaps,
     youdakuonPracticeData,
+    youdakuonGyouChars,
+    youdakuonDanMapping,
+    youhandakuonGyouChars,
+    youhandakuonDanMapping,
     youhandakuonPracticeData,
     gairaigoPracticeData,
 };
