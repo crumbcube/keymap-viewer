@@ -199,7 +199,7 @@ export default function App() {
         okTimerRef.current = window.setTimeout(() => {
             setOK(false);
             okTimerRef.current = null; // タイマーIDをクリア
-        }, 600); // 600ミリ秒 = 0.6秒
+        }, 500); // 500ミリ秒 = 0.5秒
     }, [setOK]); // setOK は依存関係として安定
 
     const nextStage = useCallback(() => {

@@ -124,9 +124,11 @@ const useTanbunChallengePractice = ({
             setCurrentIndex(0);
             setProgressInfo({ typedEndIndex: 0 });
             // 選ばれた短文をリストから削除
-            setRemainingSentences(prev => prev.filter((_, i) => i !== randomIndex));
+            setRemainingSentences(prev => {
+                const newRemaining = prev.filter((_, i) => i !== randomIndex);
+                return newRemaining;
+            });
         } else {
-            // 全文終了した場合
             setCurrentSentence("全ての短文が終了しました！");
             setCurrentIndex(0); // currentIndex はリセットするが、typedEndIndex はそのままでも良いかも
             // setProgressInfo({ typedEndIndex: 0 }); // 必要ならリセット
@@ -252,19 +254,22 @@ const useTanbunChallengePractice = ({
             return { isExpected: false, shouldGoToNext: false };
         }
 
-        console.log(`[Tanbun Input] Received release event. pressCode: 0x${inputInfo.pressCode.toString(16)}, CurrentIndex: ${currentIndex}, InputState:`, inputState); // ★★★ ログ追加 ★★★
-
         const pressCode = inputInfo.pressCode;
         totalCharsTypedRef.current += 1; // 総打鍵数をカウント
 
         let typedChar: string | null = null;
+        let shouldReturnEarly = false;
+        let isCorrect = false; // Flag for correctness
+        let charsToAdvance = 1; // Default advancement
+
+        const expectedChar = currentSentence[currentIndex];
+        const isLastChar = currentIndex === currentSentence.length - 1;
+
         const currentGyouKey = hid2Gyou(pressCode, kb, side);
         const currentDanKey = hid2Dan(pressCode, kb, side);
         const currentYouonKey = hid2Youon(pressCode, kb, side); // 拗音キー判定
         const funcMap = functionKeyMaps[kb]?.[side] ?? {};
         const funcKeyName = Object.entries(funcMap).find(([idx, _]) => parseInt(idx) + 1 === pressCode)?.[1]; // 1-based index
-
-        console.log(`[Tanbun Input] Key Info: gyou=${currentGyouKey}, dan=${currentDanKey}, youon=${currentYouonKey}, func=${funcKeyName}`); // ★★★ ログ追加 ★★★
 
         // 1. 機能キー (単独で意味を持つもの、または状態を変更するもの)
         if (funcKeyName === '促音') {
@@ -309,7 +314,6 @@ const useTanbunChallengePractice = ({
                 setInputState(initialInputState); // 無効なシーケンス
                 return { isExpected: false, shouldGoToNext: false };
             }
-        // ★★★ 記号キーの処理を追加 ★★★
         } else if (funcKeyName === '記号') {
             clearInputTimeout();
             if (inputState.gyouKey) { // 行キーが押された後に記号キー (kigoPractice2)
@@ -318,16 +322,25 @@ const useTanbunChallengePractice = ({
                 if (kigoMapping2[gyou]) {
                     typedChar = kigoMapping2[gyou];
                 }
-                console.log(`[Tanbun Input] kigoPractice2 detected. gyou=${gyou}, typedChar=${typedChar}`); // ★★★ ログ追加 ★★★
                 setInputState(initialInputState); // 状態リセット
                 // -> 文字比較へ
-            // ★★★ 記号キーが最初に押された場合のログを追加 ★★★
             } else { // 記号キーが最初に押された (kigoPractice3)
-                console.log(`[Tanbun Input] kigoPractice3 started. Setting gyouKey to '記号'`); // ★★★ この行を追加 ★★★
                 setInputState({ ...initialInputState, gyouKey: '記号' }); // 行キーとして '記号' をセット
                 inputTimeoutRef.current = window.setTimeout(resetInputStateAndClearTimeout, INPUT_TIMEOUT_MS);
                 return { isExpected: true, shouldGoToNext: false }; // 状態変更のみ
             }
+        }
+        else if (inputState.gyouKey === '記号' && currentGyouKey) { // kigoPractice3 パターン (記号キー -> 行キー)
+            clearInputTimeout();
+            const kigoValue = kigoMapping3[currentGyouKey];
+            console.log(`[Tanbun Input] kigoPractice3 - kigoValue for ${currentGyouKey}:`, kigoValue);
+            if (kigoValue) {
+                console.log(`[Tanbun Input] kigoPractice3 detected. currentGyouKey=${currentGyouKey}`);
+                typedChar = kigoValue.split('\n')[0];
+            }
+            console.log(`[Tanbun Input] kigoPractice3 result. typedChar=${typedChar}`);
+            setInputState(initialInputState);
+            // -> 文字比較へ
         }
         // 2. 段キー (inputState.gyouKey がある場合)
         else if (currentDanKey && inputState.gyouKey) {
@@ -384,34 +397,11 @@ const useTanbunChallengePractice = ({
             setInputState(initialInputState); // 状態リセット
             // -> 文字比較へ
         }
-        // 3. 行キー
-        else if (currentGyouKey) { // 行キーが押された場合
-             clearInputTimeout();
-             if (inputState.gyouKey === '記号') { // kigoPractice3 パターン (記号キー -> 行キー)
-                 // ★★★ デバッグログ追加 ★★★
-                 console.log(`[Tanbun Input] Checking kigoMapping3 for key: '${currentGyouKey}'. kigoMapping3['${currentGyouKey}'] = ${kigoMapping3[currentGyouKey]}`);
-                 // ★★★ 条件をより明示的に変更 ★★★
-                 const kigoValue = kigoMapping3[currentGyouKey];
-                 console.log(`[Tanbun Input] kigoValue type: ${typeof kigoValue}, length: ${kigoValue?.length}`); // ★★★ さらにデバッグログ追加 ★★★
-                 // if (typeof kigoMapping3[currentGyouKey] === 'string' && kigoMapping3[currentGyouKey].length > 0) {
-                // if (typeof kigoValue === 'string' && kigoValue.length > 0) {
-                 // ★★★ 条件判定の詳細ログを追加 ★★★
-                 console.log(`[Tanbun Input] Evaluating condition: Boolean(kigoValue) = ${Boolean(kigoValue)}`);
-                 // if (kigoValue) { // ★★★ 条件をさらに単純化 (truthy かどうか) ★★★
-                 // ★★★ 文字コードを確認するログを追加 ★★★
-                 console.log(`[Tanbun Input] kigoValue charCodeAt(0): ${kigoValue?.charCodeAt(0)}, Expected '。'.charCodeAt(0): ${'。'.charCodeAt(0)}`);
-                 // if (kigoValue === '。') {
-                 if (kigoValue?.charCodeAt(0) === 12290) { // ★★★ 文字コードでの比較に戻す ★★★
-                 // if (true) { // ★★★ 強制 true を削除 ★★★
-                    console.warn("[Tanbun Input] Forcing typedChar = '。' for debugging."); // ★★★ デバッグ用警告 ★★★
-                    console.log(`[Tanbun Input] kigoPractice3 detected. currentGyouKey=${currentGyouKey}`); // ★★★ ログ追加 ★★★
-                    typedChar = kigoMapping3[currentGyouKey].split('\n')[0];
-                 }
-                 console.log(`[Tanbun Input] kigoPractice3 result. typedChar=${typedChar}`); // ★★★ ログ追加 ★★★
-                 setInputState(initialInputState);
-                 // -> 文字比較へ
-             } else if (!inputState.gyouKey && !inputState.hasYouon && !inputState.hasDakuon && !inputState.hasHandakuon) { // 初期状態の場合
-                 setInputState({ ...initialInputState, gyouKey: currentGyouKey });
+        // 3. 行キー (単独)
+        else if (currentGyouKey) { // 行キーが押された場合 (他のパターンに一致しなかった場合)
+            clearInputTimeout();
+            if (!inputState.gyouKey && !inputState.hasYouon && !inputState.hasDakuon && !inputState.hasHandakuon) { // 初期状態の場合
+                setInputState({ ...initialInputState, gyouKey: currentGyouKey });
                  inputTimeoutRef.current = window.setTimeout(resetInputStateAndClearTimeout, INPUT_TIMEOUT_MS);
                  return { isExpected: true, shouldGoToNext: false }; // 状態変更のみ
              } else { // 予期しないシーケンス
@@ -429,9 +419,9 @@ const useTanbunChallengePractice = ({
 
         // 文字が確定した場合のみ判定
         if (typedChar !== null) {
-            console.log(`[Tanbun Input] Character determined: typedChar='${typedChar}'`); // ★★★ ログ追加 ★★★
+            console.log(`[Tanbun Input] Character determined: typedChar='${typedChar}'`);
             let expectedCharsToCompare = "";
-            let charsToAdvance = 1; // 正解時に進むインデックス数
+            // let charsToAdvance = 1; // Default advancement (moved up)
             if (currentIndex < currentSentence.length) { // インデックスが範囲内かチェック
                 const firstChar = currentSentence[currentIndex];
                 expectedCharsToCompare = firstChar; // まず1文字目を取得
@@ -451,30 +441,18 @@ const useTanbunChallengePractice = ({
                 }
             }
 
-            console.log(`[Tanbun Input] Comparing typed='${typedChar}' with expected='${expectedCharsToCompare}'`); // ★★★ ログ追加 ★★★
 
-            // ▼▼▼ ここから変更 ▼▼▼
-            let isCorrect = false;
-            const isLastCharExpected = currentIndex === currentSentence.length - 1 && expectedCharsToCompare === '。';
-
-            if (isLastCharExpected && typedChar !== null) {
-                // 文末の「。」が期待される状況で、何らかの文字が入力されたら CORRECT とみなす (回避策)
-                console.warn("[Tanbun Input] Skipping '。' check at the end of sentence (Workaround).");
-                isCorrect = true;
-                // charsToAdvance は 1 のまま (「。」1文字分進む扱い)
-            } else if (typedChar === expectedCharsToCompare) {
-                // 通常の文字比較
+            if (typedChar === expectedCharsToCompare) {
                 isCorrect = true;
             }
-            // ▲▲▲ ここまで変更 ▲▲▲
 
-            if (isCorrect) { // 変更後の比較                console.log(`[Tanbun Input] CORRECT! Advancing ${charsToAdvance} chars.`); // ★★★ ログ追加 ★★★
+            if (isCorrect) {
                 // correctCountRef.current += charsToAdvance; // 古いカウントは使わない
                 completedCharsCountRef.current += charsToAdvance; // 正しく入力完了した文字数をカウント
                 const nextIndex = currentIndex + charsToAdvance;
+
                 if (nextIndex >= currentSentence.length) {
                     // 短文完了 (句点まで入力された)
-                    console.log(`[Tanbun Input] Sentence completed! Selecting next sentence.`); // ★★★ ログ追加 ★★★
                     completedSentenceCountRef.current += 1;
                     selectNextSentence(); // 次の文へ (currentIndex は selectNextSentence でリセット)
                 } else {
@@ -483,14 +461,11 @@ const useTanbunChallengePractice = ({
                 }
                 return { isExpected: true, shouldGoToNext: false }; // shouldGoToNext は false
             } else {
-                console.log(`[Tanbun Input] INCORRECT.`); // ★★★ ログ追加 ★★★
                 missCountRef.current += 1;
                 // ミスした場合、currentIndex は変更しない
                 return { isExpected: false, shouldGoToNext: false };
             }
         } else {
-            console.log(`[Tanbun Input] No character determined. Input state might have changed.`); // ★★★ ログ追加 ★★★
-            // 文字が確定しなかった場合 (行キーや機能キーのみ押された場合など)
             // console.warn(`[Tanbun Input] Reached unexpected state where typedChar is null after processing.`);
             return { isExpected: false, shouldGoToNext: false };
         }
