@@ -728,7 +728,8 @@ export default function App() {
                                         currentFunctionKeyMap={currentFunctionKeyMap}
                                         fixedWidthNum={fixedWidthNum}
                                         okVisible={okVisible}
-                                    />
+                                       // status={activePractice?.status} // status は渡さない
+                                       />
                                 </div>
                                 {isChallengeFinished ? (
                                     <div className={`flex items-center justify-center p-4 border rounded bg-gray-50 ${
@@ -740,10 +741,10 @@ export default function App() {
                                             <pre className="text-lg text-left font-semibold">
                                                 {`【${practice} 結果】\n`}
                                                 {`問題数：${activePractice.challengeResults.totalQuestions}問クリア\n`}
-                                                {practice !== '記号入力１分間トレーニング' && `入力文字数：${activePractice.challengeResults.totalCharsTyped}文字\n`}
-                                                {`正答率：${(activePractice.challengeResults.accuracy * 100).toFixed(1)}%\n`} {/* ★★★ 正答率の表示を統一 ★★★ */}
+                                                {(practice === 'かな入力１分間トレーニング' || practice === '短文入力３分間トレーニング') && `正解文字数：${activePractice.challengeResults.correctCharsCount}文字\n`}
+                                                {`打鍵精度：${(activePractice.challengeResults.accuracy * 100).toFixed(1)}%\n`}
                                                 {`スコア：${activePractice.challengeResults.score}点\n`}
-                                                {`\n${activePractice.challengeResults.rankMessage}`}
+                                                {activePractice.challengeResults.rankMessage && `\n${activePractice.challengeResults.rankMessage}`}
                                             </pre>
                                         )}
                                     </div>

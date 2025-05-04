@@ -56,10 +56,10 @@ const useKanaChallengePractice = ({
     const countdownTimerRef = useRef<number | null>(null);
     const trainingTimerRef = useRef<number | null>(null);
     const startTimeRef = useRef<number | null>(null);
-    const correctCountRef = useRef(0); // 正解タイプ数
+    const correctCountRef = useRef(0); // 正解タイプ数 (シーケンス完了数)
     const missCountRef = useRef(0); // ミスタイプ数
-    const totalCharsTypedRef = useRef(0); // 総入力文字数（正解・不正解問わず）
-    const questionsCompletedRef = useRef(0); // クリアした問題数（文字単位ではなく問題単位）
+    const totalCharsTypedRef = useRef(0); // 総打鍵数（キーを押した回数）
+    const completedCharsCountRef = useRef(0); // 正しく入力完了した文字数 (ヘッダー表示文字数)
     const totalAttemptedRef = useRef(0); // 総試行回数（文字単位）
     const [challengeResults, setChallengeResults] = useState<ChallengeResult | null>(null);
 
@@ -125,23 +125,25 @@ const useKanaChallengePractice = ({
                     setIsFinished(true); // 終了状態をセット
                     if (trainingTimerRef.current) clearInterval(trainingTimerRef.current); // タイマー停止
 
-                    const correct = correctCountRef.current;
+                    const correct = correctCountRef.current; // 正解シーケンス完了数
                     const miss = missCountRef.current;
-                    const totalTyped = correct + miss; // 正誤合わせた総タイプ数
-                    const accuracy = totalTyped > 0 ? correct / totalTyped : 0;
-                    const missRate = 1 - accuracy;
-                    const cps = correct / CHALLENGE_DURATION_SECONDS;
-                    const score = Math.round(cps * Math.pow(1 - missRate, 2) * 1000);
-                    const rankMessage = getRankMessage(score);
+                    const totalTypedChars = totalCharsTypedRef.current; // 実際にタイプしたキーの総数
+                    // 正答率の計算式を (総入力キー数 - ミスタイプ数) / 総入力キー数 に変更
+                    const accuracy = totalTypedChars > 0 ? Math.max(0, (totalTypedChars - miss) / totalTypedChars) : 0; // 0未満にならないように
 
+                    // 新しいスコア計算 (例: 正解シーケンス数 * 精度 * 20)
+                    const score = Math.round(correct * accuracy * 20);
+                    // 入力が全くなかった場合はランクメッセージを空にする
+                    const rankMessage = totalTypedChars > 0 ? getRankMessage(score) : '';
                     const results: ChallengeResult = {
-                        totalQuestions: totalAttemptedRef.current, // 問題数 -> 総試行回数に変更
-                        totalCharsTyped: totalCharsTypedRef.current, // 実際にタイプした総文字数
-                        correctCount: correct,
-                        missCount: miss,
-                        accuracy: accuracy,
+                        totalQuestions: correct, // 問題数 = 正解シーケンス完了数
+                        correctCharsCount: completedCharsCountRef.current, // 正解文字数 (ヘッダー表示文字数)
+                        totalCharsTyped: totalTypedChars, // 実際にタイプした総キー数
+                        correctCount: correct, // 正解シーケンス完了数
+                        missCount: miss, // ミスタイプ数
+                        accuracy: accuracy, // (総入力キー数 - ミスタイプ数) / 総入力キー数
                         score: score,
-                        rankMessage: rankMessage,
+                        rankMessage: rankMessage, // rankMessage を追加
                     };
                     setChallengeResults(results); // 計算結果を state にセット
                     setHeadingChars([]); // ヘッダーはクリア（結果は App.tsx で表示するため）
@@ -183,10 +185,10 @@ const useKanaChallengePractice = ({
         setHeadingChars([]); // ヘッダーもクリア
         setChallengeResults(null); // 結果もリセット
         startTimeRef.current = null;
-        correctCountRef.current = 0;
+        correctCountRef.current = 0; // 正解シーケンス完了数リセット
         missCountRef.current = 0;
+        completedCharsCountRef.current = 0; // 正しく入力完了した文字数リセット
         totalCharsTypedRef.current = 0;
-        questionsCompletedRef.current = 0; // 使っていないが一応リセット
         totalAttemptedRef.current = 0;
         if (countdownTimerRef.current !== null) clearTimeout(countdownTimerRef.current);
         if (trainingTimerRef.current !== null) clearInterval(trainingTimerRef.current);
@@ -241,6 +243,7 @@ const useKanaChallengePractice = ({
                 if (actualDanKey === expectedDanKey) {
                     isExpected = true;
                     correctCountRef.current += 1;
+                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算
                     selectNextTarget();
                     nextStage = null;
                 } else {
@@ -278,6 +281,7 @@ const useKanaChallengePractice = ({
                 if (actualDanKey === expectedDanKey) {
                     isExpected = true;
                     correctCountRef.current += 1;
+                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算
                     selectNextTarget();
                     nextStage = null;
                 } else {
@@ -315,6 +319,7 @@ const useKanaChallengePractice = ({
                 if (actualDanKey === expectedDanKey) {
                     isExpected = true;
                     correctCountRef.current += 1;
+                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算
                     selectNextTarget();
                     nextStage = null;
                 } else {
@@ -332,6 +337,7 @@ const useKanaChallengePractice = ({
                 if (pressCode === expectedTsuKeyCode) {
                     isExpected = true;
                     correctCountRef.current += 1;
+                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算 (1文字)
                     selectNextTarget();
                     nextStage = null; // ステージは selectNextTarget でリセットされる
                 } else {
@@ -342,9 +348,7 @@ const useKanaChallengePractice = ({
         }
 
         // 共通処理
-        // setTotalTyped(prev => prev + 1); // ref に変更
         if (shouldIncrementAttempt) {
-            // setTotalAttempted(prev => prev + 1); // ref に変更
             totalAttemptedRef.current += 1;
         }
 
@@ -512,6 +516,7 @@ const useKanaChallengePractice = ({
         isInvalidInputTarget,
         isOkVisible: false, // チャレンジ中はOK表示しない
         challengeResults, // 計算結果を返す
+        status, // status を返す
     };
 };
 

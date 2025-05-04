@@ -210,26 +210,6 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
         console.log('[KigoChallenge] Finishing challenge. State from ref:', stateRef.current);
         console.log(`[KigoChallenge] totalKeyPresses at finish: ${totalKeyPresses}`);
 
-        if (durationSeconds <= 0 || totalQuestions === 0) {
-            console.warn("[KigoChallenge] Cannot calculate results: duration or totalQuestions is zero.");
-            setState(prev => ({
-                ...prev,
-                endTime: now,
-                status: 'finished',
-                challengeResults: {
-                    totalQuestions: 0,
-                    // correctAnswers -> correctCount に修正
-                    correctCount: 0,
-                    missCount: 0, // missCount を追加
-                    totalCharsTyped: 0,
-                    accuracy: 0,
-                    score: 0,
-                    rankMessage: "記録なし",
-                }
-            }));
-            return;
-        }
-
         const accuracy = totalKeyPresses > 0 ? (totalKeyPresses - incorrectKeyPresses) / totalKeyPresses : 0;
         console.log(`[KigoChallenge] totalKeyPresses: ${totalKeyPresses}`);
 
@@ -238,14 +218,10 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
         // スコア計算: (正答数 * 精度) を基本とし、時間経過で少し減点（仮）
         // const score = Math.max(0, Math.round((correctAnswers * accuracy * 10) - (durationSeconds / 10)));
         // スコア計算: 正答数 * 精度 * 10 を基本とする
-        const score = Math.round(correctAnswers * accuracy * 2);
+        const score = Math.round(correctAnswers * accuracy * 20);
 
-
-        let rankMessage = "頑張りましょう！";
-        if (score >= 150) rankMessage = "素晴らしい！達人レベルです！";
-        else if (score >= 100) rankMessage = "すごい！かなりの腕前です！";
-        else if (score >= 70) rankMessage = "良い調子！もっと上を目指せます！";
-        else if (score >= 40) rankMessage = "まずまずです！練習を続けましょう！";
+        // 新しいランクメッセージ判定 (入力がなければ空)
+        const rankMessage = totalKeyPresses > 0 ? getRankMessageKigo(score) : '';
 
         const results: ChallengeResult = { // ChallengeResults -> ChallengeResult に修正
             totalQuestions,
@@ -271,6 +247,16 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
     clearLongPressTimer();
 }, [clearLongPressTimer]); // Only depends on functions/refs it calls
 
+// --- ランクメッセージ判定関数 (記号用) ---
+const getRankMessageKigo = (score: number): string => {
+    // スコア基準は他のチャレンジと調整が必要かもしれません
+    if (score >= 1500) return "Godlike! タイピングの神！";
+    if (score >= 1000) return "Excellent! 正確さバッチリ！";
+    if (score >= 500) return "Great! なかなかやりますね！";
+    if (score >= 200) return "Good! その調子！";
+    return "Keep Trying! 練習あるのみ！";
+    };
+  
     // 60秒タイマー
     useEffect(() => {
         if (isActive && state.status === 'running' && state.startTime && !state.endTime) {

@@ -311,6 +311,7 @@ export interface PracticeHighlightResult {
 export interface ChallengeResult {
     totalQuestions: number; // 問題数（クリアした数）
     totalCharsTyped: number; // 総入力文字数
+    correctCharsCount?: number; // 正しく入力完了した文字数（かな/短文）
     correctCount: number; // 正解タイプ数
     missCount: number; // ミスタイプ数
     accuracy: number; // 正答率 (0-1)
@@ -331,6 +332,8 @@ export interface PracticeHookResult {
     isInvalidInputTarget: (pressCode: number, layoutIndex: number, keyIndex: number) => boolean;
     isOkVisible: boolean; // OK表示の状態をフックから受け取る
     challengeResults?: ChallengeResult | null; // Ensure this line exists and is correct
+    // チャレンジモードの状態 (idle, countdown, running, finished)
+    status?: 'idle' | 'countdown' | 'running' | 'finished';
     targetLayerIndex?: number | null;
     displayLayers?: string[][];
 }
