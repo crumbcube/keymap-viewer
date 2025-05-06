@@ -194,11 +194,12 @@ export const youonKakuchoDanMapping: Record<string, string[]> = {
 export interface GairaigoPracticeTarget {
   char: string;
   headerIndex: number;
-  // keys: [string, string, string]; // 変更前
-  keys: [string, string, string]; // 1番目: 1打目キー, 2番目: 2打目"表示"キー, 3番目: 3打目キー
+  // Allow 3 or 4 keys using a union type for the tuple
+  keys: [string, string, string] | [string, string, string, string]; // 1: 1st key, 2: 2nd display, 3: 3rd key, 4: optional 4th key
   // ▼▼▼ 2打目の実際の入力キーを追加 ▼▼▼
   actualSecondKey: string; // 2打目の実際の入力キー名 (例: "さ行")
   // ▲▲▲ 追加 ▲▲▲
+  actualThirdKey?: string; // Actual key for 3rd input (optional) // Remove extra brace here
 }
 
 export interface GairaigoPracticeGroup {
@@ -210,7 +211,8 @@ export const gairaigoPracticeData: GairaigoPracticeGroup[] = [
   { // グループ1: いぁいぃいぅいぇいぉ (変更なし)
     headerChars: ["いぁ", "いぃ", "いぅ", "いぇ", "いぉ"],
     targets: [
-      { char: "いぇ", headerIndex: 3, keys: ["あ行", "拗音", "え段"], actualSecondKey: "拗音" } // 2打目は拗音
+      // <<< targets に全ての文字を追加 >>>
+      { char: "いぇ", headerIndex: 3, keys: ["あ行", "拗音", "え段"], actualSecondKey: "拗音" },
     ]
   },
   { // グループ2: うぁうぃうぅうぇうぉ (2打目を 拗2 に変更)
@@ -225,9 +227,10 @@ export const gairaigoPracticeData: GairaigoPracticeGroup[] = [
     headerChars: ["くぁ", "くぃ", "くぅ", "くぇ", "くぉ"],
     targets: [
       { char: "くぁ", headerIndex: 0, keys: ["か行", "拗2", "あ段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
-      { char: "くぃ", headerIndex: 1, keys: ["か行", "拗2", "い段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
-      { char: "くぇ", headerIndex: 3, keys: ["か行", "拗2", "え段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
-      { char: "くぉ", headerIndex: 4, keys: ["か行", "拗2", "お段"], actualSecondKey: "さ行" }  // 表示: 拗2, 入力: さ行
+      { char: "くぃ", headerIndex: 1, keys: ["か行", "拗2", "い段"], actualSecondKey: "さ行" }, // index 1 (配列上のインデックス)
+      // くぅ (headerIndex: 2) は練習対象外なのでデータ不要
+      { char: "くぇ", headerIndex: 3, keys: ["か行", "拗2", "え段"], actualSecondKey: "さ行" }, // index 2 (配列上のインデックス)
+      { char: "くぉ", headerIndex: 4, keys: ["か行", "拗2", "お段"], actualSecondKey: "さ行" }  // index 3 (配列上のインデックス)
     ]
   },
   { // グループ4: すぁすぃすぅすぇすぉ (2打目を 拗2 に変更)
@@ -264,6 +267,17 @@ export const gairaigoPracticeData: GairaigoPracticeGroup[] = [
       { char: "ふぃ", headerIndex: 1, keys: ["は行", "拗2", "い段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
       { char: "ふぇ", headerIndex: 3, keys: ["は行", "拗2", "え段"], actualSecondKey: "さ行" }, // 表示: 拗2, 入力: さ行
       { char: "ふぉ", headerIndex: 4, keys: ["は行", "拗2", "お段"], actualSecondKey: "さ行" }  // 表示: 拗2, 入力: さ行
+    ]
+  },
+  { // グループ9: ヴァヴィヴヴェヴォ (gIdx=8)
+    headerChars: ["ヴァ", "ヴィ", "ヴ", "ヴェ", "ヴォ"],
+    targets: [
+      { char: "ヴァ", headerIndex: 0, keys: ["あ行", "拗2", "濁音", "あ段"], actualSecondKey: "さ行", actualThirdKey: "濁音" },
+      { char: "ヴィ", headerIndex: 1, keys: ["あ行", "拗2", "濁音", "い段"], actualSecondKey: "さ行", actualThirdKey: "濁音" },
+      // ヴ (index 2) is skipped in practice, but data structure needs placeholder if accessed directly
+      { char: "ヴ",   headerIndex: 2, keys: ["わ行", "濁音", "う段"], actualSecondKey: "濁音" }, // Kept 3 keys for simplicity if accessed, but won't be used in normal flow
+      { char: "ヴェ", headerIndex: 3, keys: ["あ行", "拗2", "濁音", "え段"], actualSecondKey: "さ行", actualThirdKey: "濁音" },
+      { char: "ヴォ", headerIndex: 4, keys: ["あ行", "拗2", "濁音", "お段"], actualSecondKey: "さ行", actualThirdKey: "濁音" }, // ★★★ ヴォのデータを追加 ★★★
     ]
   },
 ];

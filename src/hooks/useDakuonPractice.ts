@@ -27,7 +27,6 @@ export default function useDakuonPractice({
   isActive,
   gIdx,
   dIdx,
-  okVisible,
   side,
   kb,
   isRandomMode
@@ -144,13 +143,12 @@ export default function useDakuonPractice({
   // 期待キー (変更なし)
   const expectedGyouKey = useMemo(() => (isRandomMode ? randomTarget?.gyouKey : currentGyouKey) ?? null, [isRandomMode, randomTarget, currentGyouKey]);
   const expectedDanKey = useMemo(() => (isRandomMode ? randomTarget?.danKey : currentDan) ?? null, [isRandomMode, randomTarget, currentDan]);
-  const currentOkVisible = okVisible;
 
   // handleInput
   const handleInput = useCallback(
     (input: PracticeInputInfo): PracticeInputResult => {
 
-      if (!isActive || okVisible || !expectedGyouKey || !expectedDanKey || dakuonKeyCode === null) {
+      if (!isActive || !expectedGyouKey || !expectedDanKey || dakuonKeyCode === null) {
           return { isExpected: false, shouldGoToNext: false };
       }
       if (input.type !== 'release') {
@@ -207,13 +205,13 @@ export default function useDakuonPractice({
 
       return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, stage, expectedGyouKey, expectedDanKey,
+        isActive, stage, expectedGyouKey, expectedDanKey,
         hid2Gyou, hid2Dan, dakuonKeyCode, isRandomMode, selectNextRandomTarget, setStage
     ]);
 
   const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
       const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-      if (!isActive || okVisible || !expectedGyouKey || !expectedDanKey) {
+      if (!isActive || !expectedGyouKey || !expectedDanKey) {
           return noHighlight;
       }
 
@@ -243,7 +241,7 @@ export default function useDakuonPractice({
           return { className: 'bg-blue-100', overrideKey: null };
       }
       return noHighlight;
-    }, [isActive, okVisible, stage, expectedGyouKey, expectedDanKey, gIdx, dIdx, isRandomMode]);
+    }, [isActive, stage, expectedGyouKey, expectedDanKey, gIdx, dIdx, isRandomMode]);
 
   // isInvalidInputTarget
   const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
@@ -271,6 +269,5 @@ export default function useDakuonPractice({
     getHighlightClassName,
     reset,
     isInvalidInputTarget,
-    isOkVisible: currentOkVisible,
-  };
+   };
 }

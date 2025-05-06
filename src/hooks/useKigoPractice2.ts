@@ -23,7 +23,6 @@ const useKigoPractice2 = ({
     gIdx,
     dIdx,
     isActive,
-    okVisible,
     side,
     kb,
     layers, // layers を受け取る
@@ -125,12 +124,10 @@ const useKigoPractice2 = ({
         }
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
-    const currentOkVisible = okVisible;
-
 
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
 
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return { isExpected: false, shouldGoToNext: false };
         }
         if (!currentTargetChar) {
@@ -185,14 +182,14 @@ const useKigoPractice2 = ({
 
         return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, stage, layers, currentTargetChar,
+        isActive, stage, layers, currentTargetChar,
         isRandomMode, selectNextRandomTarget, setStage
     ]);
 
     // ▼▼▼ getHighlightClassName を修正 ▼▼▼
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return noHighlight;
         }
 
@@ -225,7 +222,7 @@ const useKigoPractice2 = ({
         }
         return noHighlight;
     }, [
-        isActive, okVisible, stage, currentTargetChar,
+        isActive, stage, currentTargetChar,
         isRandomMode, gIdx, dIdx, layers // hid2Gyou は不要
     ]);
 
@@ -243,7 +240,6 @@ const useKigoPractice2 = ({
         getHighlightClassName,
         reset,
         isInvalidInputTarget,
-        isOkVisible: currentOkVisible,
     };
 };
 

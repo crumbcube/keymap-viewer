@@ -17,7 +17,6 @@ const useSeionPractice = ({
     gIdx: initialGIdx,
     dIdx: initialDIdx,
     isActive,
-    okVisible,
     side,
     layers, // layers は handleInput で使うので必要
     kb,
@@ -74,15 +73,30 @@ const useSeionPractice = ({
         if (isRandomMode) {
             const allSeion: { char: string; gyouKey: string; danKey: string }[] = [];
             gyouList.forEach((gyouKey) => {
-                const danListForGyou = danOrder[gyouKey];
-                const charsForGyou = gyouChars[gyouKey];
-                danListForGyou.forEach((char, index) => {
-                    const danKey = danList[index];
-                    if (danKey && charsForGyou && charsForGyou[index]) {
-                        allSeion.push({ char: charsForGyou[index], gyouKey, danKey });
+                const actualCharsInGyou = gyouChars[gyouKey]; // 実際の文字リストを取得 (例: や行なら ['や', 'ゆ', 'よ'])
+                if (actualCharsInGyou) {
+                    actualCharsInGyou.forEach((char) => { // 実際の文字でループ
+                        let determinedDanKey: string | null = null;
+                        if (gyouKey === 'や行') {
+                            // や行の特殊マッピング
+                            if (char === 'や') determinedDanKey = 'あ段';
+                            else if (char === 'ゆ') determinedDanKey = 'う段';
+                            else if (char === 'よ') determinedDanKey = 'お段';
+                        } else {
+                            // や行以外：danOrderでの文字の位置からdanListのインデックスを取得して段キーを決定
+                            const charDisplayIndex = danOrder[gyouKey]?.indexOf(char);
+                            if (charDisplayIndex !== -1 && charDisplayIndex !== undefined && charDisplayIndex < danList.length) {
+                                determinedDanKey = danList[charDisplayIndex];
+                            }
+                        }
+
+                        if (determinedDanKey) {
+                            allSeion.push({ char, gyouKey, danKey: determinedDanKey });
+                        }
                     }
-                });
-            });
+                );
+            }
+        });
 
             if (allSeion.length > 0) {
                 const randomIndex = Math.floor(Math.random() * allSeion.length);
@@ -195,8 +209,7 @@ const useSeionPractice = ({
 
     // --- 入力処理 ---
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
-        if (!isActive || okVisible || !targetChar || !expectedGyouKey || !expectedDanKey || inputInfo.type !== 'release') {
-            // console.log(`[Seion handleInput] Exit early: isActive=${isActive}, okVisible=${okVisible}, targetChar=${targetChar}, expectedGyouKey=${expectedGyouKey}, expectedDanKey=${expectedDanKey}, type=${inputInfo.type}`);
+        if (!isActive || !targetChar || !expectedGyouKey || !expectedDanKey || inputInfo.type !== 'release') {
             return { isExpected: false, shouldGoToNext: false };
         }
 
@@ -243,7 +256,7 @@ const useSeionPractice = ({
         // console.log(`[Seion handleInput] Result: isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext}, Final Stage=${stage}`);
         return { isExpected, shouldGoToNext };
     // calculateTarget を依存配列に追加
-    }, [isActive, okVisible, targetChar, stage, expectedGyouKey, expectedDanKey, kb, side, isRandomMode, calculateTarget]);
+    }, [isActive, targetChar, stage, expectedGyouKey, expectedDanKey, kb, side, isRandomMode, calculateTarget]);
 
     // --- リセット処理 ---
     const reset = useCallback(() => {
@@ -278,7 +291,7 @@ const useSeionPractice = ({
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
 
-        if (!isActive || okVisible || !targetChar) {
+        if (!isActive || !targetChar) {
             return noHighlight;
         }
 
@@ -310,7 +323,7 @@ const useSeionPractice = ({
 
         return noHighlight;
     // expectedGyouKey, expectedDanKey を依存配列に追加
-    }, [isActive, okVisible, targetChar, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
+    }, [isActive, targetChar, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
 
     // --- 不正入力ターゲット判定 ---
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
@@ -332,7 +345,6 @@ const useSeionPractice = ({
     // stage と isActive を依存配列に追加
     }, [isActive, stage]);
 
-    const currentOkVisible = okVisible;
 
     // --- フックの戻り値 ---
     return useMemo(() => ({
@@ -341,11 +353,7 @@ const useSeionPractice = ({
         getHighlightClassName,
         reset,
         isInvalidInputTarget,
-        isOkVisible: currentOkVisible,
-        // ▼▼▼ targetChar を追加 ▼▼▼
         targetChar: targetChar ?? '',
-        // ▲▲▲ 追加完了 ▲▲▲
-        // ▼▼▼ getHighlight を追加 ▼▼▼
         getHighlight: () => { // 基本的な実装
             let start: string | null = null;
             let end: string | null = null;
@@ -353,10 +361,9 @@ const useSeionPractice = ({
             else if (stage === 'danInput') end = expectedDanKey;
             return { start, end };
         },
-        // ▲▲▲ 追加完了 ▲▲▲
     }), [
         headingChars,
-        handleInput, getHighlightClassName, reset, isInvalidInputTarget, currentOkVisible,
+        handleInput, getHighlightClassName, reset, isInvalidInputTarget, 
         targetChar, stage, expectedGyouKey, expectedDanKey // getHighlight 用の依存関係を追加
     ]);
 };

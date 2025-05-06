@@ -21,7 +21,7 @@ import {
 
 type SokuonKomojiStage = 'tsuInput' | 'gyouInput' | 'middleInput' | 'danInput';
 
-export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActive, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult {
+export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult {
     const [stage, setStage] = useState<SokuonKomojiStage>(() => {
         const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
         return initialChar === 'っ' ? 'tsuInput' : 'gyouInput';
@@ -170,11 +170,9 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
         return currentInputDef?.dan ?? null;
     }, [isRandomMode, randomTarget, currentInputDef]);
 
-    const currentOkVisible = okVisible;
-
     const handleInput = useCallback((input: PracticeInputInfo): PracticeInputResult => {
 
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return { isExpected: false, shouldGoToNext: false };
         }
         if (tsuKeyCode === null || (isMiddleKeyRequired && dakuonKeyCode === null)) {
@@ -244,13 +242,13 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
 
         return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, stage, expectedGyouKey, expectedDanKey, isCurrentCharTsu, tsuKeyCode, dakuonKeyCode, // dakuonKeyCode 追加
+        isActive, stage, expectedGyouKey, expectedDanKey, isCurrentCharTsu, tsuKeyCode, dakuonKeyCode, // dakuonKeyCode 追加
         hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage, isMiddleKeyRequired // isMiddleKeyRequired 追加
     ]);
 
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return noHighlight;
         }
 
@@ -285,7 +283,7 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
             return { className: 'bg-blue-100', overrideKey: null };
         }
         return noHighlight;
-    }, [isActive, okVisible, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
+    }, [isActive, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
@@ -308,6 +306,5 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, okVisible, isActiv
         getHighlightClassName,
         reset,
         isInvalidInputTarget,
-        isOkVisible: currentOkVisible,
     };
 }

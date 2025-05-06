@@ -1,221 +1,277 @@
 // /home/coffee/my-keymap-viewer/src/components/PracticeHeading.tsx
 import React, { useMemo } from 'react';
-import {
-    PracticeMode,
-    PracticeHookResult,
-    TanbunProgressInfo
-} from '../hooks/usePracticeCommons';
-import {
-    youdakuonPracticeData,
-    kigoPractice3Data,
-    gairaigoPracticeData, // 外来語データをインポート
-} from '../data/keymapData';
+import { PracticeMode, PracticeStatus } from '../hooks/usePracticeCommons'; // PracticeMode, PracticeStatus をインポート
 
 interface PracticeHeadingProps {
-  activePractice: PracticeHookResult | null;
-  isRandomMode: boolean; // isRandomMode はチャレンジモードでは true 扱いされる
-  practice: PracticeMode;
+  practice: PracticeMode; // PracticeMode を使用
+  headingChars: string[];
   gIdx: number;
   dIdx: number;
-  currentFunctionKeyMap: Record<number, string>;
-  fixedWidthNum: number;
-  okVisible: boolean;
-  // status?: PracticeHookResult['status']; // status は使わないので削除
+  isRandomMode?: boolean;
+  isFinished?: boolean; // 追加: チャレンジ終了フラグ
+  typedEndIndex?: number; // 追加: 短文入力の進捗
+  status?: PracticeStatus; // 追加: 練習の状態
 }
 
-const keyWidthRem = 5.5;
-const gapRem = 0.5;
-
 const PracticeHeading: React.FC<PracticeHeadingProps> = ({
-  activePractice,
-  isRandomMode,
   practice,
+  headingChars,
   gIdx,
   dIdx,
-  currentFunctionKeyMap,
-  fixedWidthNum,
-  // status, // status は受け取らない
+  isRandomMode = false,
+  isFinished = false, // デフォルトは false
+  typedEndIndex = 0, // デフォルトは 0
+  status = 'idle', // デフォルトは idle
 }) => {
-  const headingChars = activePractice?.headingChars ?? [];
-  const okVisible = activePractice?.isOkVisible ?? false;
+  // console.log(`[PracticeHeading] Rendering. practice=${practice}, gIdx=${gIdx}, dIdx=${dIdx}, isRandomMode=${isRandomMode}, headingChars=`, headingChars);
+  // console.log(`[PracticeHeading] typedEndIndex: ${typedEndIndex}`);
 
-  const okLeftPosition = useMemo(() => {
-    const bsKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === 'BS');
-    const bsKeyIndex = bsKeyEntry ? parseInt(bsKeyEntry[0]) : -1;
-
-    let position = '50%'; // デフォルトは中央
-
-    if (bsKeyIndex !== -1) {
-      const offsetFromGridStart = bsKeyIndex * (keyWidthRem + gapRem) + keyWidthRem / 2;
-      const offsetFromCenter = offsetFromGridStart - fixedWidthNum / 2;
-      position = `calc(50% + ${offsetFromCenter}rem)`;
+  const displayChars = useMemo(() => {
+    if (isFinished) {
+      return ['終了！']; // 終了時は「終了！」を表示
     }
-    return position;
-  }, [currentFunctionKeyMap, fixedWidthNum]);
+    if (practice === '短文入力３分間トレーニング') {
+      // 短文練習の場合、headingChars は ['短文全体']
+      return headingChars.length > 0 ? headingChars[0].split('') : [];
+    }
+    if (practice === '拗音の基本練習') {
+      // headingChars は ["きゃ", "きゅ", "きょ"] のような配列
+      return headingChars.flatMap(char => char.split('')); // ["き", "ゃ", "き", "ゅ", "き", "ょ"] のように分解
+    }
+    return headingChars;
+  }, [practice, headingChars, isFinished]);
 
-  // 外来語練習用の現在のターゲット情報を取得 (存在すれば) - 通常モード用
-  const currentGairaigoGroup = useMemo(() => {
-      if (!isRandomMode && practice === '外来語の発音補助' && gIdx >= 0 && gIdx < gairaigoPracticeData.length) {
-          return gairaigoPracticeData[gIdx];
+  const getHighlightClass = (index: number): string => {
+    if (status === 'countdown') {
+      return '';
+    }
+    if (isFinished) {
+      return ''; // 終了時はハイライトしない
+    }
+
+    if (practice === '短文入力３分間トレーニング') {
+      // typedEndIndex が undefined や null の場合はデフォルトのスタイルを返す
+      if (typedEndIndex === undefined || typedEndIndex === null) return ''; // 変更なし
+
+      // --- 拗音判定用のヘルパー定数 ---
+      const baseYouonChars = ['き', 'し', 'ち', 'に', 'ひ', 'み', 'り', 'ぎ', 'じ', 'ぢ', 'び', 'ぴ'];
+      const smallYouonChars = ['ゃ', 'ゅ', 'ょ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ'];
+
+      // --- 現在のターゲットが拗音かどうかを判定 ---
+      const isTargetYouon =
+        index === typedEndIndex && // 現在のインデックスがターゲットであり、
+        index + 1 < displayChars.length && // 次の文字が存在し、
+        baseYouonChars.includes(displayChars[index]) && // 現在の文字が拗音の基底文字で、
+        smallYouonChars.includes(displayChars[index + 1]); // 次の文字が小文字である
+
+      // --- 現在のインデックスが、拗音ターゲットの2文字目かどうかを判定 ---
+      const isSecondCharOfTargetYouon =
+        index === typedEndIndex + 1 && // 現在のインデックスがターゲットの次であり、
+        typedEndIndex >= 0 && // typedEndIndex が有効で、
+        baseYouonChars.includes(displayChars[typedEndIndex]) && // 前の文字(ターゲット1文字目)が拗音の基底文字で、
+        smallYouonChars.includes(displayChars[index]); // 現在の文字が小文字である
+
+      // --- ハイライトクラスの決定 ---
+      if (index < typedEndIndex) {
+        return 'text-gray-400'; // 入力済み
+      // ターゲット文字(1文字目または拗音の1文字目) または 拗音ターゲットの2文字目ならハイライト
+      } else if (index === typedEndIndex || isSecondCharOfTargetYouon) {
+        return 'text-blue-500'; // 文字色を青に変更
       }
-      return null;
-  }, [practice, gIdx, isRandomMode]); // isRandomMode を依存配列に追加
+      // それ以外（未入力）
+      return '';
+    } // <-- 短文入力ブロックの閉じ括弧
 
-  const currentGairaigoTarget = useMemo(() => {
-      if (currentGairaigoGroup && dIdx >= 0 && dIdx < currentGairaigoGroup.targets.length) {
-          return currentGairaigoGroup.targets[dIdx];
+    if (practice === '拗音の基本練習') {
+      const targetBaseIndex = dIdx * 2; // ターゲットの最初の文字のインデックス
+      //console.log(`[PracticeHeading Youon] index: ${index}, dIdx: ${dIdx}, targetBaseIndex: ${targetBaseIndex}`);
+      if (index === targetBaseIndex || index === targetBaseIndex + 1) {
+        //console.log(`[PracticeHeading Youon] Highlighting index: ${index}`);
+        return 'text-blue-500'; // ターゲットの2文字を文字色でハイライト
       }
-      return null;
-  }, [currentGairaigoGroup, dIdx]);
+      return ''; // それ以外はハイライトしない
+    }
 
-  const isChallengeCountdown = (practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング' || practice === '短文入力３分間トレーニング') && headingChars.length === 1 && headingChars[0].endsWith('秒');
-  const isChallengeResult = !!activePractice?.challengeResults;
+    const challengeModeSet = new Set<PracticeMode>([
+      'かな入力１分間トレーニング',
+      '記号入力１分間トレーニング',
+      '短文入力３分間トレーニング',
+    ]);
+    const isChallengeMode = challengeModeSet.has(practice);
+    if (!isChallengeMode && isRandomMode && index === 0) { // <-- if 文のブロックを開始
+      return 'text-blue-500'; // 文字色でハイライト
+    } // <-- if 文のブロックを閉じる
 
-    const progressData = activePractice?.getProgressInfo?.();
-    const tanbunProgress: TanbunProgressInfo | null =
-        practice === '短文入力３分間トレーニング' ? progressData ?? null : null;
+    // 通常モードのハイライトロジック
+    let currentIndex = -1;
+    const isGairaigo = practice === '外来語の発音補助';
+    const isIaGroup = isGairaigo && gIdx === 0;
+    const isUaGroup = isGairaigo && gIdx === 1;
+    const isTargetKu = isGairaigo && gIdx === 2; // 「くぁ」グループ
+    const isTargetTsu = isGairaigo && gIdx === 4; // 「つぁ」グループ
+    const isTargetTeGroup = headingChars.length === 5 && headingChars[0] === 'てぁ'; // map スコープの外に移動
+    const isToGroup = headingChars.length === 5 && headingChars[0] === 'とぁ';
+    const isFuGroup = headingChars.length === 5 && headingChars[0] === 'ふぁ';
+    const isVaGroup = headingChars.length === 5 && headingChars[0] === 'ヴァ';
+    const isTargetFu = isGairaigo && isFuGroup && dIdx === 2;
+    const isTargetVa = isGairaigo && isVaGroup && dIdx === 2;
 
-    const getNextCharLength = (sentence: string, index: number): number => {
-        if (index >= sentence.length) return 0; // インデックスが範囲外なら0
-        // (ここに拗音などを判定して 1 or 2 を返すロジックを実装 - 簡易版)
-        const firstChar = sentence[index];
-        const secondChar = sentence[index + 1];
-        const smallYouonChars = ['ゃ', 'ゅ', 'ょ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ'];
-        const isBaseForYouon = ['き', 'し', 'ち', 'に', 'ひ', 'み', 'り', 'ぎ', 'じ', 'ぢ', 'び', 'ぴ'].includes(firstChar);
-        if (isBaseForYouon && secondChar && smallYouonChars.includes(secondChar)) {
-            return 2;
+    if (practice === '拗音拡張') {
+        currentIndex = dIdx;
+        // 拗音拡張では dIdx が 1 (ぃ) または 3 (ぇ) のみをハイライト
+        if (dIdx !== 1 && dIdx !== 3) {
+            currentIndex = -1; // それ以外はハイライトしない
         }
-        return 1;
-    };
+    } else if (isGairaigo) {
+        // 外来語モードのハイライトロジック
+        if (isIaGroup) {
+          // dIdx 0, 1, 2, 3, 4 -> index 3 (いぇ)
+          currentIndex = 3;
+          //console.log(`[PracticeHeading IaGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+        } else if (isUaGroup) {
+          // dIdx 0 (うぁ) -> index 1 (うぃ) をハイライト
+          // dIdx 1 (うぃ) -> index 1
+          // dIdx 2 (うぅ) -> index 3 (うぇ) をハイライト
+          // dIdx 3 (うぇ) -> index 3
+          // dIdx 4 (うぉ) -> index 4
+          if (dIdx === 0 || dIdx === 1) { // Practice starts or target is うぃ
+            currentIndex = 1; // Highlight うぃ (index 1)
+          } else if (dIdx === 2 || dIdx === 3) { // Practice skipped うぅ or target is うぇ
+            currentIndex = 3; // Highlight うぇ (index 3)
+          } else if (dIdx === 4) { // Target is うぉ
+            currentIndex = 4; // Highlight うぉ (index 4)
+          }
+          // If dIdx is somehow out of bounds, currentIndex remains -1
+          //console.log(`[PracticeHeading UaGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+        } else if (isTargetKu) { // 「くぁ」グループ
+          // dIdx 0 -> index 0 (くぁ)
+            // dIdx 1 -> index 1 (くぃ)
+            // dIdx 2 -> index 2 (くぅ) - ハイライトしない
+            // dIdx 3 -> index 3 (くぇ)
+            // dIdx 4 -> index 4 (くぉ)
+            if (dIdx === 2) currentIndex = -1; // くぅはハイライトしない
+            else currentIndex = dIdx;
+            //console.log(`[PracticeHeading KuGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+        } else if (isTargetTsu) { // 「つぁ」グループ
+            // dIdx 0 -> index 0 (つぁ)
+            // dIdx 1 -> index 1 (つぃ)
+            // dIdx 2 -> index 2 (つぅ) - ハイライトしない
+            // dIdx 3 -> index 3 (つぇ)
+            // dIdx 4 -> index 4 (つぉ)
+            if (dIdx === 2) currentIndex = -1; // つぅはハイライトしない
+            else currentIndex = dIdx;
+            //console.log(`[PracticeHeading TsuGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+        } else if (isTargetTeGroup) { // 「てぁ」グループ
+            // dIdx 0, 1, 2, 3, 4 -> index 1 (てぃ)
+            currentIndex = 1;
+            //console.log(`[PracticeHeading TeGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+        } else if (isToGroup) {
+            // dIdx 0, 1, 2, 3, 4 -> index 2 (とぅ)
+            currentIndex = 2;
+            //console.log(`[PracticeHeading ToGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+        } else if (isFuGroup) {
+            // dIdx 0 -> index 0 (ふぁ)
+            // dIdx 1 -> index 1 (ふぃ)
+            // dIdx 2 -> index 2 (ふぅ) - ハイライトしない
+            // dIdx 3 -> index 3 (ふぇ)
+            // dIdx 4 -> index 4 (ふぉ)
+            if (dIdx === 2) {
+                currentIndex = -1; // ふぅはハイライトしない
+            } else {
+              // If dIdx is 2, don't highlight anything
+              if (dIdx === 2) currentIndex = -1;
+              else currentIndex = dIdx;
+            }
+            //console.log(`[PracticeHeading FuGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+        } else if (isVaGroup) {
+            // 「ヴ」(index 2) はハイライトしないので、dIdx をそのまま使う
+            currentIndex = dIdx;
+            //console.log(`[PracticeHeading VaGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+          } else {
+            currentIndex = dIdx;
+        }
+      } else {
+        currentIndex = dIdx;
+    }
 
-  console.log('[PracticeHeading] headingChars:', headingChars, 'tanbunProgress:', tanbunProgress, 'isChallengeResult:', isChallengeResult); // status ログ削除
+    // 通常のハイライト条件を先に評価
+    let determinedHighlightClass = '';
+    if (index === currentIndex && !isRandomMode) {
+        // 外来語モードで「くぅ」「つぅ」「ふぅ」「ヴ」がターゲットの場合、
+        // currentIndex は -1 または次の文字を指していることがあるため、
+        // ここでは index 2 の文字はハイライトしないようにする
+        if (!(isGairaigo && ((isTargetKu || isTargetTsu || isTargetFu || isTargetVa) && index === 2))) {
+          determinedHighlightClass = 'text-blue-500'; // 通常ハイライト (文字色)
+        }
+    }
+
+    // 外来語モードでの特別ハイライト条件
+    if (isGairaigo) {
+        const isTargetKu = gIdx === 2 && dIdx === 2; // 「くぅ」がターゲット
+        const isTargetTsu = gIdx === 4 && dIdx === 2; // 「つぅ」がターゲット
+        const isTargetTe = isTargetTeGroup; // 「てぁ」グループは常に「てぃ」がターゲット扱い (ハイライト用)
+        const shouldHighlightNextKu = isTargetKu && index === 3; // 「くぇ」をハイライト
+        const shouldHighlightNextTsu = isTargetTsu && index === 3; // 「つぇ」をハイライト
+        const shouldHighlightNextFu = isTargetFu && index === 3;
+
+        // 「くぇ」「つぇ」「ふぇ」をハイライトする条件
+        if (shouldHighlightNextKu || shouldHighlightNextTsu || shouldHighlightNextFu) {
+          determinedHighlightClass = 'text-blue-500'; // 上書き (文字色)
+        }
+        // 「てぃ」をハイライトする条件
+        if (isTargetTe && index === 1) {
+          determinedHighlightClass = 'text-blue-500'; // 上書き (文字色)
+        }
+        // 「とぅ」をハイライトする条件
+        if (isToGroup && index === 2) {
+          determinedHighlightClass = 'text-blue-500'; // 上書き (文字色)
+        }
+    }
+    //console.log(`[PracticeHeading getHighlightClass] index: ${index}, currentIndex: ${currentIndex}, determinedHighlightClass: "${determinedHighlightClass}"`);
+
+    return determinedHighlightClass; // <-- 関数の最後に return を追加
+  };
+
+    const isTanbunChallenge = practice === '短文入力３分間トレーニング';
+
   return (
-    <div className="relative flex justify-start mb-6"> {/* justify-center を justify-start に変更 */}
-      {/* 練習文字を表示する部分 */}
-      <div className="flex text-black text-4xl font-bold"> {/* スタイルをここに集約 */}
-        {/* チャレンジ終了時 (isChallengeResult が true かつ headingChars が '終了！') は文字列全体をハイライトなしで表示 */}
-        {isChallengeResult && headingChars.length > 0 && headingChars[0] === '終了！' ? (
-            <span>{headingChars[0]}</span>
-        ) : (
-            /* 練習中の表示ロジック */
-            headingChars.map((char: string, index: number) => {
-              let className = '';
-              let style: React.CSSProperties = { padding: '0.25rem' };
+      <div className={`mb-4 flex items-center text-4xl ${
+        isFinished ? 'font-bold justify-center space-x-1' // 終了時
+        : (isTanbunChallenge ? 'font-semibold justify-start' // 短文チャレンジ中は space-x なし
+          : (practice === '拗音の基本練習' ? 'font-bold justify-center' // 拗音の基本練習中は space-x なし
+            : 'font-bold justify-center space-x-1') // それ以外の練習
+          )
+      }`}>
+      {displayChars.map((char, index) => {
 
-              const sentenceChars = practice === '短文入力３分間トレーニング' ? char.split('') : [char];
-              const isTanbunMode = practice === '短文入力３分間トレーニング';
+        const isYouonPractice = practice === '拗音の基本練習';
+        const isTanbunChallenge = practice === '短文入力３分間トレーニング';
 
-              // チャレンジモードのカウントダウンは特別なスタイル
-              if (isChallengeCountdown) {
-                  className = 'text-3xl font-bold'; // 少し大きめに
-              } else {
-                  // 通常の練習文字表示
-                  className = 'text-2xl';
-              }
+        const isFirstCharOfYouonPair = isYouonPractice && index % 2 === 0;
+        const isSecondCharOfYouonPair = isYouonPractice && index % 2 !== 0;
 
-              // --- 太字表示ロジック ---
-              let isBoldTarget = false;
-              if (!isChallengeCountdown && !isChallengeResult) {
-                  if (isRandomMode && (practice === '拗音拡張' || practice === '外来語の発音補助' /* || practice === 'かな入力１分間トレーニング' */)) { // チャレンジもランダム扱い
-                      isBoldTarget = true;
-                  } else if (practice === '外来語の発音補助' && currentGairaigoGroup) {
-                      isBoldTarget = currentGairaigoGroup.targets.some(target => target.headerIndex === index);
-                  } else if (practice !== '拗音拡張' && practice !== '外来語の発音補助') {
-                      isBoldTarget = true;
-                  }
-              }
+        let paddingClass = 'px-1'; // デフォルトのパディングクラス
 
-              if (isBoldTarget) {
-                  className += ' font-bold';
-              }
+        if (isTanbunChallenge) {
+          if (index === 0) {
+            paddingClass = 'pl-1'; // 短文の最初の文字は左パディングのみ
+          } else if (index === displayChars.length - 1) {
+            paddingClass = 'pr-1'; // 短文の最後の文字は右パディングのみ
+          } else {
+            paddingClass = 'px-0'; // 短文の中間の文字は水平パディングなし
+          }
+        } else if (isFirstCharOfYouonPair) {
+          paddingClass = 'pl-1'; // 拗音の1文字目は左パディングのみ
+        } else if (isSecondCharOfYouonPair) {
+          paddingClass = 'pr-1'; // 拗音の2文字目は右パディングのみ
+        }
 
-              // --- ハイライト処理 (ランダムモードでない場合、チャレンジ結果表示中でない場合) ---
-              if (!isRandomMode && !isChallengeResult && practice !== 'かな入力１分間トレーニング' && practice !== '記号入力１分間トレーニング') {
-                  let shouldHighlight = false;
-                  if (practice === '拗濁音の練習') {
-                      shouldHighlight = (gIdx >= 0 && gIdx < youdakuonPracticeData.length && youdakuonPracticeData[gIdx]?.chars && index === dIdx);
-                  } else if (practice === '拗半濁音の練習') {
-                      shouldHighlight = (index === dIdx);
-                  } else if (practice === '記号の基本練習３') {
-                      shouldHighlight = (gIdx >= 0 && gIdx < kigoPractice3Data.length && kigoPractice3Data[gIdx]?.chars && index === dIdx);
-                  } else if (practice === '拗音拡張') {
-                      // dIdx (App.tsx から渡される値) が 1 または 3 の場合にハイライト
-                      shouldHighlight = (index === dIdx && (dIdx === 1 || dIdx === 3));
-                  } else if (practice === '外来語の発音補助' && currentGairaigoTarget) {
-                      // 現在のターゲットのヘッダインデックスと一致したらハイライト
-                      shouldHighlight = (index === currentGairaigoTarget.headerIndex);
-                  } else { // 清音、拗音、濁音、半濁音、小文字、記号1, 2
-                      shouldHighlight = (index === dIdx);
-                  }
-
-                  if (shouldHighlight) {
-                      className += ' bg-blue-100';
-                  }
-              }
-
-              // 短文モードで、かつチャレンジ実行中の場合のみ文字ごとのスタイルを適用
-              if (isTanbunMode) {
-                if (isChallengeCountdown) {
-                    return (
-                      <span key={index} className={className.trim()} style={style}>
-                        {char} {/* カウントダウン文字をそのまま表示 */}
-                      </span>
-                    );
-                  } else if (!isChallengeResult) { // ← isChallengeResult が false の場合のみ
-                    // カウントダウン後、かつ終了前（短文表示中）は文字ごとのスタイルを適用
-                    return (
-                      <span key={index} className={`${className.trim()} whitespace-pre text-4xl font-bold`} style={style}> {/* whitespace-pre を追加, スタイル調整 */}
-                        {sentenceChars.map((c, charIndex) => {
-                          let charClassName = 'transition-colors duration-100'; // transition を追加
-                          if (tanbunProgress) {
-                            const typedEndIndex = tanbunProgress.typedEndIndex;
-                            if (charIndex < typedEndIndex) {
-                              // 入力済み
-                              charClassName += ' text-gray-400'; // 例: グレー文字
-                            } else if (charIndex >= typedEndIndex) {
-                              // 次の入力対象か判定
-                              const nextCharLen = getNextCharLength(char, typedEndIndex);
-                              if (charIndex < typedEndIndex + nextCharLen) {
-                                charClassName += ' text-blue-500 underline'; // 例: 青文字+下線
-                              } else {
-                                // 未入力
-                                // charClassName += ' text-black'; // デフォルト色
-                              }
-                            }
-                        }
-                        return ( <span key={charIndex} className={charClassName}>
-                            {c}
-                          </span>
-                        );})}
-                      </span>
-                    );
-                  } else {
-                    // 短文モードで終了している場合 (isChallengeResult が true) は、
-                    // 外側の isChallengeResult 条件で処理されるはずなので、
-                    // ここには通常到達しませんが、念のためプレーンな表示を返します。
-                    return <span key={index} className={className.trim()} style={style}>{char}</span>;
-                  }
-                }
-              return (
-                <span key={index} className={className.trim()} style={style}>
-                  {char} {/* 通常モード */}
-                  </span>
-              );
-            })
-        )}
-      </div>
-      {/* OKマーク */}
-      {okVisible && practice !== 'かな入力１分間トレーニング' && practice !== '記号入力１分間トレーニング' && practice !== '短文入力３分間トレーニング' && (
-          <div
-              className="absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2"
-              style={{
-                  left: okLeftPosition,
-                  zIndex: 10
-              }}
-          >
-              <span className='text-3xl font-bold text-green-600' style={{ padding: '0.25rem' }}>OK</span>
-          </div>
-      )}
+        return (
+          <span key={index} className={`${paddingClass} py-1 rounded transition-colors duration-150 ${getHighlightClass(index)}`}>
+            {char}
+          </span>
+        );
+      })}
     </div>
   );
 };

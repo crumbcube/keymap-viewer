@@ -205,18 +205,6 @@ const useTanbunChallengePractice = ({
         };
     }, [isActive, status]);
 
-    // ヘッダー表示用文字配列 (現在の短文)
-    const headingChars = useMemo(() => {
-        if (status === 'countdown') {
-            return [`${countdownValue}秒`];
-        } else if (status === 'finished') {
-            return ['終了！'];
-        } else if (status === 'running' && currentSentence) {
-            return [currentSentence]; // 短文全体を1要素として渡す
-        }
-        return [];
-    }, [status, countdownValue, currentSentence]);
-
     // リセット処理
     const reset = useCallback(() => {
         setStatus('idle');
@@ -333,12 +321,12 @@ const useTanbunChallengePractice = ({
         else if (inputState.gyouKey === '記号' && currentGyouKey) { // kigoPractice3 パターン (記号キー -> 行キー)
             clearInputTimeout();
             const kigoValue = kigoMapping3[currentGyouKey];
-            console.log(`[Tanbun Input] kigoPractice3 - kigoValue for ${currentGyouKey}:`, kigoValue);
+            //console.log(`[Tanbun Input] kigoPractice3 - kigoValue for ${currentGyouKey}:`, kigoValue);
             if (kigoValue) {
                 console.log(`[Tanbun Input] kigoPractice3 detected. currentGyouKey=${currentGyouKey}`);
                 typedChar = kigoValue.split('\n')[0];
             }
-            console.log(`[Tanbun Input] kigoPractice3 result. typedChar=${typedChar}`);
+            //console.log(`[Tanbun Input] kigoPractice3 result. typedChar=${typedChar}`);
             setInputState(initialInputState);
             // -> 文字比較へ
         }
@@ -419,7 +407,7 @@ const useTanbunChallengePractice = ({
 
         // 文字が確定した場合のみ判定
         if (typedChar !== null) {
-            console.log(`[Tanbun Input] Character determined: typedChar='${typedChar}'`);
+            //console.log(`[Tanbun Input] Character determined: typedChar='${typedChar}'`);
             let expectedCharsToCompare = "";
             // let charsToAdvance = 1; // Default advancement (moved up)
             if (currentIndex < currentSentence.length) { // インデックスが範囲内かチェック
@@ -479,21 +467,41 @@ const useTanbunChallengePractice = ({
         return progressInfo;
     }, [progressInfo]);
 
-    return {
-        // targetChar: currentSentence[currentIndex] ?? '', // ターゲット文字は使わないかも
-        headingChars,
+    const practiceResult = useMemo(() => {
+        // headingChars の計算ロジックを useMemo の中に移動
+        let calculatedHeadingChars: string[] = [];
+        if (status === 'countdown') {
+            calculatedHeadingChars = [`${countdownValue}秒`];
+        } else if (status === 'finished') {
+            calculatedHeadingChars = ['終了！'];
+        } else if (status === 'running' && currentSentence) {
+            calculatedHeadingChars = [currentSentence];
+        }
+
+        return {
+            headingChars: calculatedHeadingChars, // 計算結果を使用
+            handleInput,
+            getProgressInfo,
+            reset,
+            challengeResults,
+            targetLayerIndex: null,
+            displayLayers: [],
+            getHighlightClassName: () => ({ className: null, overrideKey: null }),
+            isInvalidInputTarget: () => false,
+            typedEndIndex: progressInfo.typedEndIndex, // 最新の typedEndIndex を含める
+            status, // status も返す
+            countdownValue, // countdownValue も返す
+        };
+    }, [
+        status, countdownValue, currentSentence, // headingChars の計算に必要なもの
         handleInput,
         getProgressInfo,
         reset,
-        isOkVisible: false, // OK表示は使わない
         challengeResults,
-        // キーボード非表示のための設定
-        targetLayerIndex: null,
-        displayLayers: [],
-        // 以下は必須だが使わないもの
-        getHighlightClassName: () => ({ className: null, overrideKey: null }),
-        isInvalidInputTarget: () => false,
-    };
+        progressInfo // typedEndIndex の更新を検知
+    ]);
+
+    return practiceResult; // useMemo の結果を返す
 };
 
 export default useTanbunChallengePractice;

@@ -22,7 +22,6 @@ const useKigoPractice1 = ({
     gIdx,
     dIdx,
     isActive,
-    okVisible,
     side,
     kb,
     layers, // layers は使わないが props として受け取る
@@ -117,7 +116,7 @@ const useKigoPractice1 = ({
         return () => {
             clearLongPressTimer();
         };
-    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, clearLongPressTimer, selectNextRandomTarget]); // internalOkVisible を削除
+    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, clearLongPressTimer, selectNextRandomTarget]);
 
     // 通常モード用
     const currentGroup = useMemo(() => {
@@ -148,13 +147,11 @@ const useKigoPractice1 = ({
         }
     }, [isActive, isRandomMode, randomTarget, currentGroup]);
 
-    const currentOkVisible = okVisible;
-
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
         const pressCode = inputInfo.pressCode;
         const inputKeyName = hid2Gyou[pressCode] ?? null;
 
-        if (!isActive || okVisible || !expectedKeyName) {
+        if (!isActive || !expectedKeyName) {
             return { isExpected: false, shouldGoToNext: false };
         }
 
@@ -210,14 +207,14 @@ const useKigoPractice1 = ({
 
         return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, expectedKeyName, hid2Gyou, clearLongPressTimer, isLongPressSuccess,
-        isRandomMode, selectNextRandomTarget // handleCorrectAndGoNextRandom, internalOkVisible, reset を削除
+        isActive, expectedKeyName, hid2Gyou, clearLongPressTimer, isLongPressSuccess,
+        isRandomMode, selectNextRandomTarget
     ]);
 
     // ▼▼▼ getHighlightClassName の修正 ▼▼▼
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (!isActive || okVisible || !expectedKeyName) {
+        if (!isActive || !expectedKeyName) {
             return noHighlight;
         }
 
@@ -230,7 +227,7 @@ const useKigoPractice1 = ({
         }
         return noHighlight;
     }, [
-        isActive, okVisible, expectedKeyName, isLongPressSuccess // internalOkVisible, isRandomMode, hid2Gyou を削除
+        isActive, expectedKeyName, isLongPressSuccess
     ]);
     // ▲▲▲ 修正完了 ▲▲▲
 
@@ -263,7 +260,6 @@ const useKigoPractice1 = ({
         getHighlightClassName,
         reset,
         isInvalidInputTarget,
-        isOkVisible: currentOkVisible,
     };
 };
 

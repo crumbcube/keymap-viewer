@@ -41,7 +41,6 @@ const useYoudakuonPractice = ({
     gIdx,
     dIdx,
     isActive,
-    okVisible,
     side,
     kb,
     layers,
@@ -60,23 +59,18 @@ const useYoudakuonPractice = ({
         } else { // TW-20H
             return side === 'left' ? hid2GyouHLeft_Kana : hid2GyouHRight_Kana;
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
+    }, [kb, side]);
     const hid2Dan = useMemo(() => {
         if (kb === 'tw-20v') {
             return side === 'left' ? hid2DanVLeft_Kana : hid2DanVRight_Kana;
         } else { // TW-20H
             return side === 'left' ? hid2DanHLeft_Kana : hid2DanHRight_Kana;
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
+    }, [kb, side]);
     const currentFunctionKeyMap = useMemo(() => {
         return functionKeyMaps[kb]?.[side] ?? {};
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
+    }, [kb, side]);
+    
     const selectNextRandomTarget = useCallback(() => {
         if (allYoudakuonCharInfos.length > 0) {
             const randomIndex = Math.floor(Math.random() * allYoudakuonCharInfos.length);
@@ -158,11 +152,9 @@ const useYoudakuonPractice = ({
         // クリーンアップは不要
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
-    const currentOkVisible = okVisible;
-
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
 
-        if (!isActive || okVisible || !currentInputDef) {
+        if (!isActive || !currentInputDef) {
             return { isExpected: false, shouldGoToNext: false };
         }
         if (inputInfo.type !== 'release') {
@@ -236,13 +228,13 @@ const useYoudakuonPractice = ({
 
         return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, stage, currentInputDef, hid2Gyou, hid2Dan, currentFunctionKeyMap,
+        isActive, stage, currentInputDef, hid2Gyou, hid2Dan, currentFunctionKeyMap,
         isRandomMode, selectNextRandomTarget, setStage
     ]);
 
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (!isActive || okVisible || !currentInputDef) {
+        if (!isActive || !currentInputDef) {
             return noHighlight;
         }
 
@@ -286,7 +278,7 @@ const useYoudakuonPractice = ({
 
         return noHighlight;
     }, [
-        isActive, okVisible, stage, currentInputDef, isRandomMode, gIdx, dIdx, currentFunctionKeyMap
+        isActive, stage, currentInputDef, isRandomMode, gIdx, dIdx, currentFunctionKeyMap
     ]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
@@ -317,8 +309,7 @@ const useYoudakuonPractice = ({
         getHighlightClassName,
         reset,
         isInvalidInputTarget,
-        isOkVisible: isRandomMode ? false : currentOkVisible,
-    };
+   };
 };
 
 export default useYoudakuonPractice;

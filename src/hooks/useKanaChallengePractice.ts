@@ -40,7 +40,6 @@ const getRankMessage = (score: number): string => {
 
 const useKanaChallengePractice = ({
     isActive,
-    okVisible,
     side,
     kb,
     layers,
@@ -80,7 +79,7 @@ const useKanaChallengePractice = ({
         if (allKanaTargets.length > 0) {
             const randomIndex = Math.floor(Math.random() * allKanaTargets.length);
             const nextTarget = allKanaTargets[randomIndex];
-            console.log(">>> Selecting new Kana Challenge target:", nextTarget);
+            //console.log(">>> Selecting new Kana Challenge target:", nextTarget);
             setCurrentTarget(nextTarget);
             if (nextTarget.type === 'sokuonKomoji' && nextTarget.isTsu) {
                 setChallengeStage('tsuInput');
@@ -192,7 +191,7 @@ const useKanaChallengePractice = ({
         totalAttemptedRef.current = 0;
         if (countdownTimerRef.current !== null) clearTimeout(countdownTimerRef.current);
         if (trainingTimerRef.current !== null) clearInterval(trainingTimerRef.current);
-        console.log("Resetting Kana Challenge Practice");
+        //console.log("Resetting Kana Challenge Practice");
     }, [setChallengeResults, setHeadingChars]);
 
     // アクティブになったらカウントダウン開始
@@ -221,7 +220,7 @@ const useKanaChallengePractice = ({
         let nextStage: ChallengeStage | null = null;
         let shouldIncrementAttempt = false;
 
-        console.log(`[KanaChallenge] Input: 0x${pressCode.toString(16)} for target: ${currentTarget.char} (${currentTarget.type}), Stage: ${challengeStage}`);
+        //console.log(`[KanaChallenge] Input: 0x${pressCode.toString(16)} for target: ${currentTarget.char} (${currentTarget.type}), Stage: ${challengeStage}`);
         totalCharsTypedRef.current += 1; // タイプ数をカウント
 
         if (currentTarget.type === 'seion') {
@@ -353,18 +352,18 @@ const useKanaChallengePractice = ({
         }
 
         if (nextStage && nextStage !== challengeStage) {
-            console.log(`[KanaChallenge] Setting stage from ${challengeStage} to ${nextStage}`);
+            //console.log(`[KanaChallenge] Setting stage from ${challengeStage} to ${nextStage}`);
             setChallengeStage(nextStage);
         } else if (!isExpected && challengeStage !== 'gyouInput' && challengeStage !== 'tsuInput' && nextStage !== null) { // 促音以外で不正解の場合
-             console.log(`[KanaChallenge] Incorrect input, resetting stage to gyouInput`);
+            // console.log(`[KanaChallenge] Incorrect input, resetting stage to gyouInput`);
              setChallengeStage('gyouInput');
         } else if (!isExpected && challengeStage === 'tsuInput') {
              // 促音で不正解の場合はステージをリセットしない（再度 tsuInput を待つ）
-             console.log(`[KanaChallenge] Incorrect input for tsu, staying in tsuInput stage`);
+            // console.log(`[KanaChallenge] Incorrect input for tsu, staying in tsuInput stage`);
         }
 
 
-        console.log(`[KanaChallenge] End - isExpected: ${isExpected}, Final Stage: ${nextStage ?? challengeStage}`);
+        //console.log(`[KanaChallenge] End - isExpected: ${isExpected}, Final Stage: ${nextStage ?? challengeStage}`);
         return { isExpected, shouldGoToNext: false };
     // isFinished を依存配列に追加
     }, [status, currentTarget, challengeStage, kb, side, selectNextTarget, currentFunctionKeyMap, isFinished, setChallengeStage]);
@@ -506,18 +505,23 @@ const useKanaChallengePractice = ({
     // isFinished, layers を依存配列に追加
     }, [status, currentTarget, challengeStage, currentFunctionKeyMap, isFinished, layers, kb, side]);
 
-    return {
-        targetChar: currentTarget?.char ?? '', // 現在のターゲット文字
-        getHighlight: () => ({ start: null, end: null }), // チャレンジモードではハイライト不要なので仮実装
-        headingChars,
-        handleInput,
-        getHighlightClassName,
-        reset,
-        isInvalidInputTarget,
-        isOkVisible: false, // チャレンジ中はOK表示しない
-        challengeResults, // 計算結果を返す
-        status, // status を返す
-    };
+    const practiceResult = useMemo(() => {
+        //console.log('[useKanaChallengePractice useMemo] Recalculating result object. currentTarget:', currentTarget, 'status:', status);
+        return {
+            currentTarget: currentTarget ?? undefined, // currentTarget を含める (null の場合は undefined に)
+            getHighlight: () => ({ start: null, end: null }), // チャレンジモードではハイライト不要なので仮実装
+            headingChars,
+            handleInput,
+            getHighlightClassName,
+            reset,
+            isInvalidInputTarget,
+            challengeResults, // 計算結果を返す
+            status, // status を返す
+            countdownValue,
+        };
+    }, [currentTarget, headingChars, handleInput, getHighlightClassName, reset, isInvalidInputTarget, challengeResults, status, countdownValue]);
+
+    return practiceResult;
 };
 
 export default useKanaChallengePractice;

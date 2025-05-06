@@ -146,7 +146,7 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         // console.log(`[renderKey ${layoutIndex}-${idx}] After invalid check. highlightResult:`, highlightResult); // ログ削減
 
         // 正解キーハイライト処理 (不正入力でない場合のみ)
-        if (!isInvalid && showKeyLabels && !activePractice?.isOkVisible && activePractice) {
+        if (!isInvalid && showKeyLabels && activePractice) { // !activePractice?.isOkVisible を削除
             const result = activePractice.getHighlightClassName(originalKey, layoutIndex);
             if (result.className) {
                 highlightResult = result;
@@ -191,6 +191,10 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         } else {
             // キー表示OFF時は、元々空だったキー以外は ____ でマスク
             displayContent = isEmptyKey ? '\n' : '____';
+        }
+        // ★★★ Add log just before returning the div ★★★
+        if (layoutIndex === 2 && originalKey === 'は行') {
+            console.log(`[KeyboardLayout 2 renderKey "は行"] Final highlightResult.className: ${highlightResult.className ?? 'null'}`);
         }
 
         // 練習モードON時のレンダリング

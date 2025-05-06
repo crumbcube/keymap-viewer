@@ -21,6 +21,15 @@ import {
     functionKeyMaps,
     youonKakuchoChars,
     gairaigoPracticeData,
+    basicPracticeMenuItems, // PracticeMenu で使うためインポート
+    stepUpPracticeMenuItems, // PracticeMenu で使うためインポート
+    challengeMenuItems, // PracticeMenu で使うためインポート
+    gyouChars, // calculateNextIndices で使用
+    youonDanMapping, // calculateNextIndices で使用
+    dakuonDanMapping, // calculateNextIndices で使用
+    handakuonDanMapping, // calculateNextIndices で使用
+    youdakuonDanMapping, // calculateNextIndices で使用
+    youhandakuonDanMapping, // calculateNextIndices で使用
 } from './data/keymapData';
 import {
     PracticeMode,
@@ -28,7 +37,8 @@ import {
     PracticeHookProps,
     PracticeHookResult,
     KeyboardSide,
-    KeyboardModel
+    KeyboardModel,
+    PracticeStatus // PracticeHeading に渡すためインポート
 } from './hooks/usePracticeCommons';
 import useSeionPractice from './hooks/useSeionPractice';
 import useYouonPractice from './hooks/useYouonPractice';
@@ -73,8 +83,7 @@ export default function App() {
     const [dIdx, setDIdx] = useState(0); // 初期値は 0 に戻す
 
     /* UIフィードバック */
-    const [okVisible, setOK] = useState(false);
-    const okTimerRef = useRef<number | null>(null); // OK表示用タイマーref
+    // okVisible と okTimerRef を削除
     const [lastInvalidKeyCode, setLastInvalidKeyCode] = useState<number | null>(null);
 
     /* HID / カウンタ */
@@ -92,8 +101,8 @@ export default function App() {
 
     // --- カスタムフックの呼び出し ---
     const commonHookProps: PracticeHookProps = useMemo(() => ({
-        gIdx, dIdx, isActive: false, okVisible, side, layers, kb, isRandomMode
-    }), [gIdx, dIdx, okVisible, side, layers, kb, isRandomMode]);
+        gIdx, dIdx, isActive: false, side, layers, kb, isRandomMode // okVisible を削除
+    }), [gIdx, dIdx, side, layers, kb, isRandomMode]); // okVisible を依存配列から削除
 
     // 各練習フックの呼び出し
     const seionPractice = useSeionPractice({ ...commonHookProps, isActive: practice === '清音の基本練習' });
@@ -128,11 +137,11 @@ export default function App() {
             case '拗半濁音の練習': return youhandakuonPractice;
             case '拗音拡張': return youonKakuchoPractice;
             case '外来語の発音補助': return gairaigoPractice;
-            case 'かな入力１分間トレーニング': return kanaChallengePractice;
-            case '記号入力１分間トレーニング': return kigoChallengePractice;
-            case '短文入力３分間トレーニング': return tanbunChallengePractice;
-            default: return null;
-        }
+            case 'かな入力１分間トレーニング': return kanaChallengePractice; // ← 修正: 正しいフックを返す
+            case '記号入力１分間トレーニング': return kigoChallengePractice; // ← 修正: 正しいフックを返す
+            case '短文入力３分間トレーニング': return tanbunChallengePractice; // ← 修正: 正しいフックを返す
+            default: return null; // default ケースを追加して null を返す
+                }
     }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice, gairaigoPractice, kanaChallengePractice, kigoChallengePractice, tanbunChallengePractice]);
 
     const isChallengeFinished = useMemo(() => {
@@ -187,172 +196,306 @@ export default function App() {
         invalidInputTimeoutRef.current = timerId;
      }, []); // 依存配列を空に修正
 
-    // --- OK表示処理 ---
-    const showOkFeedback = useCallback(() => {
-        // 既存のタイマーがあればクリア
-        if (okTimerRef.current !== null) {
-            clearTimeout(okTimerRef.current);
-        }
-        // OKを表示
-        setOK(true);
-        // 0.6秒後にOKを非表示にするタイマーを設定
-        okTimerRef.current = window.setTimeout(() => {
-            setOK(false);
-            okTimerRef.current = null; // タイマーIDをクリア
-        }, 500); // 500ミリ秒 = 0.5秒
-    }, [setOK]); // setOK は依存関係として安定
-
-    const nextStage = useCallback(() => {
-        // ランダムモードの場合、リセットのみ行う（OK表示は showOkFeedback で行う）
-        if (isRandomMode) {
-            activePracticeRef.current?.reset?.();
-            return;
-        }
-
-        const currentGIdx = gIdxRef.current;
-        const currentDIdx = dIdxRef.current;
+    // 次の練習ステージに進む関数
+    const calculateNextIndices = (currentGIdx: number, currentDIdx: number, isRandomMode: boolean, practiceMode: PracticeMode) => {
         let nextGIdx = currentGIdx;
-        let nextDIdx = currentDIdx;
+        let nextDIdx = currentDIdx + 1; // 基本は現在の dIdx + 1
 
-        if (practiceRef.current === '清音の基本練習') {
-            const currentGyouKey = gyouList[currentGIdx]; // currentGIdx を使用
-            if (!currentGyouKey || !gyouList.includes(currentGyouKey)) {
-                console.error("清音練習で無効な gIdx または currentGyouKey");
-            } else {
-                const list = danOrder[currentGyouKey];
-                if (currentDIdx < list.length - 1) { // currentDIdx を使用
-                    nextDIdx = currentDIdx + 1;
-                } else {
+        // console.log(`[calculateNextIndices] Start. currentGIdx=${currentGIdx}, currentDIdx=${currentDIdx}, isRandomMode=${isRandomMode}, practiceMode=${practiceMode}`);
+
+        if (practiceMode === '清音の基本練習') {
+            const currentGyouKey = gyouList[currentGIdx];
+            const list = danOrder[currentGyouKey];
+            const charsForGyou = gyouChars[currentGyouKey];
+            // console.log(`[calculateNextIndices Seion] currentGyouKey=${currentGyouKey}, list=${list}, charsForGyou=${charsForGyou}, dIdx=${dIdx}`);
+            if (list && charsForGyou) {
+                if (currentDIdx >= charsForGyou.length - 1) { // 現在の行の最後の文字か？
+                    nextGIdx = currentGIdx + 1;
                     nextDIdx = 0;
-                    nextGIdx = (currentGIdx + 1) % gyouList.length; // currentGIdx を使用
-                }
-            }
-        }
-        else if (practiceRef.current === '拗音の基本練習') {
-            if (currentGIdx < 0 || currentGIdx >= youonGyouList.length) { console.error("拗音練習で無効な gIdx"); }
-            else {
-                const currentGyouKey = youonGyouList[currentGIdx];
-                const currentChars = youonGyouChars[currentGyouKey] || [];
-                if (currentDIdx < currentChars.length - 1) { nextDIdx = currentDIdx + 1; }
-                else { nextDIdx = 0; nextGIdx = (currentGIdx + 1) % youonGyouList.length; }
-            }
-        } else if (practiceRef.current === '濁音の基本練習') {
-             if (currentGIdx < 0 || currentGIdx >= dakuonGyouList.length) { console.error("濁音練習で無効な gIdx"); }
-             else {
-                const currentGyouKey = dakuonGyouList[currentGIdx];
-                const currentChars = dakuonGyouChars[currentGyouKey] || [];
-                if (currentDIdx < currentChars.length - 1) { nextDIdx = currentDIdx + 1; }
-                else { nextDIdx = 0; nextGIdx = (currentGIdx + 1) % dakuonGyouList.length; }
-             }
-        } else if (practiceRef.current === '半濁音の基本練習') {
-             if (currentGIdx < 0 || currentGIdx >= handakuonGyouList.length) { console.error("半濁音練習で無効な gIdx"); }
-             else {
-                const currentChars = handakuonGyouChars['は行'] || [];
-                if (currentDIdx < currentChars.length - 1) { nextDIdx = currentDIdx + 1; }
-                else { nextDIdx = 0; nextGIdx = 0; } // gIdx は常に 0
-             }
-        } else if (practiceRef.current === '小文字(促音)の基本練習') {
-             if (currentGIdx < 0 || currentGIdx >= sokuonKomojiData.length) { console.error("促音/小文字練習で無効な gIdx"); }
-             else {
-                const currentSet = sokuonKomojiData[currentGIdx];
-                const currentChars = currentSet.chars;
-                 if (currentDIdx < 0 || currentDIdx >= currentChars.length) { console.error("促音/小文字練習で無効な dIdx"); nextGIdx = 0; nextDIdx = 0; }
-                 else {
-                    const isTsu = currentChars[currentDIdx] === 'っ';
-                    if (isTsu || currentDIdx === currentChars.length - 1) {
-                        nextDIdx = 0;
-                        nextGIdx = (currentGIdx + 1) % sokuonKomojiData.length;
-                    } else {
-                        nextDIdx = currentDIdx + 1;
+                    if (nextGIdx >= gyouList.length) {
+                        nextGIdx = 0;
                     }
-                 }
-             }
-        } else if (practiceRef.current === '記号の基本練習１') {
-            if (currentGIdx < 0 || currentGIdx >= kigoPractice1Data.length) { console.error("記号練習1で無効な gIdx"); }
-            else {
-                const currentGroup = kigoPractice1Data[currentGIdx];
-                if (currentDIdx < currentGroup.chars.length - 1) { nextDIdx = currentDIdx + 1; }
-                else { nextDIdx = 0; nextGIdx = (currentGIdx + 1) % kigoPractice1Data.length; }
-            }
-        } else if (practiceRef.current === '記号の基本練習２') {
-            if (currentGIdx < 0 || currentGIdx >= kigoPractice2Data.length) { console.error("記号練習2で無効な gIdx"); }
-            else {
-                const currentGroup = kigoPractice2Data[currentGIdx];
-                if (currentDIdx < 0 || currentDIdx >= currentGroup.chars.length) { console.error("記号練習2で無効な dIdx"); }
-                else {
-                    if (currentDIdx < currentGroup.chars.length - 1) {
-                        nextDIdx = currentDIdx + 1;
-                    } else {
-                        nextDIdx = 0;
-                        nextGIdx = (currentGIdx + 1) % kigoPractice2Data.length;
-                    }
-                }
-            }
-        } else if (practiceRef.current === '記号の基本練習３') {
-            if (currentGIdx < 0 || currentGIdx >= kigoPractice3Data.length) { console.error("記号練習3で無効な gIdx"); }
-            else {
-                const currentGroup = kigoPractice3Data[currentGIdx];
-                if (currentDIdx < currentGroup.chars.length - 1) {
-                    nextDIdx = currentDIdx + 1;
                 } else {
-                    if (currentGIdx < kigoPractice3Data.length - 1) {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '拗音の基本練習') {
+            const currentGyouKey = youonGyouList[currentGIdx];
+            const danListForGyou = youonDanMapping[currentGyouKey];
+            if (danListForGyou) {
+                if (currentDIdx >= danListForGyou.length - 1) {
+                    nextGIdx = currentGIdx + 1;
+                    nextDIdx = 0;
+                    if (nextGIdx >= youonGyouList.length) {
+                        nextGIdx = 0;
+                    }
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '濁音の基本練習') {
+            const currentGyouKey = dakuonGyouList[currentGIdx];
+            const danListForGyou = dakuonDanMapping[currentGyouKey];
+            if (danListForGyou) {
+                if (currentDIdx >= danListForGyou.length - 1) {
+                    nextGIdx = currentGIdx + 1;
+                    nextDIdx = 0;
+                    if (nextGIdx >= dakuonGyouList.length) {
+                        nextGIdx = 0;
+                    }
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '半濁音の基本練習') {
+            const currentGyouKey = handakuonGyouList[currentGIdx]; // 常に 'は行'
+            const danListForGyou = handakuonDanMapping[currentGyouKey];
+            if (danListForGyou) {
+                if (currentDIdx >= danListForGyou.length - 1) {
+                    // 半濁音は「は行」のみなので、次は最初のグループに戻る
+                    nextGIdx = 0;
+                    nextDIdx = 0;
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '小文字(促音)の基本練習') {
+            const group = sokuonKomojiData[currentGIdx];
+            if (group) {
+                const maxDIdx = group.chars.length - 1;
+                if (currentDIdx >= maxDIdx) {
+                    nextGIdx = currentGIdx + 1;
+                    nextDIdx = 0;
+                    if (nextGIdx >= sokuonKomojiData.length) {
+                        nextGIdx = 0;
+                    }
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '記号の基本練習１') {
+            const group = kigoPractice1Data[currentGIdx];
+            if (group) {
+                const maxDIdx = group.chars.length - 1;
+                if (currentDIdx >= maxDIdx) {
+                    nextGIdx = currentGIdx + 1;
+                    nextDIdx = 0;
+                    if (nextGIdx >= kigoPractice1Data.length) {
+                        nextGIdx = 0;
+                    }
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '記号の基本練習２') {
+            const group = kigoPractice2Data[currentGIdx];
+            if (group) {
+                const maxDIdx = group.chars.length - 1;
+                if (currentDIdx >= maxDIdx) {
+                    nextGIdx = currentGIdx + 1;
+                    nextDIdx = 0;
+                    if (nextGIdx >= kigoPractice2Data.length) {
+                        nextGIdx = 0;
+                    }
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '記号の基本練習３') {
+            const group = kigoPractice3Data[currentGIdx];
+            if (group) {
+                const maxDIdx = group.chars.length - 1;
+                if (currentDIdx >= maxDIdx) {
+                    nextGIdx = currentGIdx + 1;
+                    nextDIdx = 0;
+                    if (nextGIdx >= kigoPractice3Data.length) {
+                        nextGIdx = 0;
+                    }
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '拗濁音の練習') {
+            const youdakuonGyouKeys = Object.keys(youdakuonPracticeData); // 行名のリストを取得
+            const currentGyouKey = youdakuonGyouKeys[currentGIdx];
+            const danListForGyou = youdakuonDanMapping[currentGyouKey];
+            if (danListForGyou) {
+                if (currentDIdx >= danListForGyou.length - 1) {
+                    nextGIdx = currentGIdx + 1;
+                    nextDIdx = 0;
+                    if (nextGIdx >= youdakuonGyouKeys.length) {
+                        nextGIdx = 0;
+                    }
+                } else {
+                    // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+                }
+            }
+        } else if (practiceMode === '拗半濁音の練習') {
+            // 拗半濁音は「は行」のみ
+            const currentGyouKey = 'は行';
+            const danListForGyou = youhandakuonDanMapping[currentGyouKey];
+            if (currentDIdx >= danListForGyou.length - 1) {
+                nextGIdx = 0; // 最初のグループに戻る
+                nextDIdx = 0;
+            } else {
+                // nextDIdx は既に currentDIdx + 1 になっているので何もしない
+            }
+        } else if (practiceMode === '拗音拡張') {
+            const currentGyouKey = youonGyouList[currentGIdx];
+            // 拗音拡張は dIdx が 1(ぃ) か 3(ぇ) のみ練習対象
+            // dIdx が 1 なら次は 3 へ、3 なら次のグループへ
+            if (currentDIdx === 1) {
+                nextDIdx = 3;
+            } else if (currentDIdx === 3) {
+                nextGIdx = currentGIdx + 1; // gIdx をインクリメント
+                nextDIdx = 1; // 次のグループの最初のターゲット (ぃ)
+                if (nextGIdx >= youonGyouList.length) {
+                    nextGIdx = 0;
+                }
+            } else {
+                // 不正な dIdx の場合はリセット
+                nextGIdx = 0;
+                nextDIdx = 1;
+            }
+        } else if (practiceMode === '外来語の発音補助') {
+            const group = gairaigoPracticeData[currentGIdx];
+            if (group) {
+                if (currentGIdx === 0) {
+                    nextGIdx = 1; // 次の「うぁ」グループへ
+                    nextDIdx = 0; // dIdx は 0 にリセット
+                    return { nextGIdx, nextDIdx };
+                }
+                else if (currentGIdx === 1) { // else if に変更
+                    if (currentDIdx === 0 || currentDIdx === 1) nextDIdx = 3; // うぃ -> うぇ (dIdx=2 をスキップ)
+                    else if (currentDIdx === 2 || currentDIdx === 3) nextDIdx = 4; // うぇ -> うぉ
+                    else if (currentDIdx === 4) { // うぉ -> 次のグループへ
                         nextGIdx = currentGIdx + 1;
                         nextDIdx = 0;
-                    } else {
+                    }
+                }
+                else if (currentGIdx === 2) { // gIdx=2 (くぁ)
+                    // dIdx は 0, 1, 3, 4 と進む (2 はスキップ)
+                    if (currentDIdx === 0) nextDIdx = 1; // くぁ -> くぃ
+                    else if (currentDIdx === 1) nextDIdx = 3; // くぃ -> くぇ (dIdx=2 は練習対象外なのでスキップ)
+                    else if (currentDIdx === 3) nextDIdx = 4; // くぇ -> くぉ
+                    else if (currentDIdx === 4) { // くぉ -> 次のグループへ
+                        nextGIdx = 3;
+                        // すぁ行の最初のターゲットは「すぃ」(dIdx=1)
+                        nextDIdx = 1;
+                    } else { // 予期しない dIdx (dIdx=2 など)
                         nextGIdx = 0;
                         nextDIdx = 0;
                     }
                 }
-            }
-        } else if (practiceRef.current === '拗濁音の練習') {
-            if (currentGIdx < 0 || currentGIdx >= youdakuonPracticeData.length) { console.error("拗濁音練習で無効な gIdx"); }
-            else {
-                const currentGroup = youdakuonPracticeData[currentGIdx];
-                if (currentDIdx < currentGroup.chars.length - 1) {
-                    nextDIdx = currentDIdx + 1;
-                } else {
+                else if (currentGIdx === 3) { // gIdx=3 (す)
+                    // 「すぃ」(dIdx=1) の次は「つぁ」グループ (gIdx=4, dIdx=0) へ
+                    if (currentDIdx === 1) {
+                        nextGIdx = 4;
+                        nextDIdx = 0;
+                    } else {
+                        // 「すぃ」以外からの遷移は想定しない (またはエラー処理)
+                        console.warn(`[calculateNextIndices Gairaigo] Unexpected dIdx ${currentDIdx} for gIdx 3 (Su group)`);
+                        nextGIdx = 0; // エラー時は最初に戻るなど
+                        nextDIdx = 0;
+                    }
+                }
+                else if (currentGIdx === 4) { // gIdx=4 (つぁ)
+                    // dIdx は 0, 1, 3, 4 と進む (2 はスキップ)
+                    if (currentDIdx === 0) nextDIdx = 1; // つぁ -> つぃ
+                    else if (currentDIdx === 1) nextDIdx = 3; // つぃ -> つぇ (dIdx=2 は練習対象外なのでスキップ)
+                    else if (currentDIdx === 3) nextDIdx = 4; // つぇ -> つぉ
+                    else if (currentDIdx === 4) { // つぉ -> 次のグループへ
+                        nextGIdx = 5;
+                        // てぁ行の最初のターゲットは「てぃ」(dIdx=1)
+                        nextDIdx = 1;
+                    } else { // 予期しない dIdx (dIdx=2 など)
+                        nextGIdx = 0;
+                        nextDIdx = 0;
+                    }
+                }
+                else if (currentGIdx === 5) { // gIdx=5 (て)
+                    // 「てぃ」(dIdx=1) の次は「とぅ」グループ (gIdx=6, dIdx=2) へ
+                    if (currentDIdx === 1) {
+                        nextGIdx = 6; // と グループ
+                        nextDIdx = 2; // とぅ
+                    } else {
+                        console.warn(`[calculateNextIndices Gairaigo] Unexpected dIdx ${currentDIdx} for gIdx 5 (Te group)`);
+                        nextGIdx = 0; // エラー時は最初に戻るなど
+                        nextDIdx = 3; // いぇ
+                    }
+                    return { nextGIdx, nextDIdx };
+                }
+                else if (currentGIdx === 6) { // gIdx=6 (と)
+                    // 「とぅ」(dIdx=2) の次は「ふぁ」グループ (gIdx=7, dIdx=0) へ
+                    if (currentDIdx === 2) {
+                        nextGIdx = 7; // ふぁ グループ
+                        nextDIdx = 0; // ふぁ
+                    } else {
+                        console.warn(`[calculateNextIndices Gairaigo] Unexpected dIdx ${currentDIdx} for gIdx 6 (To group)`);
+                        nextGIdx = 0; // エラー時は最初に戻るなど
+                        nextDIdx = 0;
+                    }
+                }
+                else if (currentGIdx === 7) { // gIdx=7 (ふぁ)
+                    // dIdx は 0, 1, 3, 4 と進む (2 はスキップ)
+                    if (currentDIdx === 0) nextDIdx = 1; // ふぁ -> ふぃ
+                    else if (currentDIdx === 1) nextDIdx = 3; // ふぃ -> ふぇ (dIdx=2 は練習対象外なのでスキップ)
+                    else if (currentDIdx === 3) nextDIdx = 4; // ふぇ -> ふぉ
+                    else if (currentDIdx === 4) { // ふぉ -> 次のグループへ
+                        nextGIdx = 8; // ヴァ グループ
+                        nextDIdx = 0; // ヴァ
+                    } else { // 予期しない dIdx (dIdx=2 など)
+                        nextGIdx = 0;
+                        nextDIdx = 0;
+                    }
+                }
+                else if (currentGIdx === 8) { // gIdx=8 (ヴぁ)
+                    // dIdx は 0, 1, 3, 4 と進む (2 はスキップ)
+                    if (currentDIdx === 0) nextDIdx = 1; // ヴァ -> ヴィ
+                    else if (currentDIdx === 1) nextDIdx = 3; // ヴィ -> ヴェ (dIdx=2 はスキップ)
+                    else if (currentDIdx === 3) nextDIdx = 4; // ヴェ -> ヴォ
+                    else if (currentDIdx === 4) { // ヴォ -> 次のグループ (最初に戻る)
+                        nextGIdx = 0;
+                        nextDIdx = 0;
+                    }
+                    // dIdx=2 からの遷移は想定しない
+                }
+                else {
+                    const maxDIdxInGroup = group.headerChars.length - 1; // ヘッダーの数-1 が dIdx の最大値
+                    if (currentDIdx >= maxDIdxInGroup) {
+                        nextGIdx = currentGIdx + 1; // gIdx をインクリメント
+                        nextDIdx = 0;
+                    } else {
+                        nextDIdx = currentDIdx + 1;
+                    }
+                }
+
+                // 最後のグループを超えたら最初のグループに戻る (gIdx のチェック)
+                if (nextGIdx >= gairaigoPracticeData.length) {
+                    nextGIdx = 0;
                     nextDIdx = 0;
-                    nextGIdx = (currentGIdx + 1) % youdakuonPracticeData.length;
                 }
             }
-        } else if (practiceRef.current === '拗半濁音の練習') {
-            const currentGroup = youhandakuonPracticeData[0];
-            if (currentDIdx < currentGroup.chars.length - 1) {
-                nextDIdx = currentDIdx + 1;
-            } else {
-                nextDIdx = 0;
-            }
-            nextGIdx = 0; // gIdx は常に 0
         }
-        else if (practiceRef.current === '拗音拡張') {
-            // 拗音拡張は dIdx が 1 と 3 の間を行き来する特殊なロジック
-            if (currentDIdx === 1) { // 現在「ぃ」を練習していた場合
-                nextDIdx = 3; // 次は「ぇ」
-            } else if (currentDIdx === 3) { // 現在「ぇ」を練習していた場合
-                nextDIdx = 1; // 次は次の行の「ぃ」
-                nextGIdx = (currentGIdx + 1) % youonGyouList.length;
-            } else {
-                console.warn(`Invalid currentDIdx ${currentDIdx} in nextStage for 拗音拡張. Resetting to 1.`);
-                nextDIdx = 1; // 不正な場合はリセット
-            }
-        }
-        else if (practiceRef.current === '外来語の発音補助') {
-             if (currentGIdx < 0 || currentGIdx >= gairaigoPracticeData.length) { console.error("外来語練習で無効な gIdx"); }
-             else {
-                const currentGroup = gairaigoPracticeData[currentGIdx];
-                if (currentDIdx < currentGroup.targets.length - 1) {
-                    nextDIdx = currentDIdx + 1;
-                } else {
-                    nextDIdx = 0;
-                    nextGIdx = (currentGIdx + 1) % gairaigoPracticeData.length;
-                }
-             }
+        // console.log(`[calculateNextIndices] End. nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}`);
+        return { nextGIdx, nextDIdx };
+      };
+
+    const nextStage = useCallback(() => {
+        if (isRandomMode) {
+            // ランダムモードの場合は各フック内で次のターゲットを選択する
+            return;
         }
 
+        // useCallback の依存配列に gIdx, dIdx を追加したので、直接 state を参照する
+        //console.log(`[nextStage] Before calculate (using state): currentGIdx=${gIdx}, currentDIdx=${dIdx}`);
+        const { nextGIdx, nextDIdx } = calculateNextIndices(gIdx, dIdx, isRandomMode, practice); // practiceRef.current の代わりに practice を使用
+        //console.log(`[nextStage] Calling setGIdx(${nextGIdx}), setDIdx(${nextDIdx})`);
+        //console.log(`[nextStage] After calculate: nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}`);
         setGIdx(nextGIdx);
         setDIdx(nextDIdx);
 
-    }, [isRandomMode, gyouList, danOrder, youonGyouList, youonGyouChars, dakuonGyouList, dakuonGyouChars, handakuonGyouList, handakuonGyouChars, sokuonKomojiData, kigoPractice1Data, kigoPractice2Data, kigoPractice3Data, youdakuonPracticeData, youhandakuonPracticeData, youonKakuchoChars, gairaigoPracticeData]);
+    }, [isRandomMode, gIdx, dIdx, practice, setGIdx, setDIdx]); // gIdx, dIdx, practice を依存配列に追加
 
     // onInput (依存配列修正済み & ref を使用)
     const onInput: (ev: HIDInputReportEvent) => void = useCallback((ev) => {
@@ -401,12 +544,14 @@ export default function App() {
                     const inputInfo: PracticeInputInfo = { type: 'release', timestamp, pressCode };
                     const result = activePracticeRef.current.handleInput(inputInfo); // ← ref を使用
 
+                    //console.log(`[App onInput] handleInput result: isExpected=${result.isExpected}, shouldGoToNext=${result.shouldGoToNext}`);
+
                     if (result.isExpected) {
-                        if (result.shouldGoToNext && practiceRef.current !== 'かな入力１分間トレーニング' && practiceRef.current !== '記号入力１分間トレーニング' && practiceRef.current !== '短文入力３分間トレーニング') { // ★★★ 短文チャレンジも除外 ★★★
+                        if (result.shouldGoToNext && practiceRef.current !== 'かな入力１分間トレーニング' && practiceRef.current !== '記号入力１分間トレーニング' && practiceRef.current !== '短文入力３分間トレーニング') {
                             nextStage(); // 次の練習問題へ
-                            showOkFeedback(); // OK表示を開始/延長
+                            // showOkFeedback(); // OK表示を削除
                         }
-                    } else {
+                   } else {
                         handleInvalidInput(pressCode);
                     }
                 } else {
@@ -414,7 +559,7 @@ export default function App() {
                 }
             }
         }
-     }, [handleInvalidInput, nextStage, showOkFeedback, setTraining, setShowKeyLabels, setIsRandomMode, kb, side]); // showOkFeedback を追加
+    }, [handleInvalidInput, nextStage, setTraining, setShowKeyLabels, setIsRandomMode, kb, side]); // nextStage を依存配列に追加 (中身が変わるため)
 
     /* HID send (練習 ON/OFF) */ // (依存配列修正済み)
     const sendHid: (on: boolean) => Promise<void> = useCallback(async (on) => {
@@ -452,7 +597,7 @@ export default function App() {
         } else {
             setPractice('');
             setGIdx(0); setDIdx(0);
-            setOK(false);
+            // setOK(false); // 削除
             setLastInvalidKeyCode(null); // 不正入力ハイライトもクリア
             if (invalidInputTimeoutRef.current !== null) {
                 clearTimeout(invalidInputTimeoutRef.current);
@@ -461,14 +606,10 @@ export default function App() {
             pressedKeysRef.current.clear();
             activePracticeRef.current?.reset?.(); // ← ref を使用
             setShowKeyLabels(true);
-            // OK表示タイマーもクリア
-            if (okTimerRef.current !== null) {
-                clearTimeout(okTimerRef.current);
-                okTimerRef.current = null;
-            }
+            // OK表示タイマーのクリア処理を削除
             setIsRandomMode(false);
         }
-     }, [setTraining, setPractice, setGIdx, setDIdx, setOK, setLastInvalidKeyCode, setShowKeyLabels, setIsRandomMode]);
+     }, [setTraining, setPractice, setGIdx, setDIdx, setLastInvalidKeyCode, setShowKeyLabels, setIsRandomMode]); // setOK を依存配列から削除
 
     /* 初期化 */ // (依存配列修正済み)
     useEffect(() => {
@@ -541,20 +682,19 @@ export default function App() {
         activePracticeRef.current?.reset?.(); // ← ref を使用
         setPractice(item);
         setGIdx(0);
-        setOK(false);
-        if (okTimerRef.current !== null) {
-            clearTimeout(okTimerRef.current);
-            okTimerRef.current = null;
-        }
+        // setOK(false); // 削除
+        // OKタイマークリア処理を削除
         if (item === 'かな入力１分間トレーニング' || item === '記号入力１分間トレーニング' || item === '短文入力３分間トレーニング') {
             // 特有の初期化があればここに追加
             setDIdx(0); // dIdx は使わないかもしれないが念のためリセット
         } else if (item === '拗音拡張') {
             setDIdx(1);
+        } else if (item === '外来語の発音補助') {
+            setDIdx(3); // 最初のターゲット「いぇ」の dIdx
         } else {
-            setDIdx(0); // 外来語含む他のモードは 0
+            setDIdx(0); // 他のモードは 0
         }
-        setOK(false);
+        // setOK(false); // 削除
         setLastInvalidKeyCode(null);
         if (invalidInputTimeoutRef.current !== null) {
             clearTimeout(invalidInputTimeoutRef.current);
@@ -646,6 +786,66 @@ export default function App() {
 
     }, [practice, activePractice, kb, side]); // layers を削除し、kb, side を追加
 
+    // ヘッダーに表示する文字配列
+    const headingChars = useMemo(() => {
+        //console.log(`[App headingChars useMemo] Start calculation. training=${training}, practice=${practice}, gIdx=${gIdx}, isRandomMode=${isRandomMode}, activePractice exists: ${!!activePractice}`);
+        if (!training || !practice || !activePractice) return [];
+
+        let data: any[] = [];
+        let groupKey: string | null = null; // 参照するキーを格納する変数
+
+        switch (practice) {
+            // 配列を直接返すモード
+            case '清音の基本練習': data = gyouList.map(gyou => danOrder[gyou]); break; // 配列を返す
+            case '拗音の基本練習': data = youonGyouList.map(gyou => youonGyouChars[gyou]); break;
+            case '濁音の基本練習': data = dakuonGyouList.map(gyou => dakuonGyouChars[gyou]); break;
+            case '半濁音の基本練習': data = [handakuonGyouChars['は行']]; break; // 半濁音は「は行」のみ
+            case '拗音拡張': data = youonGyouList.map(gyou => youonKakuchoChars[gyou]); break;
+            // ▼▼▼ チャレンジモードの場合はフックの headingChars を直接返す ▼▼▼
+            case 'かな入力１分間トレーニング': {
+                return activePractice.headingChars; // フックの headingChars を返す
+            }
+            case '記号入力１分間トレーニング': {
+                return activePractice.headingChars; // フックの headingChars を返す
+            }
+            case '短文入力３分間トレーニング': {
+                return activePractice.headingChars; // フックの headingChars を返す
+            }
+            // オブジェクト配列から特定のキーを参照するモード
+            case '小文字(促音)の基本練習': data = sokuonKomojiData; groupKey = 'chars'; break;
+            case '記号の基本練習１': data = kigoPractice1Data; groupKey = 'chars'; break;
+            case '記号の基本練習２': data = kigoPractice2Data; groupKey = 'chars'; break;
+            case '記号の基本練習３': data = kigoPractice3Data; groupKey = 'chars'; break;
+            case '拗濁音の練習': data = youdakuonPracticeData; groupKey = 'chars'; break;
+            case '拗半濁音の練習': data = youhandakuonPracticeData; groupKey = 'chars'; break;
+            case '外来語の発音補助':
+                data = gairaigoPracticeData;
+                groupKey = 'headerChars'; // 外来語は headerChars を使う
+                break;
+            default: return [];
+        }
+
+        const result = (() => {
+            if (isRandomMode) { // isRandomMode のチェックを先に移動
+                // ランダムモードの場合、フックの headingChars を使う
+                // (各フックはランダムモード時に headingChars にターゲット文字を入れているはず)
+                const targetChar = activePractice.headingChars?.[0];
+                return targetChar ? [targetChar] : [];
+            }
+
+            // 通常モードの処理
+            if (gIdx >= 0 && gIdx < data.length) {
+                const group = data[gIdx];
+                if (Array.isArray(group)) { return group; } // 配列の場合はそのまま返す
+                else if (typeof group === 'object' && group !== null && groupKey && group[groupKey]) { return group[groupKey]; } // オブジェクトの場合は指定されたキーの配列を返す
+            }
+            return [];
+        })();
+        //console.log(`[App headingChars useMemo] Calculated result:`, result);
+        return result;
+    }, [training, practice, gIdx, isRandomMode, activePractice, activePractice?.headingChars]);
+
+
     // コンポーネント全体のJSX
     return (
         <div className='p-4 pt-20'>
@@ -659,7 +859,7 @@ export default function App() {
                         }}
                         style={buttonStyle}
                     >
-                        {training ? '練習モード OFF' : '練習モード ON'}
+                        {training ? 'レイアウト表示に戻る' : '練習を始める'}
                     </button>
                     {training && (
                         <>
@@ -699,7 +899,6 @@ export default function App() {
             {/* 練習モードON時の表示 */}
             {training ? (
                 <>
-
                     {practice ? (
                         <div className='grid grid-cols-3 gap-4 items-start'>
                             {/* メニュー表示 */}
@@ -708,35 +907,39 @@ export default function App() {
                                 handlePracticeSelect={handlePracticeSelect}
                             />
 
-                            {/* 練習モードに応じたキーボード表示 */}
-                            <div className={`col-span-2 grid ${
-                                displayLayerIndices.length === 2 && displayLayerIndices.includes(2) && displayLayerIndices.includes(3)
-                                ? 'grid-cols-2' // かなスタート/エンドの横並び
-                                : 'grid-cols-1 justify-items-center' // それ以外は中央に1つ表示 (ヘッダーとキーボードを中央揃え)
-                            } gap-4`}> {/* justify-items-center は縦並びの場合のみ適用 */}
-                                <div className={`${
-                                    displayLayerIndices.length === 2 && displayLayerIndices.includes(2) && displayLayerIndices.includes(3)
-                                    ? 'col-start-1 justify-self-center' // 横並び時は1列目の中央
-                                    : 'justify-self-center' // 縦並び時は(親が中央揃えなので)中央
+                            {/* ▼▼▼ 常に grid-cols-2 を使用するように変更 ▼▼▼ */}
+                            <div className="col-span-2 grid grid-cols-2 gap-4">
+                            {/* ▲▲▲ 変更 ▲▲▲ */}
+                                <div className={`${ // ▼▼▼ 左カラムの中央に配置するように変更 ▼▼▼
+                                    'col-start-1 justify-self-center w-full' // 左カラムの中央に配置 & 幅を確保
                                 }`}>
-                                    <PracticeHeading
-                                        activePractice={activePractice}
-                                        isRandomMode={(practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング' || practice === '短文入力３分間トレーニング') ? true : isRandomMode}
-                                        practice={practice}
-                                        gIdx={gIdx}
-                                        dIdx={dIdx}
-                                        currentFunctionKeyMap={currentFunctionKeyMap}
-                                        fixedWidthNum={fixedWidthNum}
-                                        okVisible={okVisible}
-                                       // status={activePractice?.status} // status は渡さない
-                                       />
+                                    {/* ▼▼▼ カウントダウン表示をヘッダーの前に移動 ▼▼▼ */}
+                                    {activePractice?.status === 'countdown' && activePractice?.countdownValue && activePractice.countdownValue > 0 && (
+                                        <div className="flex items-center justify-center mb-4"> {/* justify-center に変更 */}
+                                            <div className="text-5xl font-bold"> {/* text-yellow-300 を削除 */}
+                                                {activePractice.countdownValue}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* ▲▲▲ 移動完了 ▲▲▲ */}
+                                    {/* ▼▼▼ カウントダウン中はヘッダーを表示しないように修正 ▼▼▼ */}
+                                    {activePractice?.status !== 'countdown' && (
+                                        <PracticeHeading
+                                            isRandomMode={(practice === 'かな入力１分間トレーニング' || practice === '記号入力１分間トレーニング' || practice === '短文入力３分間トレーニング') ? true : isRandomMode}
+                                            practice={practice}
+                                            gIdx={gIdx}
+                                            dIdx={dIdx}
+                                            headingChars={headingChars}
+                                            isFinished={isChallengeFinished} // チャレンジ終了フラグ
+                                            typedEndIndex={activePractice?.typedEndIndex} // 短文入力の進捗
+                                            status={activePractice?.status} // status を渡す
+                                        />
+                                    )}
                                 </div>
                                 {isChallengeFinished ? (
-                                    <div className={`flex items-center justify-center p-4 border rounded bg-gray-50 ${
-                                        displayLayerIndices.length === 2 && displayLayerIndices.includes(2) && displayLayerIndices.includes(3)
-                                        ? 'col-start-1' // 横並び時は1列目に配置
-                                        : '' // 縦並び時は親が中央揃えなので指定不要
-                                    }`} style={{ minHeight: '15rem' }}>
+                                    // ▼▼▼ 常に col-start-1 justify-self-start を使用 ▼▼▼
+                                    <div className="flex items-center p-4 border rounded bg-gray-50 col-start-1 justify-self-center" style={{ minHeight: '15rem' }}> {/* justify-self-center に変更 */}
+                                    {/* ▲▲▲ 変更 ▲▲▲ */}
                                         {activePractice?.challengeResults && (
                                             <pre className="text-lg text-left font-semibold">
                                                 {`【${practice} 結果】\n`}
@@ -750,35 +953,41 @@ export default function App() {
                                     </div>
                                 ) : (
                                     <> {/* map の結果を直接レンダリングするため、不要な div を削除 */}
-                                        {displayLayerIndices.map((layerIndex, mapIndex) => {
-                                            // 横並びの場合、レイヤー2は1列目、レイヤー3は2列目に配置
-                                            const gridColClass = displayLayerIndices.length === 2 && displayLayerIndices.includes(2) && displayLayerIndices.includes(3)
-                                                ? (layerIndex === 2 ? 'col-start-1' : 'col-start-2')
-                                                : ''; // 縦並び時は指定不要
-                                            return (
-                                            keyboardLayers[layerIndex] ? (
-                                            <KeyboardLayout
-                                                key={layerIndex} // ループでレンダリングする際は key が必要
-                                                layerData={keyboardLayers[layerIndex]}
-                                                layoutIndex={layerIndex}
-                                                className={`${gridColClass} justify-self-center`}
-                                                layoutTitle={layerNames[layerIndex] ?? `レイヤー ${layerIndex}`}
-                                                cols={cols}
-                                                fixedWidth={fixedWidth}
-                                                showKeyLabels={showKeyLabels}
-                                                lastInvalidKeyCode={lastInvalidKeyCode}
-                                                activePractice={activePractice}
-                                                practice={practice}
-                                                // currentFunctionKeyMap は KeyboardLayout 内で使われていないようなので削除検討
-                                                currentFunctionKeyMap={currentFunctionKeyMap}
-                                                training={training}
-                                                // clearInvalidHighlight={clearInvalidHighlight} // KeyboardLayout に渡す必要があれば追加
-                                            />
+                                        {/* ▼▼▼ キーボードレイアウトの配置ロジックを修正 ▼▼▼ */}
+                                        {displayLayerIndices.length === 1 ? (
+                                            // レイアウトが1つの場合: 左寄せに変更
+                                            keyboardLayers[displayLayerIndices[0]] && (
+                                                <KeyboardLayout
+                                                    key={displayLayerIndices[0]}
+                                                    layerData={keyboardLayers[displayLayerIndices[0]]}
+                                                    layoutIndex={displayLayerIndices[0]}
+                                                    className="col-start-1 justify-self-center" // 左カラムの中央揃えに変更
+                                                    layoutTitle={layerNames[displayLayerIndices[0]] ?? `レイヤー ${displayLayerIndices[0]}`}
+                                                    cols={cols} fixedWidth={fixedWidth} showKeyLabels={showKeyLabels} lastInvalidKeyCode={lastInvalidKeyCode} activePractice={activePractice} practice={practice} currentFunctionKeyMap={currentFunctionKeyMap} training={training}
+                                                />
+                                            )
+                                        ) : displayLayerIndices.length === 2 && displayLayerIndices.includes(2) && displayLayerIndices.includes(3) ? (
+                                            // レイアウトが2つ (かなスタート/エンド) の場合: 横並び
+                                            displayLayerIndices.map((layerIndex) => {
+                                                const gridColClass = layerIndex === 2 ? 'col-start-1 justify-self-center' : 'col-start-2 justify-self-center'; // 各々中央寄せ
+                                                return keyboardLayers[layerIndex] ? (
+                                                    <KeyboardLayout
+                                                        key={layerIndex}
+                                                        layerData={keyboardLayers[layerIndex]}
+                                                        layoutIndex={layerIndex}
+                                                        className={gridColClass}
+                                                        layoutTitle={layerNames[layerIndex] ?? `レイヤー ${layerIndex}`}
+                                                        cols={cols} fixedWidth={fixedWidth} showKeyLabels={showKeyLabels} lastInvalidKeyCode={lastInvalidKeyCode} activePractice={activePractice} practice={practice} currentFunctionKeyMap={currentFunctionKeyMap} training={training}
+                                                    />
+                                                ) : (
+                                                    <div key={layerIndex}>レイヤー {layerIndex} のデータが見つかりません。</div>
+                                                );
+                                            })
                                         ) : (
-                                            // レイヤーデータが見つからない場合のフォールバック
-                                            <div key={layerIndex}>レイヤー {layerIndex} のデータが見つかりません。</div>
-                                        )
-                                    );})}
+                                            // その他の場合 (例: 短文練習でレイアウトなし) は何も表示しない
+                                            null
+                                        )}
+                                        {/* ▲▲▲ 修正完了 ▲▲▲ */}
                                     </>
                                 )}
                             </div>

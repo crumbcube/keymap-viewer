@@ -67,7 +67,7 @@ const initialState: KigoChallengeState = {
 
 // 記号チャレンジモードのカスタムフック
 const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult => {
-    const { isActive, okVisible, side, layers, kb } = props; // layers, kb を受け取る
+    const { isActive, side, layers, kb } = props; // layers, kb を受け取る
 
     const [state, setState] = useState<KigoChallengeState>(initialState);
     const stateRef = useRef(state); // 常に最新の state を参照するための ref (useCallback 内で使う)
@@ -648,8 +648,9 @@ const getRankMessageKigo = (score: number): string => {
         displayLayers,
         challengeResults: state.challengeResults,
         // 以下は KigoChallenge では直接使わないかもしれないが一応返す
+        status: state.status, // ★★★ status を返すように追加 ★★★
+        countdownValue: state.countdownValue, // ★★★ countdownValue を返すように追加 ★★★
         targetChar: state.targetChar ?? undefined, // targetChar を追加
-        isOkVisible: false, // isOkVisible を追加 (チャレンジ中は false 想定)
         // gyouKey, charIndex, step は PracticeHookResult にないので削除
     };
 };

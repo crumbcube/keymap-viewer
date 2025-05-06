@@ -25,7 +25,6 @@ export default function useHandakuonPractice({
   isActive,
   gIdx, // 半濁音は gIdx を使わないが、props としては受け取る
   dIdx,
-  okVisible,
   side,
   kb,
   isRandomMode
@@ -163,13 +162,11 @@ export default function useHandakuonPractice({
     }
   }, [isActive, isRandomMode, randomTarget]);
 
-  const currentOkVisible = okVisible;
-
   // handleInput
   const handleInput = useCallback(
     (input: PracticeInputInfo): PracticeInputResult => {
 
-      if (!isActive || okVisible || !currentDan || hGyouKeyCode === null || dakuonKeyCode === null) {
+      if (!isActive || !currentDan || hGyouKeyCode === null || dakuonKeyCode === null) {
           return { isExpected: false, shouldGoToNext: false };
       }
       if (input.type !== 'release') {
@@ -239,14 +236,14 @@ export default function useHandakuonPractice({
 
       return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, stage, currentGyouKey, currentDan, isBlinking,
+        isActive, stage, currentGyouKey, currentDan, isBlinking,
         hid2Gyou, hid2Dan, hGyouKeyCode, dakuonKeyCode, resetBlinkingState,
         isRandomMode, selectNextRandomTarget, setStage
     ]);
 
   const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
       const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-      if (!isActive || okVisible || !currentDan) {
+      if (!isActive || !currentDan) {
           return noHighlight;
       }
 
@@ -279,7 +276,7 @@ export default function useHandakuonPractice({
           return { className: 'bg-blue-100', overrideKey: null };
       }
       return noHighlight;
-    }, [isActive, okVisible, currentDan, stage, isBlinking, isRandomMode, dIdx]);
+    }, [isActive, currentDan, stage, isBlinking, isRandomMode, dIdx]);
 
   // isInvalidInputTarget
   const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
@@ -307,6 +304,5 @@ export default function useHandakuonPractice({
     getHighlightClassName,
     reset,
     isInvalidInputTarget,
-    isOkVisible: currentOkVisible,
   };
 }

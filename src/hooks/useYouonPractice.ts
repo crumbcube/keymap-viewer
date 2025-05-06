@@ -23,7 +23,7 @@ import {
 
 type YouonStage = 'gyouInput' | 'youonInput' | 'danInput';
 
-export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult {
+export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult {
     const [stage, setStage] = useState<YouonStage>('gyouInput');
     const { hid2Gyou, hid2Dan } = useMemo(() => {
         if (kb === 'tw-20v') {
@@ -132,12 +132,11 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
     // 期待キー (変更なし)
     const expectedGyouKey = useMemo(() => (isRandomMode ? randomTarget?.gyouKey : currentGyouKey) ?? null, [isRandomMode, randomTarget, currentGyouKey]);
     const expectedDanKey = useMemo(() => (isRandomMode ? randomTarget?.danKey : currentDanKey) ?? null, [isRandomMode, randomTarget, currentDanKey]);
-    const currentOkVisible = okVisible;
 
     // handleInput
     const handleInput = useCallback((info: PracticeInputInfo): PracticeInputResult => {
 
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return { isExpected: false, shouldGoToNext: false };
         }
         if (!expectedGyouKey || !expectedDanKey || youonKeyCode === null) {
@@ -177,6 +176,7 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
                         shouldGoToNext = false;
                     } else {
                         shouldGoToNext = true;
+                        setStage('gyouInput'); // ★★★ 正解時にステージをリセット ★★★
                     }
                 } else {
                     isExpected = false;
@@ -187,13 +187,13 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
 
         return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, stage, expectedGyouKey, expectedDanKey, youonKeyCode,
+        isActive, stage, expectedGyouKey, expectedDanKey, youonKeyCode,
         hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage
     ]);
 
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return noHighlight;
         }
         if (!expectedGyouKey || !expectedDanKey) {
@@ -223,7 +223,7 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
             return { className: 'bg-blue-100', overrideKey: null };
         }
         return noHighlight;
-    }, [isActive, okVisible, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
+    }, [isActive, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
 
     // reset
     const reset = useCallback(() => {
@@ -257,6 +257,5 @@ export default function useYouonPractice({ gIdx, dIdx, okVisible, isActive, side
         headingChars,
         reset,
         isInvalidInputTarget,
-        isOkVisible: currentOkVisible,
     };
 }

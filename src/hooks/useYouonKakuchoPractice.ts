@@ -15,7 +15,7 @@ import {
 const practiceTargetIndices = [1, 3];
 
 const useYouonKakuchoPractice = ({
-    gIdx, dIdx, isActive, okVisible, side, layers, kb, isRandomMode
+    gIdx, dIdx, isActive, side, layers, kb, isRandomMode
 }: PracticeHookProps): PracticeHookResult => {
     const [stage, setStage] = useState<PracticeStage>('line');
     const [pressedKeys, setPressedKeys] = useState<Map<number, number>>(new Map());
@@ -107,8 +107,6 @@ const useYouonKakuchoPractice = ({
 
     const handleInput = useCallback((info: PracticeInputInfo): { isExpected: boolean; shouldGoToNext: boolean } => {
 
-        if (okVisible) return { isExpected: false, shouldGoToNext: false };
-
         let isExpected = false;
         let shouldGoToNext = false;
         const { type, pressCode } = info;
@@ -165,7 +163,7 @@ const useYouonKakuchoPractice = ({
         return { isExpected, shouldGoToNext };
 
     // currentDIdx も依存配列に追加
-    }, [stage, currentGyouKey, targetDan, expectedGyouCodes, expectedYouonCodes, expectedDanCodes, okVisible, kb, side, isRandomMode, generateRandomTarget, currentDIdx, setStage]);
+    }, [stage, currentGyouKey, targetDan, expectedGyouCodes, expectedYouonCodes, expectedDanCodes, kb, side, isRandomMode, generateRandomTarget, currentDIdx, setStage]);
 
     // ヘッダー文字
     const headingChars = useMemo(() => {
@@ -183,7 +181,6 @@ const useYouonKakuchoPractice = ({
 
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (okVisible) return noHighlight;
 
         // 問題切り替え直後は強制的に 'line' として扱う (通常モードのみ)
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
@@ -201,7 +198,7 @@ const useYouonKakuchoPractice = ({
         }
         return noHighlight;
     // targetDan も依存配列に追加
-    }, [stage, currentGyouKey, targetDan, okVisible, isRandomMode, gIdx, dIdx]);
+    }, [stage, currentGyouKey, targetDan, isRandomMode, gIdx, dIdx]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, idx: number): boolean => {
         if (!isActive) return false; // 非アクティブ時は常に false
@@ -234,7 +231,6 @@ const useYouonKakuchoPractice = ({
         handleInput,
         headingChars,
         getHighlightClassName,
-        isOkVisible: okVisible,
         reset,
         isInvalidInputTarget,
     };

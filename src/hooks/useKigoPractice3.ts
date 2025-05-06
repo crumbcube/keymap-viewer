@@ -19,7 +19,7 @@ import {
 
 type KigoPractice3Stage = 'kigoInput' | 'kigoInputWait' | 'gyouInput';
 
-const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomMode, layers }: PracticeHookProps): PracticeHookResult => {
+const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers }: PracticeHookProps): PracticeHookResult => {
     const [stage, setStage] = useState<KigoPractice3Stage>('kigoInput');
     const [showHighlightAfterWait, setShowHighlightAfterWait] = useState(true);
     const isWaitingForSecondKigo = useRef(false);
@@ -151,15 +151,13 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         };
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
-    const currentOkVisible = okVisible;
-
     // ▼▼▼ highlightTargetGyouKeyDisplayName の useMemo を削除 ▼▼▼
     // const highlightTargetGyouKeyDisplayName = useMemo(() => { ... });
     // ▲▲▲ 削除完了 ▲▲▲
 
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
 
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return { isExpected: false, shouldGoToNext: false };
         }
         // 「=」以外の場合のみ expectedGyouKey をチェック
@@ -269,14 +267,14 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
 
         return { isExpected, shouldGoToNext };
     }, [
-        isActive, okVisible, stage, hid2Gyou, isTargetEqualSign, expectedGyouKey,
+        isActive, stage, hid2Gyou, isTargetEqualSign, expectedGyouKey,
         isRandomMode, selectNextRandomTarget, setStage, setShowHighlightAfterWait
     ]);
 
     // ▼▼▼ getHighlightClassName を修正 ▼▼▼
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (!isActive || okVisible) {
+        if (!isActive) {
             return noHighlight;
         }
         // 「=」以外の場合のみ expectedGyouKey をチェック
@@ -327,7 +325,7 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
 
         return noHighlight;
     }, [
-        isActive, okVisible, stage, showHighlightAfterWait, isTargetEqualSign, expectedGyouKey, currentTargetChar, // ★★★ currentTargetChar を追加 ★★★
+        isActive, stage, showHighlightAfterWait, isTargetEqualSign, expectedGyouKey, currentTargetChar, // ★★★ currentTargetChar を追加 ★★★
         isRandomMode, gIdx, dIdx,
         layers, // ★★★ layers を依存配列に追加 ★★★
         // hid2Gyou は不要になったので削除
@@ -350,7 +348,6 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, okVisible, side, kb, isRandomM
         getHighlightClassName,
         reset,
         isInvalidInputTarget,
-        isOkVisible: currentOkVisible,
     };
 };
 

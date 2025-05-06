@@ -39,14 +39,14 @@ export type PracticeMode =
     | '小文字(促音)の基本練習'
     | '記号の基本練習１'
     | '記号の基本練習２'
-    | '記号の基本練習３'
-    | '拗濁音の練習'
-    | '拗半濁音の練習'
-    | '拗音拡張'
+    | '記号の基本練習３' 
+    | '拗濁音の練習' 
+    | '拗半濁音の練習' 
+    | '拗音拡張' 
     | '外来語の発音補助'
-    | 'かな入力１分間トレーニング'
-    | '記号入力１分間トレーニング' // (将来用)
-    | '短文入力３分間トレーニング'; // (将来用)
+    | 'かな入力１分間トレーニング' // ★★★ 追加 ★★★
+    | '記号入力１分間トレーニング' // ★★★ 追加 ★★★
+    | '短文入力３分間トレーニング'; // ★★★ 追加 ★★★
 
 /* 左右の型 */
 export type KeyboardSide = 'left' | 'right';
@@ -54,7 +54,7 @@ export type KeyboardSide = 'left' | 'right';
 /* キーボードモデルの型定義 */
 export type KeyboardModel = 'tw-20h' | 'tw-20v';
 
-export type PracticeStage = 'line' | 'youon' | 'dan' | 'middle' | 'kigo' | 'longPressWait' | 'longPressCheck' | 'gyouInput' | 'dakuonInput' | 'handakuonInput' | 'dakuonInput1' | 'dakuonInput2' | 'kigoInput' | 'kigoInputWait' | 'tsuInput'; // 既存のステージも網羅
+export type PracticeStage = 'line' | 'youon' | 'dan' | 'middle' | 'kigo' | 'longPressWait' | 'longPressCheck' | 'gyouInput' | 'dakuonInput' | 'handakuonInput' | 'dakuonInput1' | 'dakuonInput2' | 'kigoInput' | 'kigoInputWait' | 'tsuInput' | 'key1' | 'key2' | 'key3' | 'key4' | 'waitAfterFirstDakuon'; // Add 'key4'
 
 
 /* --- TW-20H マッピング --- */
@@ -281,7 +281,6 @@ export const hid2GyouVLeft_Kigo1: Record<number, string> = {
 export interface PracticeHookProps {
     gIdx: number;
     dIdx: number;
-    okVisible: boolean;
     isActive: boolean;
     side: KeyboardSide;
     layers: string[][];
@@ -319,8 +318,13 @@ export interface ChallengeResult {
     rankMessage: string; // ランクメッセージ
 }
 // ▲▲▲ 追加完了 ▲▲▲
-
+// ▼▼▼ currentTarget で受け入れる型を定義 ▼▼▼
+type PracticeTargetObject = CharInfoSeion | CharInfoYouon | CharInfoDakuon | CharInfoSokuonKomoji | CharInfoKigo1 | CharInfoKigo2 | CharInfoKigo3 | CharInfoGairaigo | CharInfoYouhandakuon;
+// ▲▲▲ 追加完了 ▲▲▲
 /* 練習フックの戻り値 */
+export type PracticeStatus = 'idle' | 'countdown' | 'running' | 'finished'; // 練習の状態
+
+/* 練習フックの共通戻り値型 */
 export interface PracticeHookResult {
     headingChars: string[]; // 見出しに表示する文字配列
     targetChar?: string; // 現在のターゲット文字 (オプション)
@@ -330,25 +334,14 @@ export interface PracticeHookResult {
     handleInput: (info: PracticeInputInfo) => PracticeInputResult;
     reset?: () => void;
     isInvalidInputTarget: (pressCode: number, layoutIndex: number, keyIndex: number) => boolean;
-    isOkVisible: boolean; // OK表示の状態をフックから受け取る
+    status?: PracticeStatus; // 練習の現在の状態 (チャレンジモード用)
+    countdownValue?: number; // カウントダウンの残り秒数 (チャレンジモード用)
     challengeResults?: ChallengeResult | null; // Ensure this line exists and is correct
-    // チャレンジモードの状態 (idle, countdown, running, finished)
-    status?: 'idle' | 'countdown' | 'running' | 'finished';
     targetLayerIndex?: number | null;
-    displayLayers?: string[][];
+    displayLayers?: string[][]; // 記号チャレンジ用
+    currentTarget?: string | PracticeTargetObject | undefined; // ★★★ 文字列またはオブジェクトを受け入れるように修正 ★★★
+    typedEndIndex?: number; // ★★★ 追加: 短文チャレンジ用 ★★★
 }
-
-/* handleInput の戻り値 */
-// export interface PracticeInputResult { // 上に移動
-//     isExpected: boolean;
-//     shouldGoToNext: boolean;
-// }
-
-/* getHighlightClassName の戻り値 */
-// export interface PracticeHighlightResult { // 上に移動
-//     className: string | null;
-//     overrideKey: string | null;
-// }
 
 /* getHighlight の戻り値 */
 export interface HighlightInfo {
@@ -416,7 +409,8 @@ export interface CharInfoKigo3 {
 export interface CharInfoGairaigo {
     type: 'gairaigo';
     char: string;
-    keys: [string, string, string]; // 表示上のキー名
+    // Allow 3 or 4 keys to match GairaigoPracticeTarget
+    keys: [string, string, string] | [string, string, string, string]; // 表示上のキー名
     actualSecondKey: string; // 実際の2打目のキー名
 }
 export interface CharInfoYouhandakuon {
