@@ -184,6 +184,8 @@ export default function App() {
             clearTimeout(invalidInputTimeoutRef.current);
         }
 
+        const invalidHighlightDuration = showKeyLabels ? 500 : 0; // キー表示OFFなら0ms
+
         const timerId = window.setTimeout((codeToClear: number) => {
             setLastInvalidKeyCode(prevCode => {
                 if (prevCode === codeToClear) {
@@ -192,9 +194,9 @@ export default function App() {
                 return prevCode;
             });
             invalidInputTimeoutRef.current = null;
-        }, 500, pressCode);
+        }, invalidHighlightDuration, pressCode); // showKeyLabels に応じた時間に変更
         invalidInputTimeoutRef.current = timerId;
-     }, []); // 依存配列を空に修正
+    }, [showKeyLabels]); // showKeyLabels を依存配列に追加
 
     // 次の練習ステージに進む関数
     const calculateNextIndices = (currentGIdx: number, currentDIdx: number, isRandomMode: boolean, practiceMode: PracticeMode) => {
@@ -488,13 +490,14 @@ export default function App() {
         }
 
         // useCallback の依存配列に gIdx, dIdx を追加したので、直接 state を参照する
-        //console.log(`[nextStage] Before calculate (using state): currentGIdx=${gIdx}, currentDIdx=${dIdx}`);
+        //console.log(`[App nextStage] Called. Current gIdx=${gIdx}, dIdx=${dIdx}, isRandomMode=${isRandomMode}, practice=${practice}`);
         const { nextGIdx, nextDIdx } = calculateNextIndices(gIdx, dIdx, isRandomMode, practice); // practiceRef.current の代わりに practice を使用
-        //console.log(`[nextStage] Calling setGIdx(${nextGIdx}), setDIdx(${nextDIdx})`);
-        //console.log(`[nextStage] After calculate: nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}`);
+        //console.log(`[App nextStage] Calculated next indices: nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}. Setting state...`);
         setGIdx(nextGIdx);
         setDIdx(nextDIdx);
 
+        // 状態更新が非同期であるため、この直後に gIdx, dIdx を参照しても古い値の可能性があることに注意
+        //console.log(`[App nextStage] State update requested. (Actual update is async)`);
     }, [isRandomMode, gIdx, dIdx, practice, setGIdx, setDIdx]); // gIdx, dIdx, practice を依存配列に追加
 
     // onInput (依存配列修正済み & ref を使用)
@@ -542,12 +545,15 @@ export default function App() {
                     pressedKeysRef.current.delete(pressCode);
 
                     const inputInfo: PracticeInputInfo = { type: 'release', timestamp, pressCode };
+                    //console.log(`[App onInput] Calling activePractice.handleInput for 0x${pressCode.toString(16)} at ${performance.now()}`); // ★追加: 呼び出し前ログ
                     const result = activePracticeRef.current.handleInput(inputInfo); // ← ref を使用
+                    //console.log(`[App onInput] activePractice.handleInput for 0x${pressCode.toString(16)} finished at ${performance.now()}`); // ★追加: 呼び出し後ログ
 
-                    //console.log(`[App onInput] handleInput result: isExpected=${result.isExpected}, shouldGoToNext=${result.shouldGoToNext}`);
+                    //console.log(`[App onInput] Release event for 0x${pressCode.toString(16)}. handleInput result: isExpected=${result.isExpected}, shouldGoToNext=${result.shouldGoToNext}`);
 
                     if (result.isExpected) {
                         if (result.shouldGoToNext && practiceRef.current !== 'かな入力１分間トレーニング' && practiceRef.current !== '記号入力１分間トレーニング' && practiceRef.current !== '短文入力３分間トレーニング') {
+                            //console.log(`[App onInput] Correct input, calling nextStage() for practice: ${practiceRef.current}`);
                             nextStage(); // 次の練習問題へ
                             // showOkFeedback(); // OK表示を削除
                         }

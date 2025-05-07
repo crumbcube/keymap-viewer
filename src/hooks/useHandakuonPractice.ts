@@ -1,4 +1,4 @@
-// src/hooks/useHandakuonPractice.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useHandakuonPractice.ts
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   PracticeHookProps,
@@ -98,46 +98,74 @@ export default function useHandakuonPractice({
     prevIsRandomModeRef.current = false;
   }, [resetBlinkingState, setStage, setRandomTarget]);
 
+  const prevIsActiveRef = useRef(isActive); // Track previous isActive state
+
+  // Effect for isActive changes and initial setup when becoming active
   useEffect(() => {
-
-
-      if (isActive) {
-          const indicesChanged = dIdx !== prevDIdxRef.current;
-          const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
-          const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
-
-          // --- リセット条件 ---
-          if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-              reset(); // reset 関数を呼び出す
-              prevGIdxRef.current = gIdx;
-              prevDIdxRef.current = dIdx;
-              isInitialMount.current = false;
+    if (isActive) {
+      if (!prevIsActiveRef.current) { // Just became active
+        //console.log(`[HandakuonPractice] Transitioned to active. isRandomMode: ${isRandomMode}, dIdx: ${dIdx}`);
+        setStage('gyouInput');
+        resetBlinkingState(); // This also resets inputCount.current
+        if (isRandomMode) {
+          // Only select if no target exists (e.g. not resuming a paused random session)
+          if (!randomTarget) {
+            selectNextRandomTarget();
           }
-
-          // --- ランダムターゲット選択条件 (初回のみ or リセット後) ---
-          if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
-               selectNextRandomTarget();
-               isInitialMount.current = false;
-               prevGIdxRef.current = gIdx;
-               prevDIdxRef.current = dIdx;
-          } else if (!isRandomMode && isInitialMount.current) {
-               reset(); // 通常モード初期化
-               isInitialMount.current = false;
-               prevGIdxRef.current = gIdx;
-               prevDIdxRef.current = dIdx;
-          }
-
-          prevIsRandomModeRef.current = isRandomMode;
-
-      } else {
-          reset(); // 非アクティブ時もリセット
+        } else {
+          setRandomTarget(null); // Clear random target if switching to normal mode or starting in normal mode
+        }
       }
+      // If already active, do nothing in this useEffect. Other useEffects handle dIdx/isRandomMode changes.
+    } else {
+      if (prevIsActiveRef.current) { // Just became inactive
+        //console.log(`[HandakuonPractice] Transitioned to inactive. Resetting.`);
+        reset();
+      }
+    }
+    prevIsActiveRef.current = isActive; // Update previous active state
+  }, [isActive, isRandomMode, dIdx, reset, selectNextRandomTarget, resetBlinkingState, randomTarget]);
+
+  // Effect for random mode toggling *while active*
+  const prevIsRandomModeActiveRef = useRef(isRandomMode); // Renamed to avoid conflict
+  useEffect(() => {
+    if (isActive) {
+      if (isRandomMode !== prevIsRandomModeActiveRef.current) {
+        //console.log(`[HandakuonPractice] Random mode changed to ${isRandomMode} while active. Resetting stage and selecting target if random.`);
+        setStage('gyouInput');
+        resetBlinkingState();
+        if (isRandomMode) {
+          selectNextRandomTarget();
+        } else {
+          setRandomTarget(null); // Clear random target if switching to normal mode
+        }
+        prevIsRandomModeActiveRef.current = isRandomMode;
+      }
+    }
+  }, [isActive, isRandomMode, selectNextRandomTarget, resetBlinkingState]);
+
+  // Effect for dIdx changes in normal mode *while active*
+  const prevDIdxActiveRef = useRef(dIdx); // Renamed to avoid conflict
+  useEffect(() => {
+    if (isActive && !isRandomMode) {
+      if (dIdx !== prevDIdxActiveRef.current) {
+        //console.log(`[HandakuonPractice] dIdx changed to ${dIdx} in normal mode while active. Resetting stage.`);
+        setStage('gyouInput');
+        resetBlinkingState();
+        prevDIdxActiveRef.current = dIdx;
+      }
+    }
+  }, [isActive, isRandomMode, dIdx, resetBlinkingState]);
+
+  // Cleanup for blinkTimeoutRef
+  useEffect(() => {
       return () => {
           if (blinkTimeoutRef.current !== null) {
               clearTimeout(blinkTimeoutRef.current);
           }
       };
-  }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
+  }, []);
+
 
   // 通常モード用 (変更なし)
   const currentGyouKey = useMemo(() => handakuonGyouList[0], []);
@@ -166,6 +194,7 @@ export default function useHandakuonPractice({
   const handleInput = useCallback(
     (input: PracticeInputInfo): PracticeInputResult => {
 
+      //console.log(`[HandakuonPractice handleInput] Received input: 0x${input.pressCode.toString(16)}, Current stage: ${stage}, Expected dakuonKeyCode: ${dakuonKeyCode === null ? 'null' : `0x${dakuonKeyCode.toString(16)}`}, Expected hGyouKeyCode: ${hGyouKeyCode === null ? 'null' : `0x${hGyouKeyCode.toString(16)}`}`);
       if (!isActive || !currentDan || hGyouKeyCode === null || dakuonKeyCode === null) {
           return { isExpected: false, shouldGoToNext: false };
       }
@@ -191,7 +220,7 @@ export default function useHandakuonPractice({
           break;
         case 'handakuonInput':
           if (pressCode === dakuonKeyCode) {
-            if (inputCount.current === 0) {
+            if (inputCount.current === 0) { // First Dakuon press
               inputCount.current = 1;
               setIsBlinking(true);
               if (blinkTimeoutRef.current !== null) clearTimeout(blinkTimeoutRef.current);
@@ -200,12 +229,15 @@ export default function useHandakuonPractice({
                 blinkTimeoutRef.current = null;
               }, 500);
               isExpected = true;
-            } else if (inputCount.current === 1 && !isBlinking) {
+            } else if (inputCount.current === 1) { // Second Dakuon press
               inputCount.current = 0;
+              setIsBlinking(false); // Stop blinking
+              if (blinkTimeoutRef.current !== null) { // Clear any pending blink timer
+                clearTimeout(blinkTimeoutRef.current);
+                blinkTimeoutRef.current = null;
+              }
               setStage('danInput');
               isExpected = true;
-            } else if (inputCount.current === 1 && isBlinking) {
-                isExpected = true;
             }
           } else {
               isExpected = false;
@@ -247,14 +279,12 @@ export default function useHandakuonPractice({
           return noHighlight;
       }
 
-      // 問題切り替え直後は強制的に 'gyouInput' として扱う (通常モードのみ)
-      const indicesJustChanged = !isRandomMode && (dIdx !== prevDIdxRef.current);
-      const currentStageForHighlight = indicesJustChanged ? 'gyouInput' : stage;
+      // console.log(`[Handakuon getHighlightClassName] Current stage: ${stage}, dIdx: ${dIdx}, prevDIdxRef: ${prevDIdxRef.current}, isBlinking: ${isBlinking}`);
 
       let expectedKeyName: string | null = null;
       let targetLayoutIndex: number | null = null;
 
-      switch (currentStageForHighlight) {
+      switch (stage) { // Use stage directly
         case 'gyouInput':
           expectedKeyName = 'は行';
           targetLayoutIndex = 2;
@@ -270,13 +300,13 @@ export default function useHandakuonPractice({
       }
 
       if (expectedKeyName !== null && layoutIndex === targetLayoutIndex && key === expectedKeyName) {
-          if (currentStageForHighlight === 'handakuonInput' && isBlinking) {
-              return noHighlight;
+          if (stage === 'handakuonInput' && isBlinking) { // Use stage directly
+            return noHighlight;
           }
           return { className: 'bg-blue-100', overrideKey: null };
       }
       return noHighlight;
-    }, [isActive, currentDan, stage, isBlinking, isRandomMode, dIdx]);
+    }, [isActive, currentDan, stage, isBlinking, isRandomMode, dIdx, prevDIdxRef]);
 
   // isInvalidInputTarget
   const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {

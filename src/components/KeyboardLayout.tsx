@@ -40,14 +40,14 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
     const invalidTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
-        console.log(`[KeyboardLayout ${layoutIndex}] useEffect triggered. lastInvalidKeyCode: ${lastInvalidKeyCode === null ? 'null' : `0x${lastInvalidKeyCode.toString(16)}`}`);
+        //console.log(`[KeyboardLayout ${layoutIndex}] useEffect triggered. lastInvalidKeyCode: ${lastInvalidKeyCode === null ? 'null' : `0x${lastInvalidKeyCode.toString(16)}`}`);
         if (lastInvalidKeyCode !== null) {
             const targetKeyIndex = lastInvalidKeyCode - 1;
             const isTargetLayout = activePractice?.isInvalidInputTarget(lastInvalidKeyCode, layoutIndex, targetKeyIndex);
-            console.log(`[KeyboardLayout ${layoutIndex}] isTargetLayout for code 0x${lastInvalidKeyCode.toString(16)}: ${isTargetLayout}`);
+            //console.log(`[KeyboardLayout ${layoutIndex}] isTargetLayout for code 0x${lastInvalidKeyCode.toString(16)}: ${isTargetLayout}`);
 
             if (isTargetLayout) {
-                console.log(`[KeyboardLayout ${layoutIndex}] Setting invalidKeyIndex to ${targetKeyIndex}`);
+                //console.log(`[KeyboardLayout ${layoutIndex}] Setting invalidKeyIndex to ${targetKeyIndex}`);
                 setInvalidKeyIndex(targetKeyIndex); // 不正入力されたキーのインデックスを設定
 
                 // 既存のタイマーがあればクリア
@@ -55,20 +55,21 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
                     clearTimeout(invalidTimerRef.current);
                 }
 
-                // 500ms後にハイライトを解除するタイマーを設定
+                // ハイライト表示時間を決定 (キー表示OFFなら0ms)
+                const highlightDuration = showKeyLabels ? 500 : 0;
                 invalidTimerRef.current = window.setTimeout(() => {
-                    console.log(`[KeyboardLayout ${layoutIndex}] Timeout clearing invalidKeyIndex for index ${targetKeyIndex}`);
+                    //console.log(`[KeyboardLayout ${layoutIndex}] Timeout clearing invalidKeyIndex for index ${targetKeyIndex}`);
                     setInvalidKeyIndex(null);
                     invalidTimerRef.current = null;
                     // clearInvalidHighlight?.(); // App.tsx 側でタイマー管理するので不要かも
-                }, 500);
+                }, highlightDuration);
             } else {
                 // このレイアウトが対象でない場合は、ローカルのハイライト状態をクリア
                 // setInvalidKeyIndex(null); // 他のレイアウトのハイライトを消さないようにコメントアウト
             }
         } else {
              // lastInvalidKeyCode が null になったら、ローカルのハイライトもクリア
-             console.log(`[KeyboardLayout ${layoutIndex}] lastInvalidKeyCode is null, clearing invalidKeyIndex.`);
+             //console.log(`[KeyboardLayout ${layoutIndex}] lastInvalidKeyCode is null, clearing invalidKeyIndex.`);
              if (invalidTimerRef.current !== null) {
                  clearTimeout(invalidTimerRef.current);
                  invalidTimerRef.current = null;
@@ -83,9 +84,9 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
                 invalidTimerRef.current = null;
             }
         };
-    }, [lastInvalidKeyCode, layoutIndex, activePractice]); // clearInvalidHighlight は不要かも
+    }, [lastInvalidKeyCode, layoutIndex, activePractice, showKeyLabels]); // showKeyLabels を依存配列に追加
 
-    console.log(`[KeyboardLayout ${layoutIndex}] Rendered. invalidKeyIndex state: ${invalidKeyIndex}`);
+    //console.log(`[KeyboardLayout ${layoutIndex}] Rendered. invalidKeyIndex state: ${invalidKeyIndex}`);
 
     // キー描画ロジック (renderKey)
     const renderKey = useCallback((key: string, idx: number) => {
@@ -191,10 +192,6 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         } else {
             // キー表示OFF時は、元々空だったキー以外は ____ でマスク
             displayContent = isEmptyKey ? '\n' : '____';
-        }
-        // ★★★ Add log just before returning the div ★★★
-        if (layoutIndex === 2 && originalKey === 'は行') {
-            console.log(`[KeyboardLayout 2 renderKey "は行"] Final highlightResult.className: ${highlightResult.className ?? 'null'}`);
         }
 
         // 練習モードON時のレンダリング
