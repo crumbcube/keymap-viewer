@@ -23,7 +23,7 @@ const useGairaigoPractice = ({
     const isInitialMount = useRef(true);
     const prevTargetCharRef = useRef<string | null>(null); // Ref to store previous target char
     const prevIsRandomModeRef = useRef(isRandomMode);
-    const prevIsActive = useRef(isActive); // isActive の変更を追跡
+    const prevIsActiveRef = useRef(isActive); // isActive の変更を追跡 (命名変更)
 
     const selectNextRandomTarget = useCallback(() => {
         if (allGairaigoCharInfos.length > 0) {
@@ -46,7 +46,7 @@ const useGairaigoPractice = ({
         prevDIdxRef.current = -1;
         isInitialMount.current = true;
         prevIsRandomModeRef.current = false;
-        prevIsActive.current = false; // reset 時は false に
+        // prevIsActiveRef.current は useEffect の最後で更新されるのでここでは不要
     }, [setStage, setPressedKeys, setRandomTarget]); // setRandomTarget を追加
 
     // Make it a standalone function accepting props
@@ -87,9 +87,9 @@ const useGairaigoPractice = ({
                 else if (currentDIdx === 1) targetIndex = 1; // くぃ -> targets[1]
                 else if (currentDIdx === 2) { // くぅ -> targets[2] (くぇのデータ) - 練習対象外だが便宜上
                     targetIndex = 2;
-                    console.log(`[Gairaigo currentTarget] Ku group (gIdx=2), dIdx=2 (Ku), setting targetIndex to 2 (Ke)`);
+                    //console.log(`[Gairaigo currentTarget] Ku group (gIdx=2), dIdx=2 (Ku), setting targetIndex to 2 (Ke)`);
                 } else if (currentDIdx === 3) targetIndex = 2; // くぇ -> targets[2]
-                else if (currentDIdx === 4) targetIndex = 3; // くぉ -> targets[3] // ★★★ 修正: dIdx=4 の場合 targetIndex=3 ★★★
+                else if (currentDIdx === 4) targetIndex = 3; // くぉ -> targets[3]
                 else targetIndex = -1; // 範囲外
             }
             // ★★★ 「つぁ」グループ (gIdx=4) の targetIndex マッピングを追加 ★★★
@@ -98,7 +98,7 @@ const useGairaigoPractice = ({
                 else if (currentDIdx === 1) targetIndex = 1; // つぃ -> targets[1]
                 else if (currentDIdx === 2) { // つぅ -> targets[2] (つぇのデータ)
                     targetIndex = 2;
-                    console.log(`[Gairaigo currentTarget] Tsu group (gIdx=4), dIdx=2 (Tsuu), setting targetIndex to 2 (Tse)`);
+                    //console.log(`[Gairaigo currentTarget] Tsu group (gIdx=4), dIdx=2 (Tsuu), setting targetIndex to 2 (Tse)`);
                 } else if (currentDIdx === 3) targetIndex = 2; // つぇ -> targets[2]
                 else if (currentDIdx === 4) targetIndex = 3; // つぉ -> targets[3]
                 else targetIndex = -1; // 範囲外
@@ -135,76 +135,72 @@ const useGairaigoPractice = ({
                 else if (currentDIdx >= 0 && currentDIdx <= 4) targetIndex = currentDIdx;
                 else targetIndex = -1;
             }
-            // ★★★ ここまで ★★★
 
             // targetIndex を使ってターゲットを取得
             if (targetIndex === -1) return null; // ターゲットなしの場合
             if (!currentGroup?.targets || targetIndex < 0 || targetIndex >= currentGroup.targets.length) return null;
-            // ★★★ この行があるか確認 ★★★
-            console.log(`[Gairaigo currentTarget] Final targetIndex: ${targetIndex}, Target:`, currentGroup.targets[targetIndex]);
+            //console.log(`[Gairaigo currentTarget] Final targetIndex: ${targetIndex}, Target:`, currentGroup.targets[targetIndex]);
             return (currentGroup.targets[targetIndex] ?? null) as GairaigoPracticeTarget | null;
         }
     }, []); // No dependencies, it's a pure function based on arguments
 
     useEffect(() => {
         // --- Inactive: Reset everything ---
-        if (!isActive) {
-            if (prevIsActive.current) { // Only reset if it *was* active
-                console.log('[Gairaigo useEffect] Resetting because isActive became false.');
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log('[Gairaigo useEffect] Resetting because isActive became false.');
+            if (prevIsActiveRef.current) { // Only reset if it *was* active
                 reset();
             }
-            prevIsActive.current = isActive;
-            prevIsRandomModeRef.current = isRandomMode; // Keep track even when inactive
-            prevGIdxRef.current = gIdx;
-            prevDIdxRef.current = dIdx;
-            return;
+            // prevIsActiveRef.current, prevIsRandomModeRef.current などは useEffect の最後で更新
+            // return; // isActive が false の場合は以降の処理はスキップ
+        } else if (isActive) { // --- Active: Handle changes ---
+            // (元の isActive 時のロジックはここに移動)
         }
 
         // --- Active: Handle changes ---
         const gIdxChanged = prevGIdxRef.current !== gIdx;
         const dIdxChanged = prevDIdxRef.current !== dIdx; // Check dIdx change
         const randomModeChanged = prevIsRandomModeRef.current !== isRandomMode;
-        const justActivated = !prevIsActive.current && isActive;
+        const justActivated = !prevIsActiveRef.current && isActive; // <<< prevIsActive を prevIsActiveRef に修正
+        // isActive が true になった最初のタイミング
+        if (isActive && !prevIsActiveRef.current) {
+            isInitialMount.current = true; // 強制的に初期マウント扱い
+        }
 
         // Calculate potential new target based on current props
          const potentialNewTarget = calculateCurrentTarget(gIdx, dIdx, isRandomMode ?? false, isActive, randomTarget); // Pass props directly, handle undefined isRandomMode
         const targetCharChanged = potentialNewTarget?.char !== prevTargetCharRef.current;
 
-        // Log comparison details
-        console.log(`[Gairaigo useEffect] Comparing: prevGIdx=${prevGIdxRef.current}, gIdx=${gIdx}, prevDIdx=${prevDIdxRef.current}, dIdx=${dIdx}, prevRandom=${prevIsRandomModeRef.current}, isRandomMode=${isRandomMode}`);
-        console.log(`[Gairaigo useEffect] Target Check: prevTarget='${prevTargetCharRef.current}', potentialNewTarget='${potentialNewTarget?.char}', targetCharChanged=${targetCharChanged}`);
-
-        console.log(`[Gairaigo useEffect] Checking conditions. isActive=${isActive}, justActivated=${justActivated}, gIdxChanged=${gIdxChanged}, dIdxChanged=${dIdxChanged}, randomModeChanged=${randomModeChanged}`);
-
         // --- Mode Switch ---
         if (randomModeChanged) {
-            console.log(`[Gairaigo useEffect] Resetting due to randomMode change (to ${isRandomMode}).`);
+            //console.log(`[Gairaigo useEffect] Resetting due to randomMode change (to ${isRandomMode}).`);
             reset(); // Reset state completely on mode switch
             if (isRandomMode) {
-                console.log('[Gairaigo useEffect] Selecting initial random target after mode switch.');
+                //console.log('[Gairaigo useEffect] Selecting initial random target after mode switch.');
                 selectNextRandomTarget();
             }
             // No need to calculate normal target here, reset handles it implicitly if needed later
         }
         // --- Activation or Index Change (Normal Mode) ---
-        // ★★★ Modify condition to check if target character actually changed ★★★
-        else if (!isRandomMode && (justActivated || targetCharChanged)) {
-             console.log(`[Gairaigo useEffect] Resetting stage for Normal Mode (justActivated=${justActivated}, targetCharChanged=${targetCharChanged}).`);
-             console.log(`[Gairaigo useEffect] --> Calling setStage('key1')`); // ★★★ Add log here ★★★
+        else if (!isRandomMode && (isInitialMount.current || targetCharChanged || gIdxChanged || dIdxChanged)) { // justActivated -> isInitialMount
+             // console.log(`[Gairaigo useEffect] Resetting stage for Normal Mode (isInitialMount=${isInitialMount.current}, targetCharChanged=${targetCharChanged}, gIdxChanged=${gIdxChanged}, dIdxChanged=${dIdxChanged}).`);
              // Only reset the stage, keep the target calculation logic separate
              setStage('key1');
              setPressedKeys(new Map()); // Also reset pressed keys
+             isInitialMount.current = false;
              // Target calculation happens naturally due to gIdx/dIdx props changing
         }
         // --- Initial Random Target Selection ---
-        else if (isRandomMode && (justActivated || !randomTarget)) {
-             console.log(`[Gairaigo useEffect] Selecting random target (justActivated=${justActivated}, no target=${!randomTarget}).`);
+        else if (isRandomMode && (isInitialMount.current || !randomTarget)) { // justActivated -> isInitialMount
+             // console.log(`[Gairaigo useEffect] Selecting random target (isInitialMount=${isInitialMount.current}, no target=${!randomTarget}).`);
             selectNextRandomTarget();
+            isInitialMount.current = false;
         }
 
         // Save current state for next comparison
         prevTargetCharRef.current = potentialNewTarget?.char ?? null; // Update previous target char
-        prevIsActive.current = isActive;
+        prevIsActiveRef.current = isActive; // prevIsActive -> prevIsActiveRef
         prevGIdxRef.current = gIdx;
         prevDIdxRef.current = dIdx;
         prevIsRandomModeRef.current = isRandomMode;
@@ -236,7 +232,7 @@ const useGairaigoPractice = ({
 
         // currentTarget が null の場合も早期リターン
         if (!isActive || !currentTarget) {
-            console.log(`[Gairaigo handleInput] Return early. isActive=${isActive}, currentTarget=`, currentTarget);
+            //console.log(`[Gairaigo handleInput] Return early. isActive=${isActive}, currentTarget=`, currentTarget);
             return { isExpected: false, shouldGoToNext: false };
         }
 
@@ -245,7 +241,7 @@ const useGairaigoPractice = ({
         const { type, pressCode } = info;
 
         if (type === 'press') {
-            console.log(`[Gairaigo handleInput] Press event, code: 0x${pressCode.toString(16)}`);
+            //console.log(`[Gairaigo handleInput] Press event, code: 0x${pressCode.toString(16)}`);
             setPressedKeys(prev => new Map(prev).set(pressCode, Date.now()));
             return { isExpected: false, shouldGoToNext: false };
         }
@@ -253,7 +249,7 @@ const useGairaigoPractice = ({
         // --- Release Event ---
         let nextStage: PracticeStage | null = null;
 
-        console.log(`[Gairaigo handleInput] Release event, code: 0x${pressCode.toString(16)}, currentStage: ${stage}, target: ${currentTarget.char} (gIdx=${gIdx}, dIdx=${dIdx})`); // Add gIdx/dIdx
+        //console.log(`[Gairaigo handleInput] Release event, code: 0x${pressCode.toString(16)}, currentStage: ${stage}, target: ${currentTarget.char} (gIdx=${gIdx}, dIdx=${dIdx})`); // Add gIdx/dIdx
 
         if (stage === 'key1') {
             if (expectedKey1Codes.includes(pressCode)) {
@@ -263,7 +259,7 @@ const useGairaigoPractice = ({
                 nextStage = 'key1'; // ミス時はリセット
             }
             shouldGoToNext = false; // Never advance after key1
-            console.log(`[Gairaigo handleInput key1] ExpectedCodes: [${expectedKey1Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`); // Improve log
+            //(`[Gairaigo handleInput key1] ExpectedCodes: [${expectedKey1Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`); // Improve log
         } else if (stage === 'key2') {
             if (expectedKey2Codes.includes(pressCode)) {
                 // Check if there's a 3rd key defined for this target
@@ -278,7 +274,7 @@ const useGairaigoPractice = ({
                 nextStage = 'key1'; // ミス時はリセット
             }
             shouldGoToNext = false; // Never advance after key2 unless it's the end (handled below)
-            console.log(`[Gairaigo handleInput key2] ExpectedCodes: [${expectedKey2Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`); // Improve log
+            //console.log(`[Gairaigo handleInput key2] ExpectedCodes: [${expectedKey2Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`); // Improve log
         } else if (stage === 'key3') {
             if (expectedKey3Codes.includes(pressCode)) {
                 // Check if this was the *actual* 3rd key of a 4-key sequence
@@ -293,7 +289,7 @@ const useGairaigoPractice = ({
                 nextStage = 'key1'; // ミス時はリセット
             }
             shouldGoToNext = false; // Never advance after key3 unless it's the end (handled below)
-            console.log(`[Gairaigo handleInput key3] ExpectedCodes: [${expectedKey3Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`); // Improve log
+            //console.log(`[Gairaigo handleInput key3] ExpectedCodes: [${expectedKey3Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`); // Improve log
         } else if (stage === 'key4') { // Handle key4 stage
             if (expectedKey4Codes.includes(pressCode)) {
                 nextStage = 'key1'; // Finish and go to next char
@@ -303,7 +299,7 @@ const useGairaigoPractice = ({
                 nextStage = 'key1'; // Reset on miss
             }
             shouldGoToNext = false; // Never advance after key4 unless it's the end (handled below)
-            console.log(`[Gairaigo handleInput key4] ExpectedCodes: [${expectedKey4Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`);
+            //console.log(`[Gairaigo handleInput key4] ExpectedCodes: [${expectedKey4Codes.map(c => `0x${c.toString(16)}`).join(', ')}], Got: 0x${pressCode.toString(16)}, Result: isExpected=${isExpected}, nextStage=${nextStage}, shouldGoToNext=${shouldGoToNext}`);
         }
 
 
@@ -319,14 +315,13 @@ const useGairaigoPractice = ({
         }
 
         if (nextStage && nextStage !== stage) {
-            console.log(`[Gairaigo handleInput] Setting stage from ${stage} to ${nextStage}`);
+            //console.log(`[Gairaigo handleInput] Setting stage from ${stage} to ${nextStage}`);
             setStage(nextStage);
         } else if (!isExpected && stage !== 'key1') {
-            console.log(`[Gairaigo handleInput] Incorrect input, resetting stage to key1`);
+            //console.log(`[Gairaigo handleInput] Incorrect input, resetting stage to key1`);
             setStage('key1');
         }
 
-        // ★★★ Return the final result ★★★
         return { isExpected, shouldGoToNext };
 
     // isRandomMode, selectNextRandomTarget を依存配列に追加
@@ -350,7 +345,7 @@ const useGairaigoPractice = ({
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         // currentTarget が null の場合も早期リターン
         if (!isActive || !currentTarget) { console.log(`[Gairaigo getHighlight] Return early. isActive=${isActive}, currentTarget=`, currentTarget); return noHighlight; } // Add log
-        console.log(`[Gairaigo getHighlight] Inside callback. currentTarget:`, currentTarget, `stage: ${stage}`); // ★★★ デバッグログ追加 ★★★
+        //console.log(`[Gairaigo getHighlight] Inside callback. currentTarget:`, currentTarget, `stage: ${stage}`);
 
         const currentStageForHighlight = stage; // <<< 常に現在のステージを見る
 
@@ -360,7 +355,7 @@ const useGairaigoPractice = ({
 
         if (currentStageForHighlight === 'key1') {
             expectedKeyName = currentTarget.keys[0]; // あ行, か行, ...
-            console.log(`[Gairaigo getHighlight] Stage key1, expectedKey from currentTarget.keys[0]: "${expectedKeyName}"`); // ★★★ デバッグログ追加 ★★★
+            //console.log(`[Gairaigo getHighlight] Stage key1, expectedKey from currentTarget.keys[0]: "${expectedKeyName}"`);
             displayKeyName = expectedKeyName; // 表示はそのまま
             targetLayoutIndex = 2;
         } else if (currentStageForHighlight === 'key2') {
@@ -390,14 +385,12 @@ const useGairaigoPractice = ({
             targetLayoutIndex = 3; // 段キー is on layout 3
         }
 
-        console.log(`[Gairaigo getHighlight] Target: ${currentTarget.char}, Stage: ${currentStageForHighlight}, Layout: ${layoutIndex}, Key: "${key}", ExpectedKey: "${expectedKeyName}", DisplayKey: "${displayKeyName}", TargetLayout: ${targetLayoutIndex}`); // Add target char
-        // ★★★ デバッグログ追加 ★★★
+        //console.log(`[Gairaigo getHighlight] Target: ${currentTarget.char}, Stage: ${currentStageForHighlight}, Layout: ${layoutIndex}, Key: "${key}", ExpectedKey: "${expectedKeyName}", DisplayKey: "${displayKeyName}", TargetLayout: ${targetLayoutIndex}`); // Add target char
         // 実際のキー (key) が期待されるキー (expectedKeyName) と一致し、
-        // ★★★ 追加ログ: 比較直前の値を確認 ★★★
-        console.log(`[Gairaigo getHighlight] Checking condition: expectedKeyName="${expectedKeyName}", layoutIndex=${layoutIndex}, targetLayoutIndex=${targetLayoutIndex}, key="${key}"`);
+        //console.log(`[Gairaigo getHighlight] Checking condition: expectedKeyName="${expectedKeyName}", layoutIndex=${layoutIndex}, targetLayoutIndex=${targetLayoutIndex}, key="${key}"`);
         // かつレイヤーが一致する場合にハイライトと表示上書きを行う
         if (expectedKeyName && layoutIndex === targetLayoutIndex && key === expectedKeyName) {
-            console.log(`[Gairaigo getHighlight] ---> MATCH FOUND! Highlighting key "${key}"`); // ★★★ Move log inside condition ★★★
+            //console.log(`[Gairaigo getHighlight] ---> MATCH FOUND! Highlighting key "${key}"`);
             return {
                 className: 'bg-blue-100',
                 overrideKey: displayKeyName // 上書き表示するキー名を返す
@@ -405,7 +398,6 @@ const useGairaigoPractice = ({
         }
 
         return noHighlight;
-    // ★★★ 依存配列から isRandomMode, gIdx, dIdx を削除 (currentTarget がこれらに依存しているため) ★★★
     }, [stage, currentTarget, isActive]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, idx: number): boolean => {

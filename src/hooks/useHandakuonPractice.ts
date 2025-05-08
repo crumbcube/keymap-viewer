@@ -64,6 +64,7 @@ export default function useHandakuonPractice({
   const prevGIdxRef = useRef(gIdx);
   const prevDIdxRef = useRef(dIdx);
   const isInitialMount = useRef(true);
+  // prevIsActiveRef は既に存在するので、それを利用します
   const prevIsRandomModeRef = useRef(isRandomMode);
 
   // 点滅関連の状態をリセットする内部関数
@@ -100,31 +101,42 @@ export default function useHandakuonPractice({
 
   const prevIsActiveRef = useRef(isActive); // Track previous isActive state
 
-  // Effect for isActive changes and initial setup when becoming active
+  // isActive の変化と、それに伴う初期化やランダムターゲット選択を管理する useEffect
   useEffect(() => {
+    // isActive が false になった最初のタイミングでリセット
+    if (!isActive && prevIsActiveRef.current) {
+        // console.log(`[Handakuon useEffect] Resetting state because isActive became false.`);
+        reset(); // reset 関数内で必要なリセット処理を行う
+    }
+
     if (isActive) {
-      if (!prevIsActiveRef.current) { // Just became active
-        //console.log(`[HandakuonPractice] Transitioned to active. isRandomMode: ${isRandomMode}, dIdx: ${dIdx}`);
-        setStage('gyouInput');
-        resetBlinkingState(); // This also resets inputCount.current
-        if (isRandomMode) {
-          // Only select if no target exists (e.g. not resuming a paused random session)
-          if (!randomTarget) {
-            selectNextRandomTarget();
-          }
-        } else {
-          setRandomTarget(null); // Clear random target if switching to normal mode or starting in normal mode
+        // isActive が true になった最初のタイミング、または依存関係の変更時
+        if (isActive && !prevIsActiveRef.current) {
+            isInitialMount.current = true; // 強制的に初期マウント扱い
+            // console.log(`[HandakuonPractice] Transitioned to active. isRandomMode: ${isRandomMode}, dIdx: ${dIdx}`);
+            setStage('gyouInput');
+            resetBlinkingState(); // This also resets inputCount.current
         }
-      }
-      // If already active, do nothing in this useEffect. Other useEffects handle dIdx/isRandomMode changes.
-    } else {
-      if (prevIsActiveRef.current) { // Just became inactive
-        //console.log(`[HandakuonPractice] Transitioned to inactive. Resetting.`);
-        reset();
-      }
+
+        const indicesChanged = dIdx !== prevDIdxRef.current; // gIdx は常に 0
+        const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
+        const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
+
+        if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
+            setStage('gyouInput');
+            resetBlinkingState();
+            setRandomTarget(null); // 通常モードではランダムターゲットをクリア
+            prevDIdxRef.current = dIdx;
+            isInitialMount.current = false;
+        } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+            selectNextRandomTarget();
+            isInitialMount.current = false;
+            prevDIdxRef.current = dIdx; // dIdx も記録
+        }
     }
     prevIsActiveRef.current = isActive; // Update previous active state
-  }, [isActive, isRandomMode, dIdx, reset, selectNextRandomTarget, resetBlinkingState, randomTarget]);
+    prevIsRandomModeRef.current = isRandomMode; // isRandomMode の前回値も更新
+  }, [isActive, isRandomMode, dIdx, reset, selectNextRandomTarget, resetBlinkingState, randomTarget, setStage]);
 
   // Effect for random mode toggling *while active*
   const prevIsRandomModeActiveRef = useRef(isRandomMode); // Renamed to avoid conflict
@@ -139,7 +151,7 @@ export default function useHandakuonPractice({
         } else {
           setRandomTarget(null); // Clear random target if switching to normal mode
         }
-        prevIsRandomModeActiveRef.current = isRandomMode;
+        // prevIsRandomModeActiveRef.current = isRandomMode; // 上の useEffect で更新されるので不要
       }
     }
   }, [isActive, isRandomMode, selectNextRandomTarget, resetBlinkingState]);

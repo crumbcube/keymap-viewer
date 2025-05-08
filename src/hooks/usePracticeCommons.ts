@@ -25,6 +25,7 @@ import {
     youhandakuonDanMapping,
     youhandakuonPracticeData,
     YouhandakuonInputDef,
+    YoudakuonInputDef, // <<< YoudakuonInputDef をインポート
     gairaigoPracticeData,
     GairaigoPracticeTarget,
 } from '../data/keymapData';
@@ -42,11 +43,11 @@ export type PracticeMode =
     | '記号の基本練習３' 
     | '拗濁音の練習' 
     | '拗半濁音の練習' 
-    | '拗音拡張' 
+    | '拗音拡張' | '' // <<< 空文字列を許容するように追加
     | '外来語の発音補助'
-    | 'かな入力１分間トレーニング' // ★★★ 追加 ★★★
-    | '記号入力１分間トレーニング' // ★★★ 追加 ★★★
-    | '短文入力３分間トレーニング'; // ★★★ 追加 ★★★
+    | 'かな入力１分間トレーニング'
+    | '記号入力１分間トレーニング'
+    | '短文入力３分間トレーニング';
 
 /* 左右の型 */
 export type KeyboardSide = 'left' | 'right';
@@ -286,6 +287,8 @@ export interface PracticeHookProps {
     layers: string[][];
     kb: KeyboardModel;
     isRandomMode?: boolean;
+    showKeyLabels: boolean; // Add showKeyLabels
+    onAdvance?: () => void; // <<< App.tsx から進行を伝えるコールバックを受け取る
 }
 
 /* 練習フックの入力情報 */
@@ -319,7 +322,7 @@ export interface ChallengeResult {
 }
 // ▲▲▲ 追加完了 ▲▲▲
 // ▼▼▼ currentTarget で受け入れる型を定義 ▼▼▼
-type PracticeTargetObject = CharInfoSeion | CharInfoYouon | CharInfoDakuon | CharInfoSokuonKomoji | CharInfoKigo1 | CharInfoKigo2 | CharInfoKigo3 | CharInfoGairaigo | CharInfoYouhandakuon;
+type PracticeTargetObject = CharInfoSeion | CharInfoYouon | CharInfoDakuon | CharInfoSokuonKomoji | CharInfoKigo1 | CharInfoKigo2 | CharInfoKigo3 | CharInfoGairaigo | CharInfoYouhandakuon | CharInfoYoudakuon;
 // ▲▲▲ 追加完了 ▲▲▲
 /* 練習フックの戻り値 */
 export type PracticeStatus = 'idle' | 'countdown' | 'running' | 'finished'; // 練習の状態
@@ -339,8 +342,8 @@ export interface PracticeHookResult {
     challengeResults?: ChallengeResult | null; // Ensure this line exists and is correct
     targetLayerIndex?: number | null;
     displayLayers?: string[][]; // 記号チャレンジ用
-    currentTarget?: string | PracticeTargetObject | undefined; // ★★★ 文字列またはオブジェクトを受け入れるように修正 ★★★
-    typedEndIndex?: number; // ★★★ 追加: 短文チャレンジ用 ★★★
+    currentTarget?: string | PracticeTargetObject | undefined;
+    typedEndIndex?: number;
 }
 
 /* getHighlight の戻り値 */
@@ -418,6 +421,12 @@ export interface CharInfoYouhandakuon {
     char: string;
     inputDef: YouhandakuonInputDef; // 入力定義を含める
 }
+// ▼▼▼ CharInfoYoudakuon を追加 ▼▼▼
+export interface CharInfoYoudakuon {
+    type: 'youdakuon';
+    char: string;
+    inputDef: YoudakuonInputDef;
+}
 
 
 // 全清音文字情報
@@ -448,32 +457,32 @@ export const allSeionCharInfos: CharInfoSeion[] = gyouList.flatMap(gyou =>
 );
 
 // 全拗音文字情報
-export const allYouonCharInfos: CharInfoYouon[] = youonGyouList.flatMap(gyou =>
-  youonDanMapping[gyou]?.map((dan, index) => ({
+export const allYouonCharInfos: CharInfoYouon[] = youonGyouList.flatMap((gyou: string) =>
+  youonDanMapping[gyou]?.map((dan: string, index: number) => ({
     type: 'youon' as const,
     char: youonGyouChars[gyou]?.[index] ?? '?',
     gyouKey: gyou,
     danKey: dan,
-  })).filter(info => info.char !== '?') ?? []
+  })).filter((info): info is CharInfoYouon => info.char !== '?') ?? [] // Type guard for filter
 );
 
 // 全濁音文字情報
-export const allDakuonCharInfos: CharInfoDakuon[] = dakuonGyouList.flatMap(gyou =>
-  dakuonDanMapping[gyou]?.map((dan, index) => ({
+export const allDakuonCharInfos: CharInfoDakuon[] = dakuonGyouList.flatMap((gyou: string) =>
+  dakuonDanMapping[gyou]?.map((dan: string, index: number) => ({
     type: 'dakuon' as const,
     char: dakuonGyouChars[gyou]?.[index] ?? '?',
     gyouKey: gyou,
     danKey: dan,
-  })).filter(info => info.char !== '?') ?? []
+  })).filter((info): info is CharInfoDakuon => info.char !== '?') ?? [] // Type guard for filter
 );
 
 // 全半濁音文字情報
-export const allHandakuonCharInfos: CharInfoHandakuon[] = handakuonDanMapping['は行']?.map((dan, index) => ({
+export const allHandakuonCharInfos: CharInfoHandakuon[] = handakuonDanMapping['は行']?.map((dan: string, index: number) => ({
     type: 'handakuon' as const,
     char: handakuonGyouChars['は行']?.[index] ?? '?',
     gyouKey: 'は行' as const,
     danKey: dan,
-})).filter(info => info.char !== '?') ?? [];
+})).filter((info): info is CharInfoHandakuon => info.char !== '?') ?? []; // Type guard for filter
 
 // 全小文字・促音情報
 export const allSokuonKomojiCharInfos: CharInfoSokuonKomoji[] = sokuonKomojiData.flatMap(group =>

@@ -42,6 +42,7 @@ const useKigoPractice1 = ({
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     const pressInfoRef = useRef<{ code: number; timestamp: number } | null>(null);
@@ -83,36 +84,44 @@ const useKigoPractice1 = ({
     }, [clearLongPressTimer, setRandomTarget]);
 
     useEffect(() => {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[Kigo1 useEffect] Resetting state because isActive became false.`);
+            reset();
+        }
 
         if (isActive) {
+            // isActive が true になった最初のタイミング、または依存関係の変更時
+            if (isActive && !prevIsActiveRef.current) {
+                isInitialMount.current = true; // 強制的に初期マウント扱い
+            }
+
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                reset(); // reset 関数を呼び出す
+                // 通常モードやインデックス変更時は reset の一部を実行 (ターゲット選択はしない)
+                pressInfoRef.current = null;
+                clearLongPressTimer();
+                setIsLongPressSuccess(false);
+                setRandomTarget(null); // 通常モードではランダムターゲットをクリア
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
-            }
-
-            if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
+            } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+                 // console.log(`[Kigo1 useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
-            } else if (!isRandomMode && isInitialMount.current) {
-                 reset(); // 通常モード初期化
-                 isInitialMount.current = false;
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
             }
-
-            prevIsRandomModeRef.current = isRandomMode;
-
-        } else {
-            reset(); // 非アクティブ時もリセット
         }
+
+        // 最後に前回の値を更新
+        prevIsActiveRef.current = isActive;
+        prevIsRandomModeRef.current = isRandomMode;
+
         return () => {
             clearLongPressTimer();
         };
@@ -181,8 +190,7 @@ const useKigoPractice1 = ({
                 const releaseTimestamp = inputInfo.timestamp;
                 const duration = releaseTimestamp - pressTimestamp;
 
-                // ★★★ デバッグログ追加 ★★★
-                console.log(`[Kigo1 handleInput Release] Key: ${inputKeyName}, Duration: ${duration}ms, isLongPressSuccess: ${isLongPressSuccess}, Expected: ${expectedKeyName}`);
+                //console.log(`[Kigo1 handleInput Release] Key: ${inputKeyName}, Duration: ${duration}ms, isLongPressSuccess: ${isLongPressSuccess}, Expected: ${expectedKeyName}`);
                 clearLongPressTimer();
 
                 if (inputKeyName === expectedKeyName && duration >= LONG_PRESS_DURATION && isLongPressSuccess) {
@@ -211,7 +219,6 @@ const useKigoPractice1 = ({
         isRandomMode, selectNextRandomTarget
     ]);
 
-    // ▼▼▼ getHighlightClassName の修正 ▼▼▼
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive || !expectedKeyName) {
@@ -229,7 +236,6 @@ const useKigoPractice1 = ({
     }, [
         isActive, expectedKeyName, isLongPressSuccess
     ]);
-    // ▲▲▲ 修正完了 ▲▲▲
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;

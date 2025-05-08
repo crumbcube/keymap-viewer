@@ -33,6 +33,7 @@ const useKigoPractice2 = ({
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     const [randomTarget, setRandomTarget] = useState<CharInfoKigo2 | null>(null);
@@ -93,35 +94,42 @@ const useKigoPractice2 = ({
     }, [setStage, setRandomTarget]);
 
     useEffect(() => {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[Kigo2 useEffect] Resetting state because isActive became false.`);
+            reset();
+        }
+
         if (isActive) {
+            // isActive が true になった最初のタイミング、または依存関係の変更時
+            if (isActive && !prevIsActiveRef.current) {
+                isInitialMount.current = true; // 強制的に初期マウント扱い
+            }
+
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                reset();
+                // 通常モードやインデックス変更時はステージをリセットし、ランダムターゲットをクリア
+                setStage('gyouInput');
+                setRandomTarget(null);
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
-            }
-
-            if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
+            } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+                 // console.log(`[Kigo2 useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
-            } else if (!isRandomMode && isInitialMount.current) {
-                 reset();
-                 isInitialMount.current = false;
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
             }
-
-            prevIsRandomModeRef.current = isRandomMode;
-
-        } else {
-            reset();
         }
+
+        // 最後に前回の値を更新
+        prevIsActiveRef.current = isActive;
+        prevIsRandomModeRef.current = isRandomMode;
+
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
 
@@ -153,7 +161,7 @@ const useKigoPractice2 = ({
                     isExpected = true;
                     setStage('kigoInput');
                 } else {
-                    console.log(`[Kigo2 handleInput gyouInput] Incorrect. Expected code for '${currentTargetChar}': ${expectedPressCode}, Got: ${pressCode}`);
+                    //console.log(`[Kigo2 handleInput gyouInput] Incorrect. Expected code for '${currentTargetChar}': ${expectedPressCode}, Got: ${pressCode}`);
                     isExpected = false;
                 }
                 break;
@@ -173,7 +181,7 @@ const useKigoPractice2 = ({
                         shouldGoToNext = true;
                     }
                 } else {
-                    console.log(`[Kigo2 handleInput kigoInput] Incorrect. Expected code for '記号': ${expectedKigoCode}, Got: ${pressCode}`);
+                    //console.log(`[Kigo2 handleInput kigoInput] Incorrect. Expected code for '記号': ${expectedKigoCode}, Got: ${pressCode}`);
                     isExpected = false;
                     setStage('gyouInput');
                 }
@@ -199,9 +207,9 @@ const useKigoPractice2 = ({
         let expectedKeyDisplayName: string | null = null; // ハイライトすべきキーの「表示名」
         const targetLayoutIndex = 7;
 
-        if (layoutIndex === targetLayoutIndex) {
-            console.log(`[getHighlight Kigo2] Called for key: "${keyName}" (Layout ${layoutIndex}). Stage: ${currentStageForHighlight}, TargetChar: ${currentTargetChar}`);
-        }
+        //if (layoutIndex === targetLayoutIndex) {
+        //    console.log(`[getHighlight Kigo2] Called for key: "${keyName}" (Layout ${layoutIndex}). Stage: ${currentStageForHighlight}, TargetChar: ${currentTargetChar}`);
+        //}
 
         switch (currentStageForHighlight) {
             case 'gyouInput':
@@ -212,9 +220,9 @@ const useKigoPractice2 = ({
                 break;
         }
 
-        if (layoutIndex === targetLayoutIndex) {
-            console.log(`[getHighlight Kigo2] Expected Display Name: "${expectedKeyDisplayName}"`);
-        }
+        //if (layoutIndex === targetLayoutIndex) {
+        //    console.log(`[getHighlight Kigo2] Expected Display Name: "${expectedKeyDisplayName}"`);
+        //}
 
         // レンダリング中のキーの表示名 (keyName) と、期待される表示名 (expectedKeyDisplayName) を比較
         if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName.trim() === expectedKeyDisplayName.trim()) {

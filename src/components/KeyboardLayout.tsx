@@ -1,5 +1,5 @@
 // /home/coffee/my-keymap-viewer/src/components/KeyboardLayout.tsx
-import React, { useCallback, useState, useRef, useEffect } from 'react'; // useState, useRef, useEffect をインポート
+import React, { useCallback } from 'react'; // useState, useRef, useEffect を削除
 import { motion } from 'framer-motion';
 import { PracticeMode, PracticeHookResult, PracticeHighlightResult } from '../hooks/usePracticeCommons';
 import { kigoMapping2, kigoMapping3 } from '../data/keymapData';
@@ -18,7 +18,7 @@ interface KeyboardLayoutProps {
   currentFunctionKeyMap: Record<number, string>;
   training: boolean;
   className?: string;
-  clearInvalidHighlight?: () => void;
+  // clearInvalidHighlight?: () => void; // App.tsx側で管理するため不要
 }
 
 const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
@@ -34,59 +34,11 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
   currentFunctionKeyMap,
   training,
   className = '',
-  clearInvalidHighlight,
+  // clearInvalidHighlight, // App.tsx側で管理するため不要
 }) => {
-    const [invalidKeyIndex, setInvalidKeyIndex] = useState<number | null>(null);
-    const invalidTimerRef = useRef<number | null>(null);
+    // ローカルな invalidKeyIndex と invalidTimerRef は削除
 
-    useEffect(() => {
-        //console.log(`[KeyboardLayout ${layoutIndex}] useEffect triggered. lastInvalidKeyCode: ${lastInvalidKeyCode === null ? 'null' : `0x${lastInvalidKeyCode.toString(16)}`}`);
-        if (lastInvalidKeyCode !== null) {
-            const targetKeyIndex = lastInvalidKeyCode - 1;
-            const isTargetLayout = activePractice?.isInvalidInputTarget(lastInvalidKeyCode, layoutIndex, targetKeyIndex);
-            //console.log(`[KeyboardLayout ${layoutIndex}] isTargetLayout for code 0x${lastInvalidKeyCode.toString(16)}: ${isTargetLayout}`);
-
-            if (isTargetLayout) {
-                //console.log(`[KeyboardLayout ${layoutIndex}] Setting invalidKeyIndex to ${targetKeyIndex}`);
-                setInvalidKeyIndex(targetKeyIndex); // 不正入力されたキーのインデックスを設定
-
-                // 既存のタイマーがあればクリア
-                if (invalidTimerRef.current !== null) {
-                    clearTimeout(invalidTimerRef.current);
-                }
-
-                // ハイライト表示時間を決定 (キー表示OFFなら0ms)
-                const highlightDuration = showKeyLabels ? 500 : 0;
-                invalidTimerRef.current = window.setTimeout(() => {
-                    //console.log(`[KeyboardLayout ${layoutIndex}] Timeout clearing invalidKeyIndex for index ${targetKeyIndex}`);
-                    setInvalidKeyIndex(null);
-                    invalidTimerRef.current = null;
-                    // clearInvalidHighlight?.(); // App.tsx 側でタイマー管理するので不要かも
-                }, highlightDuration);
-            } else {
-                // このレイアウトが対象でない場合は、ローカルのハイライト状態をクリア
-                // setInvalidKeyIndex(null); // 他のレイアウトのハイライトを消さないようにコメントアウト
-            }
-        } else {
-             // lastInvalidKeyCode が null になったら、ローカルのハイライトもクリア
-             //console.log(`[KeyboardLayout ${layoutIndex}] lastInvalidKeyCode is null, clearing invalidKeyIndex.`);
-             if (invalidTimerRef.current !== null) {
-                 clearTimeout(invalidTimerRef.current);
-                 invalidTimerRef.current = null;
-             }
-             setInvalidKeyIndex(null);
-        }
-
-        // クリーンアップ関数でタイマーをクリア
-        return () => {
-            if (invalidTimerRef.current !== null) {
-                clearTimeout(invalidTimerRef.current);
-                invalidTimerRef.current = null;
-            }
-        };
-    }, [lastInvalidKeyCode, layoutIndex, activePractice, showKeyLabels]); // showKeyLabels を依存配列に追加
-
-    //console.log(`[KeyboardLayout ${layoutIndex}] Rendered. invalidKeyIndex state: ${invalidKeyIndex}`);
+    // useEffect も削除 (lastInvalidKeyCode の処理は App.tsx で一元管理)
 
     // キー描画ロジック (renderKey)
     const renderKey = useCallback((key: string, idx: number) => {
@@ -94,9 +46,16 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         const isEmptyKey = originalKey === '';
 
         let k = originalKey; // 加工前のキーラベル
-        // console.log(`[renderKey ${layoutIndex}-${idx}] Start. key: "${originalKey}", invalidKeyIndex state: ${invalidKeyIndex}`); // ログ削減
         let highlightResult: PracticeHighlightResult = { className: null, overrideKey: null };
         let isInvalid = false;
+
+        // App.tsx から渡される lastInvalidKeyCode を直接使用してエラー判定
+        if (lastInvalidKeyCode !== null && (lastInvalidKeyCode - 1) === idx) {
+            // activePractice.isInvalidInputTarget で、このレイアウトがエラー表示対象か確認
+            if (activePractice?.isInvalidInputTarget(lastInvalidKeyCode, layoutIndex, idx)) {
+                isInvalid = true;
+            }
+        }
 
         // 練習モードON時のラベル加工 (kigoMapping など)
         if (training && showKeyLabels) {
@@ -140,14 +99,13 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
             }
         }
 
-        if (invalidKeyIndex === idx) {
+        // エラーハイライトを適用 (isInvalid が true の場合)
+        if (isInvalid) {
             highlightResult = { className: 'bg-red-100', overrideKey: null };
-            isInvalid = true;
         }
-        // console.log(`[renderKey ${layoutIndex}-${idx}] After invalid check. highlightResult:`, highlightResult); // ログ削減
 
         // 正解キーハイライト処理 (不正入力でない場合のみ)
-        if (!isInvalid && showKeyLabels && activePractice) { // !activePractice?.isOkVisible を削除
+        if (!isInvalid && showKeyLabels && activePractice) {
             const result = activePractice.getHighlightClassName(originalKey, layoutIndex);
             if (result.className) {
                 highlightResult = result;
@@ -155,22 +113,20 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         }
 
         // 表示内容の決定
-        let displayContent: string; // displayContent の宣言をここに移動
+        let displayContent: string;
         if (!training) { // training が false なら練習モードOFF
             // 練習モードOFF時のレンダリング
-            const defaultStyle = 'bg-white'; // デフォルトの背景クラス
-            let keyStyleClass = getKeyStyle(originalKey); // まず styleUtils から取得
+            const defaultStyle = 'bg-white';
+            let keyStyleClass = getKeyStyle(originalKey);
 
             if (originalKey === '記号' || originalKey === '＝\n記号') {
-                // もしキーが「記号」または「＝\n記号」なら、強制的にデフォルトスタイルにする
                 keyStyleClass = defaultStyle;
             } else if (!keyStyleClass.includes('bg-')) {
-                // getKeyStyle が背景色クラスを返さなかった場合もデフォルトを適用
                 keyStyleClass = `${keyStyleClass} ${defaultStyle}`.trim();
             }
 
             return (
-                <motion.div key={idx} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center ${keyStyleClass}`} // ← 修正したクラスを適用
+                <motion.div key={idx} className={`border rounded p-3 text-center text-sm shadow flex justify-center items-center ${keyStyleClass}`}
                     whileHover={{ scale: 1.05 }}
                     style={{ minHeight: '3rem', fontSize: isLargeSymbol(originalKey) ? '1.8rem' : undefined }}>
                     <code style={{ whiteSpace: "pre-line" }}>
@@ -208,7 +164,7 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         layoutIndex, showKeyLabels, activePractice, practice,
         currentFunctionKeyMap,
         training,
-        invalidKeyIndex,
+        lastInvalidKeyCode, // lastInvalidKeyCode を依存配列に追加
     ]);
 
     if (!layerData) {
@@ -227,4 +183,3 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
 };
 
 export default KeyboardLayout;
-

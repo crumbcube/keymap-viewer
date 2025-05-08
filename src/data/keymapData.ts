@@ -28,8 +28,8 @@ export const gyouChars: Record<string, string[]> = {
     'わ行': ['わ', 'を', 'ん', 'ー', '～'],
   };
 // ... (拗音、濁音、半濁音、小文字、記号練習、拗濁音、拗半濁音のデータも変更なし) ...
-export const youonGyouList = ['か行', 'さ行', 'た行', 'な行', 'は行', 'ま行', 'ら行'];
-export const youonGyouChars: Record<string, string[]> = {
+export const youonGyouList = ['か行', 'さ行', 'た行', 'な行', 'は行', 'ま行', 'ら行']; // App.tsx, usePracticeCommons.ts で使うため export
+export const youonGyouChars: Record<string, string[]> = { // App.tsx, usePracticeCommons.ts で使うため export
     'か行': ['きゃ', 'きゅ', 'きょ'],
     'さ行': ['しゃ', 'しゅ', 'しょ'],
     'た行': ['ちゃ', 'ちゅ', 'ちょ'],
@@ -38,7 +38,7 @@ export const youonGyouChars: Record<string, string[]> = {
     'ま行': ['みゃ', 'みゅ', 'みょ'],
     'ら行': ['りゃ', 'りゅ', 'りょ'],
 };
-export const youonDanMapping: Record<string, string[]> = {
+export const youonDanMapping: Record<string, string[]> = { // App.tsx, usePracticeCommons.ts で使うため export
     'か行': ['あ段', 'う段', 'お段'],
     'さ行': ['あ段', 'う段', 'お段'],
     'た行': ['あ段', 'う段', 'お段'],
@@ -47,24 +47,24 @@ export const youonDanMapping: Record<string, string[]> = {
     'ま行': ['あ段', 'う段', 'お段'],
     'ら行': ['あ段', 'う段', 'お段'],
 };
-export const dakuonGyouList = ['か行', 'さ行', 'た行', 'は行'];
-export const dakuonGyouChars: Record<string, string[]> = {
+export const dakuonGyouList = ['か行', 'さ行', 'た行', 'は行']; // App.tsx, usePracticeCommons.ts で使うため export
+export const dakuonGyouChars: Record<string, string[]> = { // App.tsx, usePracticeCommons.ts で使うため export
     'か行': ['が', 'ぎ', 'ぐ', 'げ', 'ご'],
     'さ行': ['ざ', 'じ', 'ず', 'ぜ', 'ぞ'],
     'た行': ['だ', 'ぢ', 'づ', 'で', 'ど'],
     'は行': ['ば', 'び', 'ぶ', 'べ', 'ぼ'],
 };
-export const dakuonDanMapping: Record<string, string[]> = {
+export const dakuonDanMapping: Record<string, string[]> = { // App.tsx, usePracticeCommons.ts で使うため export
     'か行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
     'さ行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
     'た行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
     'は行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
 };
-export const handakuonGyouList = ['は行'];
-export const handakuonGyouChars: Record<string, string[]> = {
+export const handakuonGyouList = ['は行']; // App.tsx, usePracticeCommons.ts で使うため export
+export const handakuonGyouChars: Record<string, string[]> = { // App.tsx, usePracticeCommons.ts で使うため export
     'は行': ['ぱ', 'ぴ', 'ぷ', 'ぺ', 'ぽ'],
 };
-export const handakuonDanMapping: Record<string, string[]> = {
+export const handakuonDanMapping: Record<string, string[]> = { // App.tsx, usePracticeCommons.ts で使うため export
     'は行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
 };
 export interface SokuonKomojiInputDef {
@@ -156,7 +156,7 @@ export const basicPracticeMenuItems = [ '清音の基本練習', '拗音の基�
 export const stepUpPracticeMenuItems = [
   '拗濁音の練習',
   '拗半濁音の練習',
-  '拗音拡張',
+  '拗音拡張', // この練習モード名に対応する練習データも export が必要
   '外来語の発音補助', // ← 追加済み
 ];
 export const challengeMenuItems = [
@@ -165,6 +165,39 @@ export const challengeMenuItems = [
   '短文入力３分間トレーニング',
 ];
 export const practiceMenuItems = [ ...basicPracticeMenuItems, ...stepUpPracticeMenuItems, ];
+
+// 清音の練習データ (App.tsx で使うため export)
+export const seionPracticeData: SeionPracticeGroup[] = gyouList.map(gyou => ({
+  groupName: gyou,
+  chars: gyouChars[gyou] || [],
+}));
+interface SeionPracticeGroup { groupName: string; chars: string[]; } // 型定義も export するか、ここで定義
+
+// 拗音の練習データ (App.tsx で使うため export)
+export const youonPracticeData: YouonPracticeGroup[] = youonGyouList.map(gyou => ({
+  groupName: `${gyou}拗音`,
+  chars: youonGyouChars[gyou] || [],
+  // inputs は useYouonPractice フック内で生成されるか、別途定義が必要
+}));
+interface YouonPracticeGroup { groupName: string; chars: string[]; } // 型定義も export するか、ここで定義
+
+// 濁音の練習データ (App.tsx で使うため export)
+export const dakuonPracticeData: DakuonPracticeGroup[] = dakuonGyouList.map(gyou => ({
+  groupName: `${dakuonGyouChars[gyou]?.[0]?.replace(/.$/, '')}行`, // 例: 「が行」
+  chars: dakuonGyouChars[gyou] || [],
+  gyouKey: gyou,
+  // inputs は useDakuonPractice フック内で生成されるか、別途定義が必要
+}));
+interface DakuonPracticeGroup { groupName: string; chars: string[]; gyouKey: string; } // 型定義も export するか、ここで定義
+
+// 半濁音の練習データ (App.tsx で使うため export)
+export const handakuonPracticeData: HandakuonPracticeGroup[] = handakuonGyouList.map(gyou => ({
+  groupName: `${handakuonGyouChars[gyou]?.[0]?.replace(/.$/, '')}行`, // 例: 「ぱ行」
+  chars: handakuonGyouChars[gyou] || [],
+  gyouKey: gyou,
+  // inputs は useHandakuonPractice フック内で生成されるか、別途定義が必要
+}));
+interface HandakuonPracticeGroup { groupName: string; chars: string[]; gyouKey: string; } // 型定義も export するか、ここで定義
 
 // ▼▼▼ 拗音拡張用のデータを追加 ▼▼▼
 // 各行の拡張拗音を含む文字 (ゃ, ぃ, ゅ, ぇ, ょ)
@@ -188,6 +221,14 @@ export const youonKakuchoDanMapping: Record<string, string[]> = {
     'ま行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
     'ら行': ['あ段', 'い段', 'う段', 'え段', 'お段'],
 };
+
+// 拗音拡張の練習データ (App.tsx で使うため export)
+export const youonKakuchoPracticeData: YouonKakuchoPracticeGroup[] = youonGyouList.map(gyou => ({
+  groupName: `${gyou}拗音拡張`,
+  chars: youonKakuchoChars[gyou] || [],
+  // inputs は useYouonKakuchoPractice フック内で生成されるか、別途定義が必要
+}));
+interface YouonKakuchoPracticeGroup { groupName: string; chars: string[]; } // 型定義も export するか、ここで定義
 // ▲▲▲ 追加完了 ▲▲▲
 
 // ▼▼▼ 外来語練習用のデータ構造とデータを修正 ▼▼▼
@@ -277,7 +318,7 @@ export const gairaigoPracticeData: GairaigoPracticeGroup[] = [
       // ヴ (index 2) is skipped in practice, but data structure needs placeholder if accessed directly
       { char: "ヴ",   headerIndex: 2, keys: ["わ行", "濁音", "う段"], actualSecondKey: "濁音" }, // Kept 3 keys for simplicity if accessed, but won't be used in normal flow
       { char: "ヴェ", headerIndex: 3, keys: ["あ行", "拗2", "濁音", "え段"], actualSecondKey: "さ行", actualThirdKey: "濁音" },
-      { char: "ヴォ", headerIndex: 4, keys: ["あ行", "拗2", "濁音", "お段"], actualSecondKey: "さ行", actualThirdKey: "濁音" }, // ★★★ ヴォのデータを追加 ★★★
+      { char: "ヴォ", headerIndex: 4, keys: ["あ行", "拗2", "濁音", "お段"], actualSecondKey: "さ行", actualThirdKey: "濁音" },
     ]
   },
 ];

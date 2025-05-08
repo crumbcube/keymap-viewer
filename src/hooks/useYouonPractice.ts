@@ -1,4 +1,4 @@
-// src/hooks/useYouonPractice.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useYouonPractice.ts
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
     PracticeHookProps,
@@ -51,6 +51,7 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     const selectNextRandomTarget = useCallback(() => {
@@ -63,47 +64,60 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
         }
     }, [setRandomTarget, setStage]);
 
+    // reset 関数
+    const reset = useCallback(() => {
+        setStage('gyouInput');
+        setRandomTarget(null);
+        prevGIdxRef.current = -1;
+        prevDIdxRef.current = -1;
+        isInitialMount.current = true;
+        prevIsRandomModeRef.current = false; // reset 時は false に
+    }, [setStage, setRandomTarget]);
+
     useEffect(() => {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[Youon useEffect] Resetting state because isActive became false.`);
+            reset(); // reset 関数内で必要なリセット処理を行う
+        }
 
         if (isActive) {
+            // isActive が true になった最初のタイミング、または依存関係の変更時
+            if (isActive && !prevIsActiveRef.current) {
+                isInitialMount.current = true; // 強制的に初期マウント扱い
+            }
+
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             // --- リセット条件 ---
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                setStage('gyouInput');
-                setRandomTarget(null);
+                // console.log(`[Youon useEffect] Normal mode. isInitialMount=${isInitialMount.current}, indicesChanged=${indicesChanged}`);
+                setStage('gyouInput'); // 通常モードやインデックス変更時はステージをリセット
+                setRandomTarget(null); // ランダムターゲットはクリア
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
             }
-
             // --- ランダムターゲット選択条件 (初回のみ or リセット後) ---
-            if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
+            // isInitialMount.current の条件を追加して、アクティブになった直後もターゲット選択
+            else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+                 // console.log(`[Youon useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
-            } else if (!isRandomMode && isInitialMount.current) {
-                 isInitialMount.current = false;
+                 // ランダムモードでは gIdx/dIdx は直接使わないが、記録はしておく
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
             }
-
-            prevIsRandomModeRef.current = isRandomMode;
-
-        } else {
-            // 非アクティブになったら全てリセット
-            setStage('gyouInput');
-            setRandomTarget(null);
-            prevGIdxRef.current = -1;
-            prevDIdxRef.current = -1;
-            isInitialMount.current = true;
-            prevIsRandomModeRef.current = isRandomMode;
         }
 
-    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, selectNextRandomTarget]);
+        // 最後に前回の値を更新
+        prevIsActiveRef.current = isActive;
+        prevIsRandomModeRef.current = isRandomMode;
+
+    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
+
 
     // 通常モード用の現在行・段キー (変更なし)
     const currentGyouKey = useMemo(() => {
@@ -176,7 +190,7 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
                         shouldGoToNext = false;
                     } else {
                         shouldGoToNext = true;
-                        setStage('gyouInput'); // ★★★ 正解時にステージをリセット ★★★
+                        setStage('gyouInput');
                     }
                 } else {
                     isExpected = false;
@@ -224,16 +238,6 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
         }
         return noHighlight;
     }, [isActive, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
-
-    // reset
-    const reset = useCallback(() => {
-        setStage('gyouInput');
-        setRandomTarget(null);
-        prevGIdxRef.current = -1;
-        prevDIdxRef.current = -1;
-        isInitialMount.current = true;
-        prevIsRandomModeRef.current = false;
-    }, [setStage, setRandomTarget]);
 
     // isInvalidInputTarget
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {

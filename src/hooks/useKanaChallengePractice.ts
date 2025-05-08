@@ -61,6 +61,7 @@ const useKanaChallengePractice = ({
     const completedCharsCountRef = useRef(0); // 正しく入力完了した文字数 (ヘッダー表示文字数)
     const totalAttemptedRef = useRef(0); // 総試行回数（文字単位）
     const [challengeResults, setChallengeResults] = useState<ChallengeResult | null>(null);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
 
 
     const currentFunctionKeyMap = useMemo(() => {
@@ -196,12 +197,15 @@ const useKanaChallengePractice = ({
 
     // アクティブになったらカウントダウン開始
     useEffect(() => {
-        if (isActive && status === 'idle') {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[KanaChallenge useEffect] Resetting state because isActive became false.`);
+            reset();
+        } else if (isActive && status === 'idle') { // isActive が true で status が idle の場合のみカウントダウン開始
             setStatus('countdown');
             setCountdownValue(COUNTDOWN_SECONDS);
-        } else if (!isActive) {
-            reset();
         }
+        prevIsActiveRef.current = isActive; // 最後に前回の値を更新
     }, [isActive, status, reset]);
 
 

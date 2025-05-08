@@ -1,4 +1,4 @@
-// src/hooks/useSeionPractice.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useSeionPractice.ts
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     PracticeHookProps,
@@ -31,6 +31,7 @@ const useSeionPractice = ({
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     // --- 期待されるキー名の計算 ---
@@ -104,7 +105,7 @@ const useSeionPractice = ({
                 setRandomTarget(newTarget);
                 setTargetChar(newTarget.char);
                 setStage('gyouInput');
-                console.log(`[Seion Random] New target: ${newTarget.char} (Gyou: ${newTarget.gyouKey}, Dan: ${newTarget.danKey})`);
+                // console.log(`[Seion Random] New target: ${newTarget.char} (Gyou: ${newTarget.gyouKey}, Dan: ${newTarget.danKey})`);
             } else {
                 console.error("[Seion Random] No seion characters found.");
                 setRandomTarget(null);
@@ -113,7 +114,7 @@ const useSeionPractice = ({
         } else {
             // 通常モード: 内部状態の gIdx, dIdx を使用
             if (gIdx < 0 || gIdx >= gyouList.length) {
-                console.error(`[Seion Normal] Invalid gIdx: ${gIdx}`);
+                // console.error(`[Seion Normal] Invalid gIdx: ${gIdx}`);
                 setTargetChar(null);
                 setRandomTarget(null);
                 return;
@@ -123,7 +124,7 @@ const useSeionPractice = ({
             const charsForGyou = gyouChars[currentGyouKey];
 
             if (!list || !charsForGyou || dIdx < 0 || dIdx >= list.length || dIdx >= charsForGyou.length) {
-                console.error(`[Seion Normal] Invalid dIdx: ${dIdx} for gIdx: ${gIdx}`);
+                // console.error(`[Seion Normal] Invalid dIdx: ${dIdx} for gIdx: ${gIdx}`);
                 setTargetChar(null);
                 setRandomTarget(null);
                 return;
@@ -136,9 +137,9 @@ const useSeionPractice = ({
                 setTargetChar(char);
                 setRandomTarget(null); // 通常モードではクリア
                 setStage('gyouInput');
-                console.log(`[Seion Normal] Target: ${char} (Gyou: ${currentGyouKey}, Dan: ${danKey}) for gIdx=${gIdx}, dIdx=${dIdx}`);
+                // console.log(`[Seion Normal] Target: ${char} (Gyou: ${currentGyouKey}, Dan: ${danKey}) for gIdx=${gIdx}, dIdx=${dIdx}`);
             } else {
-                 console.error(`[Seion Normal] Could not determine char or danKey for gIdx=${gIdx}, dIdx=${dIdx}`);
+                //  console.error(`[Seion Normal] Could not determine char or danKey for gIdx=${gIdx}, dIdx=${dIdx}`);
                  setTargetChar(null);
                  setRandomTarget(null);
             }
@@ -153,60 +154,77 @@ const useSeionPractice = ({
         if (initialGIdx !== gIdx) setGIdx(initialGIdx);
         if (initialDIdx !== dIdx) setDIdx(initialDIdx);
 
-        console.log(`[Seion useEffect] Start. isActive=${isActive}, isRandomMode=${isRandomMode}, gIdx=${gIdx}, dIdx=${dIdx}, initialGIdx=${initialGIdx}, initialDIdx=${initialDIdx}`);
+        // console.log(`[Seion useEffect] Start. isActive=${isActive}, isRandomMode=${isRandomMode}, gIdx=${gIdx}, dIdx=${dIdx}, initialGIdx=${initialGIdx}, initialDIdx=${initialDIdx}`);
+
+        // isActive が false の場合は、以降の処理を行わずにリセット処理のみ確認
+        if (!isActive) {
+            if (prevIsActiveRef.current) { // false になった瞬間だけリセット
+                // console.log(`[Seion useEffect] Resetting state because isActive became false (early return).`);
+                resetPracticeState(); // 内部的なリセット関数を呼ぶ (calculateTarget を含まない)
+            }
+            prevIsActiveRef.current = isActive;
+            prevIsRandomModeRef.current = isRandomMode; // isRandomMode の状態も追従
+            return;
+        }
+
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[Seion useEffect] Resetting state because isActive became false.`);
+            setTargetChar(null);
+            setStage('gyouInput');
+            setRandomTarget(null);
+            prevGIdxRef.current = -1; // gIdx, dIdx の前回値をリセット
+            prevDIdxRef.current = -1;
+            isInitialMount.current = true; // 次回 active になったときに初期マウントとして扱う
+        }
+
         if (isActive) {
+            // isActive が true になった最初のタイミング、または依存関係の変更時
+            if (isActive && !prevIsActiveRef.current) {
+                isInitialMount.current = true; // 強制的に初期マウント扱い
+            }
+
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             // --- リセット条件 ---
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                console.log("[Seion useEffect] Resetting for normal mode or index change.");
+                // console.log(`[Seion useEffect] Normal mode. isInitialMount=${isInitialMount.current}, indicesChanged=${indicesChanged}`);
                 setStage('gyouInput');
                 setRandomTarget(null);
-                // calculateTarget は isInitialMount.current が true か indicesChanged が true の場合に呼ぶ
-                if (isInitialMount.current || indicesChanged) {
-                    console.log("[Seion useEffect] Calculating target for normal mode (initial or index change).");
-                    calculateTarget();
-                }
+                calculateTarget();
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
             }
             // --- ランダムターゲット選択条件 ---
-            else if (isRandomMode && (randomModeChangedToTrue || !randomTarget)) {
-                 console.log("[Seion useEffect] Selecting/Recalculating random target.");
+            else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+                //  console.log(`[Seion useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  calculateTarget();
                  prevGIdxRef.current = gIdx; // ランダムモードでは使わないが記録
                  prevDIdxRef.current = dIdx;
                  isInitialMount.current = false;
             }
-            // --- 通常モード初回 ---
-            // 上の条件で処理されるはずだが、念のため isInitialMount のみの場合も考慮
-            else if (!isRandomMode && isInitialMount.current) {
-                 console.log("[Seion useEffect] Initial calculation for normal mode.");
-                 calculateTarget();
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
-                 isInitialMount.current = false;
-            }
-
-            prevIsRandomModeRef.current = isRandomMode;
-
-        } else {
-            console.log(`[Seion useEffect] Resetting state because not active.`);
-            setTargetChar(null);
-            setStage('gyouInput');
-            setRandomTarget(null);
-            prevGIdxRef.current = -1;
-            prevDIdxRef.current = -1;
-            isInitialMount.current = true;
-            prevIsRandomModeRef.current = false;
         }
+
+        // 最後に前回の値を更新
+        prevIsActiveRef.current = isActive;
+        prevIsRandomModeRef.current = isRandomMode;
+
     // initialGIdx, initialDIdx も依存配列に追加し、内部状態 gIdx, dIdx も含める
     }, [initialGIdx, initialDIdx, isActive, isRandomMode, gIdx, dIdx, calculateTarget, randomTarget]);
 
-
+    // useEffect内で呼び出すための、calculateTargetを含まないリセット関数
+    const resetPracticeState = useCallback(() => {
+        setTargetChar(null);
+        setStage('gyouInput');
+        setRandomTarget(null);
+        prevGIdxRef.current = -1;
+        prevDIdxRef.current = -1;
+        isInitialMount.current = true;
+    }, []);
+    
     // --- 入力処理 ---
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
         if (!isActive || !targetChar || !expectedGyouKey || !expectedDanKey || inputInfo.type !== 'release') {
@@ -260,11 +278,11 @@ const useSeionPractice = ({
 
     // --- リセット処理 ---
     const reset = useCallback(() => {
-        console.log(`[Seion reset] Called. isActive=${isActive}, isRandomMode=${isRandomMode}`);
+        // console.log(`[Seion reset] Called. isActive=${isActive}, isRandomMode=${isRandomMode}`);
         setStage('gyouInput');
         // reset が呼ばれたら、現在のモードとインデックスに基づいてターゲットを再計算
         if (isActive) {
-            console.log("[Seion reset] Recalculating target...");
+            // console.log("[Seion reset] Recalculating target...");
             calculateTarget();
         }
         // isInitialMount は useEffect で管理
@@ -363,7 +381,7 @@ const useSeionPractice = ({
         },
     }), [
         headingChars,
-        handleInput, getHighlightClassName, reset, isInvalidInputTarget, 
+        handleInput, getHighlightClassName, reset, isInvalidInputTarget,
         targetChar, stage, expectedGyouKey, expectedDanKey // getHighlight 用の依存関係を追加
     ]);
 };

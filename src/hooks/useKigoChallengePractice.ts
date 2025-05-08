@@ -74,6 +74,7 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
     const pressInfoRef = useRef<{ code: number; timestamp: number } | null>(null);
     const longPressTimerRef = useRef<number | null>(null);
     const equalSignHighlightTimerRef = useRef<number | null>(null);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
 
     // state が更新されるたびに ref も更新
     useEffect(() => {
@@ -258,13 +259,16 @@ const getRankMessageKigo = (score: number): string => {
 
     // 練習モードがアクティブになったらチャレンジ開始
     useEffect(() => {
-        if (isActive && state.status === 'idle') {
-            startChallenge(); // useCallback でメモ化された関数を呼ぶ
-        } else if (!isActive && state.status !== 'idle') {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[KigoChallenge useEffect] Resetting state because isActive became false.`);
             setState(initialState); // initialState に戻す
             pressInfoRef.current = null;
             clearLongPressTimer();
+        } else if (isActive && state.status === 'idle') { // isActive が true で status が idle の場合のみチャレンジ開始
+            startChallenge(); // useCallback でメモ化された関数を呼ぶ
         }
+        prevIsActiveRef.current = isActive; // 最後に前回の値を更新
         clearEqualSignHighlightTimer();
     }, [isActive, state.status, startChallenge, clearLongPressTimer]); // clearLongPressTimer を追加
 
@@ -648,8 +652,8 @@ const getRankMessageKigo = (score: number): string => {
         displayLayers,
         challengeResults: state.challengeResults,
         // 以下は KigoChallenge では直接使わないかもしれないが一応返す
-        status: state.status, // ★★★ status を返すように追加 ★★★
-        countdownValue: state.countdownValue, // ★★★ countdownValue を返すように追加 ★★★
+        status: state.status,
+        countdownValue: state.countdownValue,
         targetChar: state.targetChar ?? undefined, // targetChar を追加
         // gyouKey, charIndex, step は PracticeHookResult にないので削除
     };

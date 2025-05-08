@@ -27,6 +27,7 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     const [randomTarget, setRandomTarget] = useState<CharInfoKigo3 | null>(null);
@@ -113,36 +114,48 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
     }, [setStage, setRandomTarget]);
 
     useEffect(() => {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[Kigo3 useEffect] Resetting state because isActive became false.`);
+            reset();
+        }
 
         if (isActive) {
+            // isActive が true になった最初のタイミング、または依存関係の変更時
+            if (isActive && !prevIsActiveRef.current) {
+                isInitialMount.current = true; // 強制的に初期マウント扱い
+            }
+
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                reset(); // reset 関数を呼び出す
+                // 通常モードやインデックス変更時はステージなどをリセット
+                setStage('kigoInput');
+                isWaitingForSecondKigo.current = false;
+                setShowHighlightAfterWait(true);
+                if (highlightTimeoutRef.current !== null) {
+                    clearTimeout(highlightTimeoutRef.current);
+                    highlightTimeoutRef.current = null;
+                }
+                setRandomTarget(null);
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
-            }
-
-            if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
+            } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+                 // console.log(`[Kigo3 useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
-            } else if (!isRandomMode && isInitialMount.current) {
-                 reset(); // 通常モード初期化
-                 isInitialMount.current = false;
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
             }
-
-            prevIsRandomModeRef.current = isRandomMode;
-
-        } else {
-            reset(); // 非アクティブ時もリセット
         }
+
+        // 最後に前回の値を更新
+        prevIsActiveRef.current = isActive;
+        prevIsRandomModeRef.current = isRandomMode;
+
         return () => {
             if (highlightTimeoutRef.current !== null) {
                 clearTimeout(highlightTimeoutRef.current);
@@ -278,18 +291,15 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
             return noHighlight;
         }
         // 「=」以外の場合のみ expectedGyouKey をチェック
-        // ★★★ 修正: expectedGyouKey が null でも isTargetEqualSign が true ならOK ★★★
         if (!isTargetEqualSign && !expectedGyouKey) {
              console.warn("getHighlightClassName: expectedGyouKey is null for non-equal sign target");
              return noHighlight;
         }
 
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
-        // ★★★ 修正: kigoInputWait ステージ中はインデックス変更による強制変更を無視 ★★★
         const currentStageForHighlight = (indicesJustChanged && stage !== 'kigoInputWait') ? 'kigoInput' : stage;
 
         let expectedKeyDisplayName: string | null = null;
-        // ★★★ 修正: targetLayoutIndex を 8 に変更 ★★★
         const targetLayoutIndex = 8;
 
         // --- 「＝\n記号」キーの実際の表示名を取得するロジック (レイヤー8から) ---
@@ -300,43 +310,36 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
 
         if (currentStageForHighlight === 'kigoInputWait') {
             // 「=」の2打目待ち中は equalSignKeyName をハイライト (点滅制御あり)
-            // ★★★ 修正: equalSignKeyName と targetLayoutIndex=8 を使用 ★★★
             if (keyName === equalSignKeyName && layoutIndex === targetLayoutIndex) {
                 return { className: showHighlightAfterWait ? 'bg-blue-100' : null, overrideKey: null };
             }
             return noHighlight;
         }
 
-        // ▼▼▼ 修正: ステージごとの expectedKeyDisplayName 設定 ▼▼▼
         if (currentStageForHighlight === 'kigoInput') {
             // 1打目は常に「＝\n記号」キー
             expectedKeyDisplayName = equalSignKeyName;
         } else if (currentStageForHighlight === 'gyouInput') {
             // 2打目 (「=」以外) は行キーに対応する記号
-            // ★★★ 修正: expectedGyouKey ではなく currentTargetChar を使用 ★★★
             expectedKeyDisplayName = currentTargetChar; // 例: ' ` '
         }
-        // ▲▲▲ 修正完了 ▲▲▲
 
-        // ★★★ 修正: targetLayoutIndex=8 を使用 ★★★
         if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyDisplayName) {
             return { className: 'bg-blue-100', overrideKey: null };
         }
 
         return noHighlight;
     }, [
-        isActive, stage, showHighlightAfterWait, isTargetEqualSign, expectedGyouKey, currentTargetChar, // ★★★ currentTargetChar を追加 ★★★
+        isActive, stage, showHighlightAfterWait, isTargetEqualSign, expectedGyouKey, currentTargetChar,
         isRandomMode, gIdx, dIdx,
-        layers, // ★★★ layers を依存配列に追加 ★★★
+        layers,
         // hid2Gyou は不要になったので削除
     ]);
-    // ▲▲▲ 修正完了 ▲▲▲
 
     // isInvalidInputTarget (変更なし)
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
         const targetKeyIndex = pressCode - 1;
-        // ★★★ 修正: 記号3はレイヤー8のみ対象 ★★★
         const isTarget = layoutIndex === 8 && keyIndex === targetKeyIndex;
         return isTarget;
     }, [isActive]);

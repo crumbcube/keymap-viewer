@@ -86,6 +86,7 @@ const useTanbunChallengePractice = ({
     const completedSentenceCountRef = useRef(0); // クリアした文の数
     const [challengeResults, setChallengeResults] = useState<ChallengeResult | null>(null);
     const inputTimeoutRef = useRef<number | null>(null);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
 
     // 機能キーコードを取得 (仮実装 - useKanaChallengePractice から移植)
     const funcKeyCodes = useMemo(() => {
@@ -229,11 +230,14 @@ const useTanbunChallengePractice = ({
 
     // アクティブ状態変化
     useEffect(() => {
-        if (isActive && status === 'idle') {
-            setStatus('countdown');
-        } else if (!isActive) {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[TanbunChallenge useEffect] Resetting state because isActive became false.`);
             reset();
+        } else if (isActive && status === 'idle') { // isActive が true で status が idle の場合のみカウントダウン開始
+            setStatus('countdown');
         }
+        prevIsActiveRef.current = isActive; // 最後に前回の値を更新
     }, [isActive, status, reset, clearInputTimeout]);
 
     // 入力処理
@@ -323,7 +327,7 @@ const useTanbunChallengePractice = ({
             const kigoValue = kigoMapping3[currentGyouKey];
             //console.log(`[Tanbun Input] kigoPractice3 - kigoValue for ${currentGyouKey}:`, kigoValue);
             if (kigoValue) {
-                console.log(`[Tanbun Input] kigoPractice3 detected. currentGyouKey=${currentGyouKey}`);
+                //console.log(`[Tanbun Input] kigoPractice3 detected. currentGyouKey=${currentGyouKey}`);
                 typedChar = kigoValue.split('\n')[0];
             }
             //console.log(`[Tanbun Input] kigoPractice3 result. typedChar=${typedChar}`);

@@ -24,6 +24,7 @@ const useYouonKakuchoPractice = ({
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     // dIdx が 1 か 3 以外の場合、強制的に 1 にする (通常モード用)
@@ -71,37 +72,45 @@ const useYouonKakuchoPractice = ({
     }, [setStage, setRandomTarget]);
 
     useEffect(() => {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[YouonKakucho useEffect] Resetting state because isActive became false.`);
+            reset();
+        }
+
         if (isActive) {
+            // isActive が true になった最初のタイミング、または依存関係の変更時
+            if (isActive && !prevIsActiveRef.current) {
+                isInitialMount.current = true; // 強制的に初期マウント扱い
+            }
+
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             // --- リセット条件 ---
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                reset(); // reset 関数を呼び出す
+                // 通常モードやインデックス変更時はステージなどをリセット
+                setStage('line');
+                setPressedKeys(new Map());
+                setRandomTarget(null);
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
-            }
-
             // --- ランダムターゲット選択条件 (初回のみ or リセット後) ---
-            if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
+            } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+                 // console.log(`[YouonKakucho useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  generateRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
-            } else if (!isRandomMode && isInitialMount.current) {
-                 reset(); // 通常モード初期化
-                 isInitialMount.current = false;
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
             }
-
-            prevIsRandomModeRef.current = isRandomMode;
-
-        } else {
-            reset(); // 非アクティブ時もリセット
         }
+
+        // 最後に前回の値を更新
+        prevIsActiveRef.current = isActive;
+        prevIsRandomModeRef.current = isRandomMode;
+
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, generateRandomTarget, currentFixedDIdx]);
 
 

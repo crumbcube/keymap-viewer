@@ -59,6 +59,7 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
+    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     const selectNextRandomTarget = useCallback(() => {
@@ -83,44 +84,42 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
     }, [setStage, setRandomTarget, gIdx, dIdx]); // gIdx, dIdx を追加
 
     useEffect(() => {
+        // isActive が false になった最初のタイミングでリセット
+        if (!isActive && prevIsActiveRef.current) {
+            // console.log(`[SokuonKomoji useEffect] Resetting state because isActive became false.`);
+            reset(); // reset 関数内で必要なリセット処理を行う
+        }
 
         if (isActive) {
+            // isActive が true になった最初のタイミング、または依存関係の変更時
+            if (isActive && !prevIsActiveRef.current) {
+                isInitialMount.current = true; // 強制的に初期マウント扱い
+            }
+
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
             const randomModeChangedToTrue = isRandomMode && !prevIsRandomModeRef.current;
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
+                // console.log(`[SokuonKomoji useEffect] Normal mode. isInitialMount=${isInitialMount.current}, indicesChanged=${indicesChanged}`);
                 const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
                 setStage(initialChar === 'っ' ? 'tsuInput' : 'gyouInput');
                 setRandomTarget(null);
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
-            }
-
-            if (isRandomMode && !randomTarget && (randomModeChangedToTrue || isInitialMount.current)) {
+            } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
+                 // console.log(`[SokuonKomoji useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
-            } else if (!isRandomMode && isInitialMount.current) {
-                 const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
-                 setStage(initialChar === 'っ' ? 'tsuInput' : 'gyouInput');
-                 isInitialMount.current = false;
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
             }
-
-            prevIsRandomModeRef.current = isRandomMode;
-
-        } else {
-            setStage('gyouInput'); // デフォルトは gyouInput
-            setRandomTarget(null);
-            prevGIdxRef.current = -1;
-            prevDIdxRef.current = -1;
-            isInitialMount.current = true;
-            prevIsRandomModeRef.current = isRandomMode;
         }
+
+        // 最後に前回の値を更新
+        prevIsActiveRef.current = isActive;
+        prevIsRandomModeRef.current = isRandomMode;
 
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, selectNextRandomTarget, setStage]);
 
