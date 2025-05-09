@@ -15,7 +15,6 @@ import {
     kigoMapping2,
     kigoMapping3,
 } from '../data/keymapData';
-import { type } from 'os'; // このインポートは不要そうなので後で削除検討
 
 // 長押し判定時間 (ミリ秒) - useKigoPractice1.ts からコピー
 const LONG_PRESS_DURATION = 600;
@@ -40,7 +39,7 @@ interface KigoChallengeState {
     totalCharsTyped: number; // 入力した総文字数（正誤問わず）
     totalKeyPresses: number;
     incorrectKeyPresses: number;
-    challengeResults: ChallengeResult | null; // ChallengeResults -> ChallengeResult に修正
+    challengeResults: ChallengeResult | null;
     isLongPressSuccess: boolean;
 }
 
@@ -95,13 +94,13 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
                     // このフックでは gyouKey は直接使わないので null でも良いかもしれない。
                     // ただし、将来的な拡張性を考慮し、inputDef の keyName を使うのが望ましい。
                     // ここでは仮に group.inputs[index].keyName を gyouKey として扱う（要確認）
-                    const keyName = group.inputs[index]?.keyName ?? null; // null チェックを追加
+                    const keyName = group.inputs[index]?.keyName ?? null;
                     allKigoChars.push({ char, gyouKey: keyName, layerIndex: 6, type: 'kigo1', isEqualSign: false });
                 });
             });
             // kigoPractice2Data からの記号には layerIndex: 2 を設定
             kigoPractice2Data.forEach(group => {
-                group.chars.forEach((char: string, index: number) => { // index を追加
+                group.chars.forEach((char: string, index: number) => {
                     // group.inputs[index].gyouKey を使う
                     const gyouKey = group.inputs[index]?.gyouKey ?? null; // null チェック
                     allKigoChars.push({ char, gyouKey: gyouKey, layerIndex: 7, type: 'kigo2', isEqualSign: false });
@@ -154,7 +153,7 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
         pressInfoRef.current = null;
         clearLongPressTimer();
         clearEqualSignHighlightTimer();
-    }, [allKigoChars, clearLongPressTimer, clearEqualSignHighlightTimer]); // clearEqualSignHighlightTimer を追加
+    }, [allKigoChars, clearLongPressTimer, clearEqualSignHighlightTimer]);
     // チャレンジ開始/リセット処理
     const startChallenge = useCallback(() => {
         setState({ // initialState を直接使う
@@ -192,7 +191,7 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
         if (state.status === 'running' && !state.targetChar) { // ターゲットがまだない場合のみ
             selectNextTarget();
         }
-    }, [state.status, selectNextTarget, state.targetChar]); // state.targetChar も依存配列に追加
+    }, [state.status, selectNextTarget, state.targetChar]);
 
     // チャレンジ終了処理
     const finishChallenge = useCallback(() => {
@@ -212,11 +211,11 @@ const useKigoChallengePractice = (props: PracticeHookProps): PracticeHookResult 
         // 新しいランクメッセージ判定 (入力がなければ空)
         const rankMessage = totalKeyPresses > 0 ? getRankMessageKigo(score) : '';
 
-        const results: ChallengeResult = { // ChallengeResults -> ChallengeResult に修正
+        const results: ChallengeResult = {
             totalQuestions,
             totalCharsTyped,
-            correctCount: correctAnswers, // correctAnswers -> correctCount
-            missCount: missCount, // missCount を追加
+            correctCount: correctAnswers,
+            missCount: missCount,
             accuracy,
             score,
             rankMessage,
@@ -270,7 +269,7 @@ const getRankMessageKigo = (score: number): string => {
         }
         prevIsActiveRef.current = isActive; // 最後に前回の値を更新
         clearEqualSignHighlightTimer();
-    }, [isActive, state.status, startChallenge, clearLongPressTimer]); // clearLongPressTimer を追加
+    }, [isActive, state.status, startChallenge, clearLongPressTimer]);
 
     // 入力処理
     const handleInput = useCallback((info: PracticeInputInfo): { isExpected: boolean; shouldGoToNext: boolean } => {
@@ -364,7 +363,6 @@ const getRankMessageKigo = (score: number): string => {
         let shouldGoToNext = false;
 
         // 1打鍵目の評価 (= が不要な場合、または = が必要な場合の1打鍵目)
-        // 修正: targetType ごとに分岐 + kigo1 の長押し判定
         if (currentStep === 0) {
             if (targetType === 'kigo1') { // レイヤー6 (1打鍵のみ)
                 expectedFirstKeyCode = getExpectedKeyCodeForKigo1();
@@ -472,7 +470,7 @@ const getRankMessageKigo = (score: number): string => {
             return { isExpected: false, shouldGoToNext: false };
         }
 
-    }, [layers, selectNextTarget, clearLongPressTimer, stateRef]); // stateRef を依存配列に追加
+    }, [layers, selectNextTarget, clearLongPressTimer, stateRef]);
 
     // リセット処理
     const reset = useCallback(() => {
@@ -481,7 +479,7 @@ const getRankMessageKigo = (score: number): string => {
         pressInfoRef.current = null;
         clearLongPressTimer();
         clearEqualSignHighlightTimer();
-    }, [clearLongPressTimer]); // initialState は外部スコープなので依存配列は空, clearLongPressTimer を追加
+    }, [clearLongPressTimer]);
 
     // ヘッダー表示用の文字配列
     const headingChars = useMemo(() => {
@@ -530,7 +528,6 @@ const getRankMessageKigo = (score: number): string => {
         let expectedKeyName: string | null = null;
         let expectedDisplayKeyName: string | null = null;
 
-        // 修正: targetType ごとに分岐
         if (targetType === 'kigo1') { // レイヤー6
             expectedKeyName = targetGyouKey;
             expectedDisplayKeyName = expectedKeyName; // kigo1 は表示名そのまま
@@ -558,8 +555,6 @@ const getRankMessageKigo = (score: number): string => {
             }
         }
 
-
-        // targetGyouKey が null の場合のチェックを追加 (特に kigo3 の '=' の場合など)
         // expectedKeyName が null になるのは、期待するキーがない場合（例：kigo1でステップ1など）
         if (expectedDisplayKeyName === null || expectedDisplayKeyName === undefined) { // undefined もチェック
             return noHighlight;
@@ -626,7 +621,7 @@ const getRankMessageKigo = (score: number): string => {
         // 期待されるキーコードと押されたキーコードが異なる、かつ、
         // 押されたキーがターゲットレイヤー上にある場合に true
         return pressCode !== expectedKeyCode && keyIndex === (pressCode - 1);
-    }, [layers, stateRef]); // stateRef を依存配列に追加
+    }, [layers, stateRef]);
 
     // getHighlight (ダミー実装)
     const getHighlight = useCallback((): HighlightInfo => {
@@ -639,23 +634,22 @@ const getRankMessageKigo = (score: number): string => {
         // App.tsx が targetLayerIndex を見て適切なレイヤーを表示する
 
         return layers;
-    }, [state.targetType, state.targetLayerIndex, layers]); // layers も依存配列に追加
+    }, [state.targetType, state.targetLayerIndex, layers]);
 
     return {
         handleInput,
         reset,
         headingChars,
-        getHighlightClassName, // highlightedKeys -> getHighlightClassName
+        getHighlightClassName,
         isInvalidInputTarget,
-        getHighlight, // getHighlight を追加
+        getHighlight,
         targetLayerIndex: state.targetLayerIndex,
         displayLayers,
         challengeResults: state.challengeResults,
         // 以下は KigoChallenge では直接使わないかもしれないが一応返す
         status: state.status,
         countdownValue: state.countdownValue,
-        targetChar: state.targetChar ?? undefined, // targetChar を追加
-        // gyouKey, charIndex, step は PracticeHookResult にないので削除
+        targetChar: state.targetChar ?? undefined,
     };
 };
 

@@ -176,7 +176,7 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
         const layer8 = layers[8] ?? [];
         const getLayer8KeyCode = (keyName: string | null): number => {
             if (!keyName) return -1;
-            const index = layer8.findIndex(key => key.trim() === keyName.trim()); // trim() を追加して空白を無視
+            const index = layer8.findIndex(key => key.trim() === keyName.trim());
             return index !== -1 ? index + 1 : -1;
         };
         const expectedKigoKeyStartCode = getLayer8KeyCode('＝\n記号');
@@ -311,9 +311,9 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
         console.log(`[Kigo3 handleInput] Returning: isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext_final}`);
         return { isExpected, shouldGoToNext: shouldGoToNext_final };
     }, [
-        isActive, stage, layers, isTargetEqualSign, expectedGyouKey, currentTargetChar, // currentTargetChar を依存配列に追加
+        isActive, stage, layers, isTargetEqualSign, expectedGyouKey, currentTargetChar,
         isRandomMode, selectNextRandomTarget, setStage, setShowHighlightAfterWait,
-        gIdx, dIdx // gIdx, dIdx を依存配列に追加
+        gIdx, dIdx
     ]);
 
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {

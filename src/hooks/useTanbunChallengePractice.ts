@@ -124,7 +124,6 @@ const useTanbunChallengePractice = ({
             setCurrentSentence(nextSentence);
             setCurrentIndex(0);
             setProgressInfo({ typedEndIndex: 0 });
-            // 選ばれた短文をリストから削除
             setRemainingSentences(prev => {
                 const newRemaining = prev.filter((_, i) => i !== randomIndex);
                 return newRemaining;
@@ -187,7 +186,7 @@ const useTanbunChallengePractice = ({
 
                     const results: ChallengeResult = {
                         totalQuestions: completedSentenceCountRef.current, // 完了した短文数
-                        correctCharsCount: correct, // 正解文字数を追加
+                        correctCharsCount: correct,
                         totalCharsTyped: totalTyped, // 総打鍵数
                         correctCount: correct, // correctCount も正解文字数とする
                         missCount: miss,
@@ -381,8 +380,6 @@ const useTanbunChallengePractice = ({
                     } else {
                         // や行以外は通常のインデックスを使用
                         typedChar = gyouChars[gyou]?.[danIndex] ?? null;
-                        // 句点の判定 (例: わ行 + お段 -> 。) は削除 (kigoPractice3 で処理)
-                        // 読点の判定 (例: な行 + お段 -> 、) は削除 (kigoPractice3 で処理)
                     }
                  }
             }
@@ -425,7 +422,6 @@ const useTanbunChallengePractice = ({
                     // 拗音・拗濁音・拗半濁音の基底文字かチェック (より正確に)
                     const isBaseForYouon = ['き', 'し', 'ち', 'に', 'ひ', 'み', 'り', 'ぎ', 'じ', 'ぢ', 'び', 'ぴ'].includes(firstChar);
                     // 促音「っ」は単独で処理されるので、ここでは考慮しない
-                    // 外来語の「うぃ」なども考慮が必要なら追加
                     if (isBaseForYouon && smallYouonChars.includes(secondChar)) {
                         expectedCharsToCompare = firstChar + secondChar; // 2文字を結合
                         charsToAdvance = 2;

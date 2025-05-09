@@ -29,7 +29,6 @@ const useKigoPractice2 = ({
     isRandomMode
 }: PracticeHookProps): PracticeHookResult => {
     const [stage, setStage] = useState<KigoPractice2Stage>('gyouInput');
-    // hid2Gyou, hid2Dan は不要になるので削除
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
@@ -200,7 +199,7 @@ const useKigoPractice2 = ({
         return { isExpected, shouldGoToNext: shouldGoToNext_final };
     }, [
         isActive, stage, layers, currentTargetChar,
-        isRandomMode, selectNextRandomTarget, setStage, gIdx, dIdx // gIdx, dIdx を依存配列に追加
+        isRandomMode, selectNextRandomTarget, setStage, gIdx, dIdx
     ]);
 
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
@@ -230,7 +229,7 @@ const useKigoPractice2 = ({
         return noHighlight;
     }, [
         isActive, stage, currentTargetChar,
-        isRandomMode, gIdx, dIdx // layers は不要になったので削除
+        isRandomMode, gIdx, dIdx
     ]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {

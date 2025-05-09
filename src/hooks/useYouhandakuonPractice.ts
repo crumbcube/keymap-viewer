@@ -24,7 +24,6 @@ import {
     getHidKeyCodes, // <<< getHidKeyCodes をインポート
 } from './usePracticeCommons';
 
-// ステージ定義を修正
 type YouhandakuonStage =
     | 'gyouInput'
     | 'youonInput' | 'dakuonInput1' | 'waitAfterFirstDakuon' | 'dakuonInput2' | 'danInput';

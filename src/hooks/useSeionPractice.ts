@@ -212,7 +212,6 @@ const useSeionPractice = ({
         prevIsActiveRef.current = isActive;
         prevIsRandomModeRef.current = isRandomMode;
 
-    // initialGIdx, initialDIdx も依存配列に追加し、内部状態 gIdx, dIdx も含める
     }, [initialGIdx, initialDIdx, isActive, isRandomMode, gIdx, dIdx, calculateTarget, randomTarget]);
 
     // useEffect内で呼び出すための、calculateTargetを含まないリセット関数
@@ -285,10 +284,8 @@ const useSeionPractice = ({
 
         // console.log(`[Seion handleInput] Result: isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext}, Final Stage=${stage}`);
         return { isExpected, shouldGoToNext };
-    // calculateTarget を依存配列に追加
     }, [isActive, targetChar, stage, expectedGyouKey, expectedDanKey, kb, side, isRandomMode, calculateTarget]);
 
-    // 依存配列に initialGIdx, initialDIdx, setStage を追加
     // }, [isActive, targetChar, stage, expectedGyouKey, expectedDanKey, kb, side, isRandomMode, calculateTarget, initialGIdx, initialDIdx, setStage]);
 
     // --- リセット処理 (App.tsx から呼ばれる想定) ---
@@ -301,7 +298,7 @@ const useSeionPractice = ({
             calculateTarget();
         }
         // isInitialMount は useEffect で管理
-    }, [isActive, isRandomMode, calculateTarget]); // calculateTarget を依存配列に追加
+    }, [isActive, isRandomMode, calculateTarget]);
 
     // --- headingChars ---
     const headingChars = useMemo(() => {
@@ -355,7 +352,6 @@ const useSeionPractice = ({
         }
 
         return noHighlight;
-    // expectedGyouKey, expectedDanKey を依存配列に追加
     }, [isActive, targetChar, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
 
     // --- 不正入力ターゲット判定 ---
@@ -375,7 +371,6 @@ const useSeionPractice = ({
         // 期待されるレイヤーで、かつキーインデックスが一致する場合のみ true
         const isTarget = layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
         return isTarget;
-    // stage と isActive を依存配列に追加
     }, [isActive, stage]);
 
 
@@ -397,7 +392,7 @@ const useSeionPractice = ({
     }), [
         headingChars,
         handleInput, getHighlightClassName, reset, isInvalidInputTarget,
-        targetChar, stage, expectedGyouKey, expectedDanKey // getHighlight 用の依存関係を追加
+        targetChar, stage, expectedGyouKey, expectedDanKey
     ]);
 };
 

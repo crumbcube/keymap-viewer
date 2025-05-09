@@ -212,7 +212,7 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
     }, [
         isActive, stage, expectedGyouKey, expectedDanKey, youonKeyCode,
         hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage,
-        gIdx, dIdx // props の gIdx, dIdx を依存配列に追加
+        gIdx, dIdx
     ]);
 
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {

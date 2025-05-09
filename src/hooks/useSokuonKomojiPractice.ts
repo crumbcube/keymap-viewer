@@ -157,7 +157,7 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
             middleKey: inputDefFromData.middleKey,
             danKey: inputDefFromData.dan,
         };
-    }, [currentSet, dIdx, isRandomMode, randomTarget, gIdx]); // gIdx を依存配列に追加 (エラーログ用)
+    }, [currentSet, dIdx, isRandomMode, randomTarget, gIdx]);
 
 
     const currentChar = useMemo(() => {

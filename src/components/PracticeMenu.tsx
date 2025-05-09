@@ -1,9 +1,7 @@
 // src/components/PracticeMenu.tsx
 import React from 'react';
 import { PracticeMode } from '../hooks/usePracticeCommons';
-// ▼▼▼ challengeMenuItems をインポート ▼▼▼
 import { basicPracticeMenuItems, stepUpPracticeMenuItems, challengeMenuItems } from '../data/keymapData';
-// ▲▲▲ インポート ▲▲▲
 
 interface PracticeMenuProps {
   practice: PracticeMode;
@@ -35,7 +33,6 @@ const PracticeMenu: React.FC<PracticeMenuProps> = ({ practice, handlePracticeSel
           </li>
         ))}
       </ul>
-      {/* ▼▼▼ チャレンジメニューセクションを追加 ▼▼▼ */}
       <h2 className='text-lg font-semibold mt-4 mb-2'>チャレンジメニュー</h2>
       <ul>
         {challengeMenuItems.map(item => (
@@ -47,7 +44,6 @@ const PracticeMenu: React.FC<PracticeMenuProps> = ({ practice, handlePracticeSel
           </li>
         ))}
       </ul>
-      {/* ▲▲▲ 追加完了 ▲▲▲ */}
     </div>
   );
 };

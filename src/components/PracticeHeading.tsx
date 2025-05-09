@@ -3,14 +3,14 @@ import React, { useMemo } from 'react';
 import { PracticeMode, PracticeStatus } from '../hooks/usePracticeCommons'; // PracticeMode, PracticeStatus をインポート
 
 interface PracticeHeadingProps {
-  practice: PracticeMode; // PracticeMode を使用
+  practice: PracticeMode;
   headingChars: string[];
   gIdx: number;
   dIdx: number;
   isRandomMode?: boolean;
-  isFinished?: boolean; // 追加: チャレンジ終了フラグ
-  typedEndIndex?: number; // 追加: 短文入力の進捗
-  status?: PracticeStatus; // 追加: 練習の状態
+  isFinished?: boolean;
+  typedEndIndex?: number;
+  status?: PracticeStatus;
   currentTargetCharForHighlight?: string | null; // 外来語練習用のハイライト対象文字
 }
 
@@ -249,7 +249,7 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
     }
     //console.log(`[PracticeHeading getHighlightClass] index: ${index}, currentIndex: ${currentIndex}, determinedHighlightClass: "${determinedHighlightClass}"`);
 
-    return determinedHighlightClass; // <-- 関数の最後に return を追加
+    return determinedHighlightClass;
   };
 
     const isTanbunChallenge = practice === '短文入力３分間トレーニング';

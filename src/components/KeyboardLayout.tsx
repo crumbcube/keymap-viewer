@@ -1,5 +1,5 @@
 // /home/coffee/my-keymap-viewer/src/components/KeyboardLayout.tsx
-import React, { useCallback } from 'react'; // useState, useRef, useEffect を削除
+import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { PracticeMode, PracticeHookResult, PracticeHighlightResult } from '../hooks/usePracticeCommons';
 import { kigoMapping2, kigoMapping3 } from '../data/keymapData';
@@ -36,10 +36,6 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
   className = '',
   // clearInvalidHighlight, // App.tsx側で管理するため不要
 }) => {
-    // ローカルな invalidKeyIndex と invalidTimerRef は削除
-
-    // useEffect も削除 (lastInvalidKeyCode の処理は App.tsx で一元管理)
-
     // キー描画ロジック (renderKey)
     const renderKey = useCallback((key: string, idx: number) => {
         let originalKey = (key ?? '').trim();
@@ -164,7 +160,7 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
         layoutIndex, showKeyLabels, activePractice, practice,
         currentFunctionKeyMap,
         training,
-        lastInvalidKeyCode, // lastInvalidKeyCode を依存配列に追加
+        lastInvalidKeyCode,
     ]);
 
     if (!layerData) {

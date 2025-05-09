@@ -10,8 +10,6 @@ import {
 } from './usePracticeCommons';
 import { gairaigoPracticeData, GairaigoPracticeTarget } from '../data/keymapData';
 
-// import { stat } from 'fs'; // fsモジュールはブラウザ環境では使えないためコメントアウトまたは削除
-
 const useGairaigoPractice = ({
     gIdx, dIdx, isActive, side, layers, kb, isRandomMode // isRandomMode を受け取る
 }: PracticeHookProps): PracticeHookResult => {
@@ -47,8 +45,7 @@ const useGairaigoPractice = ({
         prevDIdxRef.current = -1;
         isInitialMount.current = true;
         prevIsRandomModeRef.current = false;
-        // prevIsActiveRef.current は useEffect の最後で更新されるのでここでは不要
-    }, [setStage, setPressedKeys, setRandomTarget]); // setRandomTarget を追加
+    }, [setStage, setPressedKeys, setRandomTarget]);
 
     // Make it a standalone function accepting props
     const calculateCurrentTarget = useCallback((
@@ -346,7 +343,7 @@ const useGairaigoPractice = ({
         return currentTarget?.char ?? null;
     }, [currentTarget]);
 
-    return { // currentTargetChar を削除し、currentTarget を含める
+    return {
         handleInput,
         headingChars,
         getHighlightClassName,

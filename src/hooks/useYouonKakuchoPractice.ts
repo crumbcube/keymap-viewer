@@ -11,25 +11,17 @@ import {
     youonKakuchoChars,
 } from '../data/keymapData';
 
-// const practiceTargetIndices = [1, 3]; // この定数は現在の5文字練習には適合しないため削除
-
 const useYouonKakuchoPractice = ({
     gIdx, dIdx, isActive, side, layers, kb, isRandomMode
 }: PracticeHookProps): PracticeHookResult => {
     const [stage, setStage] = useState<PracticeStage>('line');
     const [pressedKeys, setPressedKeys] = useState<Map<number, number>>(new Map());
-    // randomTarget の d は 0 から 4 の数値になるように型を修正
     const [randomTarget, setRandomTarget] = useState<{ g: number; d: number } | null>(null);
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
     const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
     const prevIsRandomModeRef = useRef(isRandomMode);
-
-    // dIdx が 1 か 3 以外の場合、強制的に 1 にする (通常モード用)
-    // const currentFixedDIdx = useMemo(() => { // このロジックは不要
-    //     return practiceTargetIndices.includes(dIdx) ? dIdx as (1 | 3) : 1;
-    // }, [dIdx]);
 
     // Log prop values and derived currentGIdx/currentDIdx
     console.log(`[YouonKakuchoPractice] Hook execution. Props: gIdx=${gIdx}, dIdx=${dIdx}, isActive=${isActive}, isRandomMode=${isRandomMode}`);
@@ -82,7 +74,7 @@ const useYouonKakuchoPractice = ({
         setRandomTarget({ g: randomG, d: randomD }); // d は number 型
         setStage('line');
         setPressedKeys(new Map());
-    }, [setRandomTarget, setStage, setPressedKeys]); // 依存配列に setRandomTarget などを追加
+    }, [setRandomTarget, setStage, setPressedKeys]);
  
     // reset 関数
     const reset = useCallback(() => {
@@ -206,7 +198,6 @@ const useYouonKakuchoPractice = ({
         console.log(`[YouonKakuchoPractice handleInput] End. isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext}. Stage was: ${stage}, nextStage determined: ${nextStage ?? stage}. Set new stage to: ${nextStage ?? stage}`);
         return { isExpected, shouldGoToNext };
 
-    // currentDIdx も依存配列に追加
     }, [stage, currentGyouKey, targetDan, expectedGyouCodes, expectedYouonCodes, expectedDanCodes, kb, side, isRandomMode, generateRandomTarget, currentDIdx, setStage, currentChars.length]);
 
     // ヘッダー文字
@@ -220,7 +211,6 @@ const useYouonKakuchoPractice = ({
             // 通常モード時は行全体の文字を表示
             return currentChars;
         }
-    // 依存配列に isActive と targetChar を追加し、不要なものを削除
     }, [isActive, isRandomMode, targetChar, currentChars]);
 
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
@@ -264,7 +254,6 @@ const useYouonKakuchoPractice = ({
         // 期待されるレイヤーで、かつ押されたキーのインデックスが一致する場合のみ不正入力ターゲット
         const targetKeyIndex = pressCode - 1;
         return layoutIndex === expectedLayoutIndex && idx === targetKeyIndex;
-    // expectedDanCodes も依存配列に追加
     }, [isActive, stage, expectedGyouCodes, expectedYouonCodes, expectedDanCodes]);
 
 

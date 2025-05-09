@@ -1,5 +1,3 @@
-// 不要なファイル読み込みを削除
-
 // 必要なものだけ読み込む
 export const practiceMenuItems = ['清音の基本練習'];
 

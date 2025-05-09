@@ -1,6 +1,6 @@
 // /home/coffee/my-keymap-viewer/src/App.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { HIDDevice, HIDInputReportEvent } from './types/hid'; // パス修正済み
+import { HIDDevice, HIDInputReportEvent } from './types/hid';
 import {
     sampleJson,
     layerNames,
@@ -29,7 +29,6 @@ import {
     dakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
     handakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
     seionPracticeData, // practiceDataMap で使用
-    // youonPracticeData, dakuonPracticeData, handakuonPracticeData, youonKakuchoPracticeData は App.tsx 内で生成するため不要
     youdakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
     youhandakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
 } from './data/keymapData';
@@ -58,7 +57,7 @@ import {
     PracticeInputInfo,
     PracticeHookProps,
     PracticeHookResult,
-    KeyboardSide, // CharInfoGairaigo をインポートするために追加 (実際には不要かもしれないが念のため)
+    KeyboardSide,
     CharInfoGairaigo, // currentTarget の型チェック用
     KeyboardModel,
     PracticeStatus // PracticeHeading に渡すためインポート
@@ -137,7 +136,7 @@ export default function App() {
         let nextGIdx = currentGIdx;
         let nextDIdx = currentDIdx + 1;
 
-        if (isRandomModeActive) { // 引数名変更に合わせて修正
+        if (isRandomModeActive) {
             // ランダムモードの場合、インデックス計算はスキップ
             return { nextGIdx: currentGIdx, nextDIdx: currentDIdx };
         }
@@ -215,7 +214,7 @@ export default function App() {
         }
         console.log(`[App calculateNextIndices] Returning: nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}`);
         return { nextGIdx, nextDIdx };
-    }, [practice]); // practice を依存配列に追加 (isChallengeMode で参照するため)
+    }, [practice]);
 
     // 次の練習ステージに進む関数
     const nextStage = useCallback((currentPracticeMode: PracticeMode | '') => { // Allow '' for currentPracticeMode
@@ -238,7 +237,7 @@ export default function App() {
         setGIdx(nextGIdx);
         setDIdx(nextDIdx);
         console.log(`[App nextStage] State SET. AFTER: nextGIdx=${nextGIdx}, nextDIdx=${nextDIdx}`);
-    }, [isRandomMode, gIdx, dIdx, setGIdx, setDIdx, calculateNextIndices]); // calculateNextIndices を依存配列に追加
+    }, [isRandomMode, gIdx, dIdx, setGIdx, setDIdx, calculateNextIndices]);
 
     // --- カスタムフックの呼び出し ---
     const commonHookProps: PracticeHookProps = useMemo(() => ({
@@ -391,9 +390,8 @@ export default function App() {
                     const inputInfo: PracticeInputInfo = { type: 'release', timestamp, pressCode };
                     const result = activePracticeRef.current.handleInput(inputInfo);
 
-                    // 詳細なログを追加
-                    console.log(`[App onInput] Practice: ${practiceRef.current}, gIdx=${gIdxRef.current}, dIdx=${dIdxRef.current}`);
-                    console.log(`[App onInput] handleInput result: isExpected=${result.isExpected}, shouldGoToNext=${result.shouldGoToNext}`);
+                    //console.log(`[App onInput] Practice: ${practiceRef.current}, gIdx=${gIdxRef.current}, dIdx=${dIdxRef.current}`);
+                    //console.log(`[App onInput] handleInput result: isExpected=${result.isExpected}, shouldGoToNext=${result.shouldGoToNext}`);
 
                     if (result.isExpected) {
                         const isNonSelfAdvancingPractice = !isChallengeMode(practiceRef.current);
@@ -465,10 +463,30 @@ export default function App() {
 
     /* 初期化 */
     useEffect(() => {
+        const pathParts = window.location.pathname.split('/').filter(part => part); // e.g., /tw-20h/right -> ['tw-20h', 'right']
         const params = new URLSearchParams(window.location.search);
-        const kbRaw = params.get('kb') ?? 'tw-20v';
-        const sideRaw = params.get('side') ?? 'right';
 
+        let kbFromPath: string | undefined = undefined;
+        let sideFromPath: string | undefined = undefined;
+
+        if (pathParts.length > 0) {
+            // パスの最初の部分をキーボードモデルとして解釈
+            if (pathParts[0] === 'tw-20h' || pathParts[0] === 'tw-20v') {
+                kbFromPath = pathParts[0];
+            }
+        }
+        if (pathParts.length > 1) {
+            // パスの2番目の部分を左右として解釈
+            if (pathParts[1] === 'left' || pathParts[1] === 'right') {
+                sideFromPath = pathParts[1];
+            }
+        }
+
+        // 優先順位: URLパス -> URLクエリパラメータ -> デフォルト値
+        const kbRaw = kbFromPath ?? params.get('kb') ?? 'tw-20v';
+        const sideRaw = sideFromPath ?? params.get('side') ?? 'right';
+
+        // 型ガードを兼ねて設定
         const currentKb: KeyboardModel = kbRaw === 'tw-20h' ? 'tw-20h' : 'tw-20v';
         setKb(currentKb);
 
@@ -525,7 +543,7 @@ export default function App() {
                 // devRef.current = null; // コンポーネントアンマウント時に null にするのは良いが、再接続ロジックとの兼ね合い
             }
         };
-     }, [onInput]); // sampleJson, isRandomMode は初期化ロジックに直接影響しないため削除
+     }, [onInput]);
 
     // 練習モード選択時のリセット処理
     const handlePracticeSelect = (item: PracticeMode) => {
@@ -613,7 +631,7 @@ export default function App() {
         // (記号の基本練習３もベースレイヤーで良いはず)
         return baseLayers;
 
-    }, [practice, activePractice, kb, side, sampleJson]); // sampleJson を依存配列に追加
+    }, [practice, activePractice, kb, side, sampleJson]);
 
     // ヘッダーに表示する文字配列
     const headingChars = useMemo(() => {

@@ -230,7 +230,7 @@ const useYoudakuonPractice = ({
         return { isExpected, shouldGoToNext: shouldGoToNext_final };
     }, [
         isActive, stage, currentInputDef, hid2Gyou, hid2Dan, currentFunctionKeyMap,
-        isRandomMode, setStage, selectNextRandomTarget, gIdx, dIdx // gIdx, dIdx を依存配列に追加
+        isRandomMode, setStage, selectNextRandomTarget, gIdx, dIdx
     ]);
 
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {

@@ -17,13 +17,13 @@ import {
     hid2Gyou,
     hid2Dan,
     functionKeyMaps, // 機能キーのマッピング
-    getHidKeyCodes, // ← これを追加
+    getHidKeyCodes,
     ChallengeResult, // 結果の型をインポート
 } from './usePracticeCommons';
 
 type ChallengeStatus = 'idle' | 'countdown' | 'running' | 'finished';
 type KanaTarget = CharInfoSeion | CharInfoYouon | CharInfoDakuon | CharInfoSokuonKomoji; // | CharInfoHandakuon;
-type ChallengeStage = 'gyouInput' | 'danInput' | 'youonInput' | 'dakuonInput' | 'tsuInput'; // 促音用ステージ追加
+type ChallengeStage = 'gyouInput' | 'danInput' | 'youonInput' | 'dakuonInput' | 'tsuInput';
 
 const COUNTDOWN_SECONDS = 5;
 const TRAINING_DURATION_MS = 60 * 1000; // 1分
@@ -69,7 +69,6 @@ const useKanaChallengePractice = ({
     }, [kb, side]);
 
     const allKanaTargets = useMemo(() => {
-        // 促音「っ」のみをフィルタリングして追加
         const tsuTargets = allSokuonKomojiCharInfos.filter(info => info.isTsu);
         // TODO: 将来的には半濁音も結合
         return [...allSeionCharInfos, ...allYouonCharInfos, ...allDakuonCharInfos, ...tsuTargets];
@@ -143,7 +142,7 @@ const useKanaChallengePractice = ({
                         missCount: miss, // ミスタイプ数
                         accuracy: accuracy, // (総入力キー数 - ミスタイプ数) / 総入力キー数
                         score: score,
-                        rankMessage: rankMessage, // rankMessage を追加
+                        rankMessage: rankMessage,
                     };
                     setChallengeResults(results); // 計算結果を state にセット
                     setHeadingChars([]); // ヘッダーはクリア（結果は App.tsx で表示するため）
@@ -157,7 +156,6 @@ const useKanaChallengePractice = ({
                 clearInterval(trainingTimerRef.current);
             }
         };
-    // isFinished を依存配列に追加
     }, [isActive, status, isFinished]);
 
     // ヘッダー表示
@@ -369,7 +367,6 @@ const useKanaChallengePractice = ({
 
         //console.log(`[KanaChallenge] End - isExpected: ${isExpected}, Final Stage: ${nextStage ?? challengeStage}`);
         return { isExpected, shouldGoToNext: false };
-    // isFinished を依存配列に追加
     }, [status, currentTarget, challengeStage, kb, side, selectNextTarget, currentFunctionKeyMap, isFinished, setChallengeStage]);
 
     // ハイライト処理
@@ -436,7 +433,6 @@ const useKanaChallengePractice = ({
         }
 
         return noHighlight;
-    // isFinished を依存配列に追加
     }, [status, currentTarget, challengeStage, currentFunctionKeyMap, isFinished]);
 
     // 不正入力ターゲット判定
@@ -506,7 +502,6 @@ const useKanaChallengePractice = ({
         }
 
         return false;
-    // isFinished, layers を依存配列に追加
     }, [status, currentTarget, challengeStage, currentFunctionKeyMap, isFinished, layers, kb, side]);
 
     const practiceResult = useMemo(() => {

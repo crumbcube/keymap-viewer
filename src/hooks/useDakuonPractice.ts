@@ -214,7 +214,7 @@ export default function useDakuonPractice({
     }, [
         isActive, stage, expectedGyouKey, expectedDanKey,
         hid2Gyou, hid2Dan, dakuonKeyCode, isRandomMode, selectNextRandomTarget, setStage,
-        gIdx, dIdx // props の gIdx, dIdx を依存配列に追加
+        gIdx, dIdx
     ]);
 
   const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
