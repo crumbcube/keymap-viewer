@@ -136,65 +136,73 @@ const useKigoPractice2 = ({
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
 
         if (!isActive) {
-            return { isExpected: false, shouldGoToNext: false };
+            return { isExpected: false, shouldGoToNext: undefined };
         }
         if (!currentTargetChar) {
-            return { isExpected: false, shouldGoToNext: false };
+            return { isExpected: false, shouldGoToNext: undefined };
         }
         if (inputInfo.type !== 'release') {
-            return { isExpected: false, shouldGoToNext: false };
+            return { isExpected: false, shouldGoToNext: undefined };
         }
 
         const pressCode = inputInfo.pressCode;
         let isExpected = false;
-        let shouldGoToNext = false;
+        let shouldGoToNext_final: boolean | undefined = undefined;
+        let nextStage: KigoPractice2Stage = stage;
 
         const layer7 = layers[7] ?? [];
 
         switch (stage) {
             case 'gyouInput':
-                // layers[7] から currentTargetChar (例: '＋') のインデックスを探す
                 const targetIndex = layer7.findIndex(key => key === currentTargetChar);
                 const expectedPressCode = targetIndex !== -1 ? targetIndex + 1 : -1;
 
                 if (expectedPressCode !== -1 && pressCode === expectedPressCode) {
                     isExpected = true;
-                    setStage('kigoInput');
+                    nextStage = 'kigoInput';
+                    shouldGoToNext_final = undefined; // 記号入力はまだ完了していない
                 } else {
-                    //console.log(`[Kigo2 handleInput gyouInput] Incorrect. Expected code for '${currentTargetChar}': ${expectedPressCode}, Got: ${pressCode}`);
                     isExpected = false;
+                    shouldGoToNext_final = undefined; // 不正解、記号入力は完了していない
                 }
                 break;
 
             case 'kigoInput':
-                // layers[7] 上の '記号' キーのコードを検索
                 const kigoIndex = layer7.findIndex(key => key === '記号');
                 const expectedKigoCode = kigoIndex !== -1 ? kigoIndex + 1 : -1;
+                nextStage = 'gyouInput'; // 次の入力のためにステージを戻す (正誤に関わらず)
 
                 if (expectedKigoCode !== -1 && pressCode === expectedKigoCode) {
                     isExpected = true;
-                    setStage('gyouInput'); // 次の入力のためにステージを戻す
                     if (isRandomMode) {
                         selectNextRandomTarget();
-                        shouldGoToNext = false;
+                        shouldGoToNext_final = false; // App.tsx は gIdx/dIdx を進めない
                     } else {
-                        shouldGoToNext = true;
+                        // 通常モード: 現在の文字がそのグループの最後かどうかを判定
+                        const currentGroupData = kigoPractice2Data[gIdx]; // props の gIdx を使用
+                        const isLastInGroup = currentGroupData ? dIdx === currentGroupData.chars.length - 1 : false;
+                        shouldGoToNext_final = isLastInGroup; // グループの最後の文字なら App.tsx は gIdx を進める
                     }
                 } else {
-                    //console.log(`[Kigo2 handleInput kigoInput] Incorrect. Expected code for '記号': ${expectedKigoCode}, Got: ${pressCode}`);
                     isExpected = false;
-                    setStage('gyouInput');
+                    // shouldGoToNext_final は undefined のまま (不正解、記号入力は完了していない)
                 }
                 break;
         }
+        
+        if (nextStage !== stage) {
+            setStage(nextStage);
+        } else if (!isExpected && stage !== 'gyouInput') {
+            // 不正解で、かつ現在のステージが最初の入力ステージでない場合、最初の入力ステージに戻す
+            setStage('gyouInput');
+        }
 
-        return { isExpected, shouldGoToNext };
+        return { isExpected, shouldGoToNext: shouldGoToNext_final };
     }, [
         isActive, stage, layers, currentTargetChar,
-        isRandomMode, selectNextRandomTarget, setStage
+        isRandomMode, selectNextRandomTarget, setStage, gIdx, dIdx // gIdx, dIdx を依存配列に追加
     ]);
 
-    // ▼▼▼ getHighlightClassName を修正 ▼▼▼
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
         if (!isActive) {
@@ -204,40 +212,31 @@ const useKigoPractice2 = ({
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
         const currentStageForHighlight = indicesJustChanged ? 'gyouInput' : stage;
 
-        let expectedKeyDisplayName: string | null = null; // ハイライトすべきキーの「表示名」
+        let expectedKeyDisplayName: string | null = null; 
         const targetLayoutIndex = 7;
-
-        //if (layoutIndex === targetLayoutIndex) {
-        //    console.log(`[getHighlight Kigo2] Called for key: "${keyName}" (Layout ${layoutIndex}). Stage: ${currentStageForHighlight}, TargetChar: ${currentTargetChar}`);
-        //}
 
         switch (currentStageForHighlight) {
             case 'gyouInput':
-                expectedKeyDisplayName = currentTargetChar; // 例: '＋'
+                expectedKeyDisplayName = currentTargetChar; 
                 break;
             case 'kigoInput':
                 expectedKeyDisplayName = '記号';
                 break;
         }
 
-        //if (layoutIndex === targetLayoutIndex) {
-        //    console.log(`[getHighlight Kigo2] Expected Display Name: "${expectedKeyDisplayName}"`);
-        //}
-
-        // レンダリング中のキーの表示名 (keyName) と、期待される表示名 (expectedKeyDisplayName) を比較
         if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName.trim() === expectedKeyDisplayName.trim()) {
             return { className: 'bg-blue-100', overrideKey: null };
         }
         return noHighlight;
     }, [
         isActive, stage, currentTargetChar,
-        isRandomMode, gIdx, dIdx, layers // hid2Gyou は不要
+        isRandomMode, gIdx, dIdx // layers は不要になったので削除
     ]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
         const targetKeyIndex = pressCode - 1;
-        // 記号2はスタートレイヤー(layoutIndex=2)のみ対象
+        // 記号2はレイヤー7のみ対象
         const isTarget = layoutIndex === 7 && keyIndex === targetKeyIndex;
         return isTarget;
     }, [isActive]);

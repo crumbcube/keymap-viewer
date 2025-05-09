@@ -1,4 +1,4 @@
-// src/hooks/useSokuonKomojiPractice.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useSokuonKomojiPractice.ts
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
     PracticeHookProps,
@@ -23,9 +23,10 @@ type SokuonKomojiStage = 'tsuInput' | 'gyouInput' | 'middleInput' | 'danInput';
 
 export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb, isRandomMode }: PracticeHookProps): PracticeHookResult {
     const [stage, setStage] = useState<SokuonKomojiStage>(() => {
-        const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
-        return initialChar === 'っ' ? 'tsuInput' : 'gyouInput';
+        const initialCharInfo = isRandomMode ? null : sokuonKomojiData[gIdx]?.chars[dIdx];
+        return initialCharInfo === 'っ' ? 'tsuInput' : 'gyouInput';
     });
+
     const { hid2Gyou, hid2Dan } = useMemo(() => {
         if (kb === 'tw-20v') {
             return side === 'left'
@@ -59,7 +60,7 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
-    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
+    const prevIsActiveRef = useRef(isActive);
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     const selectNextRandomTarget = useCallback(() => {
@@ -74,26 +75,23 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
     }, [setRandomTarget, setStage]);
 
     const reset = useCallback(() => {
-        const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
+        const initialChar = isRandomMode ? null : sokuonKomojiData[gIdx]?.chars[dIdx];
         setStage(initialChar === 'っ' ? 'tsuInput' : 'gyouInput');
         setRandomTarget(null);
         prevGIdxRef.current = -1;
         prevDIdxRef.current = -1;
         isInitialMount.current = true;
         prevIsRandomModeRef.current = false;
-    }, [setStage, setRandomTarget, gIdx, dIdx]); // gIdx, dIdx を追加
+    }, [setStage, setRandomTarget, gIdx, dIdx, isRandomMode]);
 
     useEffect(() => {
-        // isActive が false になった最初のタイミングでリセット
         if (!isActive && prevIsActiveRef.current) {
-            // console.log(`[SokuonKomoji useEffect] Resetting state because isActive became false.`);
-            reset(); // reset 関数内で必要なリセット処理を行う
+            reset();
         }
 
         if (isActive) {
-            // isActive が true になった最初のタイミング、または依存関係の変更時
             if (isActive && !prevIsActiveRef.current) {
-                isInitialMount.current = true; // 強制的に初期マウント扱い
+                isInitialMount.current = true;
             }
 
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
@@ -101,55 +99,79 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                // console.log(`[SokuonKomoji useEffect] Normal mode. isInitialMount=${isInitialMount.current}, indicesChanged=${indicesChanged}`);
-                const initialChar = sokuonKomojiData[gIdx]?.chars[dIdx];
-                setStage(initialChar === 'っ' ? 'tsuInput' : 'gyouInput');
+                const currentPracticeChar = sokuonKomojiData[gIdx]?.chars[dIdx];
+                setStage(currentPracticeChar === 'っ' ? 'tsuInput' : 'gyouInput');
                 setRandomTarget(null);
                 prevGIdxRef.current = gIdx;
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
             } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
-                 // console.log(`[SokuonKomoji useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
             }
         }
-
-        // 最後に前回の値を更新
         prevIsActiveRef.current = isActive;
         prevIsRandomModeRef.current = isRandomMode;
+    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget, setStage]);
 
-    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, selectNextRandomTarget, setStage]);
 
     const currentSet = useMemo(() => {
-        if (isRandomMode || !isActive || gIdx < 0 || gIdx >= sokuonKomojiData.length) return null;
-        return sokuonKomojiData[gIdx];
+        if (!isRandomMode && isActive && gIdx >= 0 && gIdx < sokuonKomojiData.length) {
+            return sokuonKomojiData[gIdx];
+        }
+        return null;
     }, [gIdx, isActive, isRandomMode]);
 
-    const currentInputDef = useMemo(() => {
-        if (isRandomMode || !currentSet || dIdx < 0 || dIdx >= currentSet.inputs.length) return null;
-        return currentSet.inputs[dIdx];
-    }, [currentSet, dIdx, isRandomMode]);
+    const currentInputDef = useMemo((): CharInfoSokuonKomoji | null => {
+        if (isRandomMode) return randomTarget;
+        if (!currentSet || dIdx < 0 || dIdx >= currentSet.chars.length) return null;
+
+        const char = currentSet.chars[dIdx];
+        if (!char) return null;
+
+        if (char === 'っ') {
+            return {
+                type: 'sokuonKomoji',
+                char: 'っ',
+                isTsu: true,
+                // gyouKey, middleKey, danKey は undefined (オプショナルなので問題なし)
+            };
+        }
+
+        // 「っ」以外の文字の場合
+        if (dIdx >= currentSet.inputs.length) return null; // inputs 配列の範囲外チェック
+        const inputDefFromData = currentSet.inputs[dIdx];
+        // 「っ」以外の文字では inputDefFromData が null であってはならない
+        if (!inputDefFromData) {
+            console.error(`[SokuonKomojiPractice] Missing input definition for non-'っ' char: ${char} at gIdx=${gIdx}, dIdx=${dIdx}`);
+            return null;
+        }
+
+        return {
+            type: 'sokuonKomoji',
+            char: char,
+            isTsu: false, // char === 'っ' は上で処理済みなので、ここは false
+            gyouKey: inputDefFromData.gyouKey,
+            middleKey: inputDefFromData.middleKey,
+            danKey: inputDefFromData.dan,
+        };
+    }, [currentSet, dIdx, isRandomMode, randomTarget, gIdx]); // gIdx を依存配列に追加 (エラーログ用)
+
 
     const currentChar = useMemo(() => {
-        if (isRandomMode) return randomTarget?.char ?? null;
-        if (!currentSet || dIdx < 0 || dIdx >= currentSet.chars.length) return null;
-        return currentSet.chars[dIdx];
-    }, [isRandomMode, randomTarget, currentSet, dIdx]);
+        return currentInputDef?.char ?? null;
+    }, [currentInputDef]);
 
-    const isCurrentCharTsu = useMemo(() => {
-        if (isRandomMode) return randomTarget?.isTsu ?? false;
-        return currentChar === 'っ';
-    }, [isRandomMode, randomTarget, currentChar]);
+    const isCurrentCharTsu = useMemo(() => { // この useMemo は currentInputDef があれば不要になるかも
+        return currentInputDef?.isTsu ?? false;
+    }, [currentInputDef]);
 
     const isMiddleKeyRequired = useMemo(() => {
-        if (isRandomMode) return !!randomTarget?.middleKey;
         return !!currentInputDef?.middleKey;
-    }, [isRandomMode, randomTarget, currentInputDef]);
+    }, [currentInputDef]);
 
-    // ヘッダー文字 (変更なし)
     const headingChars = useMemo(() => {
         if (!isActive) return [];
         if (isRandomMode) {
@@ -160,106 +182,124 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
     }, [isActive, isRandomMode, randomTarget, currentSet]);
 
     const expectedGyouKey = useMemo(() => {
-        if (isRandomMode) return randomTarget?.gyouKey ?? null;
         return currentInputDef?.gyouKey ?? null;
-    }, [isRandomMode, randomTarget, currentInputDef]);
+    }, [currentInputDef]);
 
     const expectedDanKey = useMemo(() => {
-        if (isRandomMode) return randomTarget?.danKey ?? null;
-        return currentInputDef?.dan ?? null;
-    }, [isRandomMode, randomTarget, currentInputDef]);
+        return currentInputDef?.danKey ?? null;
+    }, [currentInputDef]);
 
     const handleInput = useCallback((input: PracticeInputInfo): PracticeInputResult => {
-
         if (!isActive) {
-            return { isExpected: false, shouldGoToNext: false };
+            return { isExpected: false, shouldGoToNext: undefined };
         }
-        if (tsuKeyCode === null || (isMiddleKeyRequired && dakuonKeyCode === null)) {
-            console.error("Sokuon/Komoji Input Error: Required key codes are null");
-            return { isExpected: false, shouldGoToNext: false };
+        // currentInputDef の存在をチェック
+        if (!currentInputDef) { // isCurrentCharTsu のチェックは不要、currentInputDef.isTsu を直接参照
+            console.error("Sokuon/Komoji Input Error: currentInputDef is null.");
+            return { isExpected: false, shouldGoToNext: undefined };
+        }
+        // tsuKeyCode のチェックは isTsu の場合のみ、dakuonKeyCode のチェックは isMiddleKeyRequired の場合のみ
+        if (currentInputDef.isTsu && tsuKeyCode === null) {
+            console.error("Sokuon/Komoji Input Error: tsuKeyCode is null for 'っ'.");
+            return { isExpected: false, shouldGoToNext: undefined };
+        }
+        if (isMiddleKeyRequired && dakuonKeyCode === null) { // isMiddleKeyRequired は currentInputDef から導出
+            console.error("Sokuon/Komoji Input Error: dakuonKeyCode is null when middleKey is required.");
+            return { isExpected: false, shouldGoToNext: undefined };
+        }
+
+        if (input.type !== 'release') {
+            return { isExpected: false, shouldGoToNext: undefined };
         }
 
         let isExpected = false;
-        let shouldGoToNext = false;
+        let shouldGoToNext_final: boolean | undefined = undefined;
+        let nextHookStage: SokuonKomojiStage = stage;
 
-        if (input.type === 'release') {
-            if (stage === 'tsuInput') { // 促音「っ」の入力
-                if (input.pressCode === tsuKeyCode) {
-                    isExpected = true;
-                    if (isRandomMode) {
-                        selectNextRandomTarget();
-                        shouldGoToNext = false;
-                    } else {
-                        shouldGoToNext = true;
-                    }
+        if (stage === 'tsuInput') { // currentInputDef.isTsu が true のはず
+            if (input.pressCode === tsuKeyCode) {
+                isExpected = true;
+                nextHookStage = 'tsuInput'; 
+
+                if (isRandomMode) {
+                    selectNextRandomTarget(); 
+                    shouldGoToNext_final = false; 
                 } else {
-                    isExpected = false;
+                    const currentGroupData = sokuonKomojiData[gIdx];
+                    const isLastInGroup = currentGroupData ? dIdx === currentGroupData.chars.length - 1 : false;
+                    shouldGoToNext_final = isLastInGroup; 
                 }
-            } else if (stage === 'gyouInput') { // 小文字の1打目（行キー）
-                if (!expectedGyouKey) return { isExpected: false, shouldGoToNext: false };
-                const expectedGyouKeyCodes = Object.entries(hid2Gyou)
-                    .filter(([_, name]) => name === expectedGyouKey)
-                    .map(([codeStr, _]) => parseInt(codeStr));
-                if (expectedGyouKeyCodes.includes(input.pressCode)) {
-                    setStage(isMiddleKeyRequired ? 'middleInput' : 'danInput');
-                    isExpected = true;
+            } else {
+                isExpected = false;
+                nextHookStage = 'tsuInput'; 
+            }
+        } else if (stage === 'gyouInput') { // currentInputDef.isTsu が false のはず
+            if (!expectedGyouKey) return { isExpected: false, shouldGoToNext: undefined };
+            const expectedGyouKeyCodes = Object.entries(hid2Gyou)
+                .filter(([_, name]) => name === expectedGyouKey)
+                .map(([codeStr, _]) => parseInt(codeStr));
+            if (expectedGyouKeyCodes.includes(input.pressCode)) {
+                isExpected = true;
+                nextHookStage = isMiddleKeyRequired ? 'middleInput' : 'danInput';
+                shouldGoToNext_final = undefined;
+            } else {
+                isExpected = false;
+            }
+        } else if (stage === 'middleInput') {
+            if (input.pressCode === dakuonKeyCode) {
+                isExpected = true;
+                nextHookStage = 'danInput';
+                shouldGoToNext_final = undefined;
+            } else {
+                isExpected = false;
+                nextHookStage = 'gyouInput';
+            }
+        } else if (stage === 'danInput') {
+            if (!expectedDanKey) return { isExpected: false, shouldGoToNext: undefined };
+            const expectedDanKeyCodes = Object.entries(hid2Dan)
+                .filter(([_, name]) => name === expectedDanKey)
+                .map(([codeStr, _]) => parseInt(codeStr));
+            if (expectedDanKeyCodes.includes(input.pressCode)) {
+                isExpected = true;
+                if (isRandomMode) {
+                    selectNextRandomTarget(); 
+                    shouldGoToNext_final = false;
                 } else {
-                    isExpected = false;
+                    const currentGroupData = sokuonKomojiData[gIdx];
+                    const isLastInGroup = currentGroupData ? dIdx === currentGroupData.chars.length - 1 : false;
+                    shouldGoToNext_final = isLastInGroup;
+                    // 次の文字が「っ」かどうかにかかわらず、小文字入力完了後は gyouInput に戻るべき
+                    // (useEffect が次のターゲットに応じて tsuInput に設定する)
+                    nextHookStage = 'gyouInput';
                 }
-            } else if (stage === 'middleInput') { // 小文字の2打目（濁音キー）
-                if (input.pressCode === dakuonKeyCode) {
-                    setStage('danInput');
-                    isExpected = true;
-                } else {
-                    isExpected = false;
-                    setStage('gyouInput'); // 1打目からやり直し
-                }
-            } else if (stage === 'danInput') { // 小文字の最終打（段キー）
-                if (!expectedDanKey) return { isExpected: false, shouldGoToNext: false };
-                const expectedDanKeyCodes = Object.entries(hid2Dan)
-                    .filter(([_, name]) => name === expectedDanKey)
-                    .map(([codeStr, _]) => parseInt(codeStr));
-                if (expectedDanKeyCodes.includes(input.pressCode)) {
-                    isExpected = true;
-                    if (isRandomMode) {
-                        selectNextRandomTarget();
-                        shouldGoToNext = false;
-                    } else {
-                        shouldGoToNext = true;
-                    }
-                } else {
-                    isExpected = false;
-                    setStage('gyouInput'); // 1打目からやり直し
-                }
+            } else {
+                isExpected = false;
+                nextHookStage = 'gyouInput';
             }
         }
 
-        if (!isExpected && input.type === 'release' && stage !== 'tsuInput') {
-            // 促音入力以外で間違えたら、必ず gyouInput に戻す
+        if (nextHookStage !== stage) {
+            setStage(nextHookStage); 
+        } else if (!isExpected && stage !== 'tsuInput' && stage !== 'gyouInput') {
             setStage('gyouInput');
         }
 
-        return { isExpected, shouldGoToNext };
+        return { isExpected, shouldGoToNext: shouldGoToNext_final };
     }, [
-        isActive, stage, expectedGyouKey, expectedDanKey, isCurrentCharTsu, tsuKeyCode, dakuonKeyCode, // dakuonKeyCode 追加
-        hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage, isMiddleKeyRequired // isMiddleKeyRequired 追加
+        isActive, stage, expectedGyouKey, expectedDanKey, currentInputDef, 
+        tsuKeyCode, dakuonKeyCode, hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget,
+        setStage, isMiddleKeyRequired, gIdx, dIdx
     ]);
 
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        if (!isActive) {
+        if (!isActive || !currentInputDef) { 
             return noHighlight;
         }
 
-        const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
-
-        let currentStageForHighlight: SokuonKomojiStage;
-        if (indicesJustChanged) {
-            const nextChar = sokuonKomojiData[gIdx]?.chars[dIdx];
-            currentStageForHighlight = nextChar === 'っ' ? 'tsuInput' : 'gyouInput';
-        } else {
-            currentStageForHighlight = stage;
-        }
+        // `indicesJustChanged` のロジックは useEffect でステージが正しく設定されるため、
+        // `getHighlightClassName` 内では現在の `stage` を直接参照する方がシンプルで信頼性が高い。
+        const currentStageForHighlight: SokuonKomojiStage = stage;
 
         let expectedKeyName: string | null = null;
         let targetLayoutIndex: number | null = null;
@@ -268,13 +308,13 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
             expectedKeyName = '促音';
             targetLayoutIndex = 2;
         } else if (currentStageForHighlight === 'gyouInput') {
-            expectedKeyName = expectedGyouKey;
+            expectedKeyName = expectedGyouKey; // currentInputDef.gyouKey を使う
             targetLayoutIndex = 2;
         } else if (currentStageForHighlight === 'middleInput') {
-            expectedKeyName = '濁音';
+            expectedKeyName = '濁音'; // currentInputDef.middleKey は '濁音' 固定なので直接指定
             targetLayoutIndex = 2;
         } else if (currentStageForHighlight === 'danInput') {
-            expectedKeyName = expectedDanKey;
+            expectedKeyName = expectedDanKey; // currentInputDef.danKey を使う
             targetLayoutIndex = 3;
         }
 
@@ -282,7 +322,7 @@ export default function useSokuonKomojiPractice({ gIdx, dIdx, isActive, side, kb
             return { className: 'bg-blue-100', overrideKey: null };
         }
         return noHighlight;
-    }, [isActive, stage, expectedGyouKey, expectedDanKey, isRandomMode, gIdx, dIdx]);
+    }, [isActive, stage, expectedGyouKey, expectedDanKey, currentInputDef]); // gIdx, dIdx, isRandomMode は不要に
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;

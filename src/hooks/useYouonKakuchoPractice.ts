@@ -1,4 +1,4 @@
-// src/hooks/useYouonKakuchoPractice.ts
+// /home/coffee/my-keymap-viewer/src/hooks/useYouonKakuchoPractice.ts
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     PracticeHookProps, PracticeHookResult, PracticeInputInfo, PracticeInputResult,
@@ -11,16 +11,15 @@ import {
     youonKakuchoChars,
 } from '../data/keymapData';
 
-// 練習対象のインデックス (1: ぃ, 3: ぇ)
-const practiceTargetIndices = [1, 3];
+// const practiceTargetIndices = [1, 3]; // この定数は現在の5文字練習には適合しないため削除
 
 const useYouonKakuchoPractice = ({
     gIdx, dIdx, isActive, side, layers, kb, isRandomMode
 }: PracticeHookProps): PracticeHookResult => {
     const [stage, setStage] = useState<PracticeStage>('line');
     const [pressedKeys, setPressedKeys] = useState<Map<number, number>>(new Map());
-    // randomTarget の d は 1 または 3 のみになるように
-    const [randomTarget, setRandomTarget] = useState<{ g: number; d: 1 | 3 } | null>(null);
+    // randomTarget の d は 0 から 4 の数値になるように型を修正
+    const [randomTarget, setRandomTarget] = useState<{ g: number; d: number } | null>(null);
     const prevGIdxRef = useRef(gIdx);
     const prevDIdxRef = useRef(dIdx);
     const isInitialMount = useRef(true);
@@ -28,22 +27,42 @@ const useYouonKakuchoPractice = ({
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     // dIdx が 1 か 3 以外の場合、強制的に 1 にする (通常モード用)
-    const currentFixedDIdx = useMemo(() => {
-        return practiceTargetIndices.includes(dIdx) ? dIdx as (1 | 3) : 1;
-    }, [dIdx]);
+    // const currentFixedDIdx = useMemo(() => { // このロジックは不要
+    //     return practiceTargetIndices.includes(dIdx) ? dIdx as (1 | 3) : 1;
+    // }, [dIdx]);
 
+    // Log prop values and derived currentGIdx/currentDIdx
+    console.log(`[YouonKakuchoPractice] Hook execution. Props: gIdx=${gIdx}, dIdx=${dIdx}, isActive=${isActive}, isRandomMode=${isRandomMode}`);
     const currentGIdx = isRandomMode ? (randomTarget?.g ?? 0) : gIdx;
     // ランダムモード時は randomTarget.d、通常モード時は補正後の dIdx を使用
-    const currentDIdx = isRandomMode ? (randomTarget?.d ?? 1) : currentFixedDIdx;
+    const currentDIdx = isRandomMode ? (randomTarget?.d ?? 0) : dIdx; // 通常モードは props.dIdx を直接使用
+    console.log(`[YouonKakuchoPractice] Derived: currentGIdx=${currentGIdx}, currentDIdx=${currentDIdx}`);
 
-    const currentGyouKey = useMemo(() => youonGyouList[currentGIdx], [currentGIdx]);
+    const currentGyouKey = useMemo(() => {
+        const keyVal = youonGyouList[currentGIdx];
+        // console.log(`[YouonKakuchoPractice] Memo currentGyouKey: ${keyVal} (currentGIdx: ${currentGIdx})`);
+        return keyVal;
+    }, [currentGIdx]);
+
     // ヘッダ表示用の文字配列 (変更なし、常に5文字)
-    const currentChars = useMemo(() => youonKakuchoChars[currentGyouKey] ?? [], [currentGyouKey]);
+    const currentChars = useMemo(() => {
+        const charsArray = youonKakuchoChars[currentGyouKey] ?? [];
+        // console.log(`[YouonKakuchoPractice] Memo currentChars: [${charsArray.join(',')}] (currentGyouKey: ${currentGyouKey})`);
+        return charsArray;
+    }, [currentGyouKey]);
+
     // ターゲットの文字 (ぃ or ぇ)
-    const targetChar = useMemo(() => currentChars[currentDIdx] ?? '', [currentChars, currentDIdx]);
-    // ターゲットの段キー (い段 or え段)
+    const targetChar = useMemo(() => {
+        const charVal = currentChars[currentDIdx] ?? '';
+        // console.log(`[YouonKakuchoPractice] Memo targetChar: "${charVal}" (currentDIdx: ${currentDIdx}, currentChars: [${currentChars.join(',')}])`);
+        return charVal;
+    }, [currentChars, currentDIdx]);
+
     const targetDan = useMemo(() => {
-        return currentDIdx === 1 ? 'い段' : 'え段';
+        const danMap = ['あ段', 'い段', 'う段', 'え段', 'お段']; // 拗音拡張の段マッピング
+        const danVal = danMap[currentDIdx] ?? 'あ段'; // currentDIdx (0-4) に対応する段を返す
+        // console.log(`[YouonKakuchoPractice] Memo targetDan: "${danVal}" (currentDIdx: ${currentDIdx})`);
+        return danVal;
     }, [currentDIdx]);
 
     const expectedGyouCodes = useMemo(() => getHidKeyCodes(currentGyouKey, layers, kb, side), [currentGyouKey, layers, kb, side]);
@@ -52,14 +71,19 @@ const useYouonKakuchoPractice = ({
 
     // ランダムモード用のターゲット生成 (d を 1 or 3 に)
     const generateRandomTarget = useCallback(() => {
-        const randomG = Math.floor(Math.random() * youonGyouList.length);
-        const randomDIndex = Math.floor(Math.random() * practiceTargetIndices.length);
-        const randomD = practiceTargetIndices[randomDIndex] as (1 | 3); // 1 または 3 をランダムに選択
-        setRandomTarget({ g: randomG, d: randomD });
+        const randomG = Math.floor(Math.random() * youonGyouList.length); // randomG をここで宣言
+        const gyouKeyForRandom = youonGyouList[randomG];
+        const charsInGyou = youonKakuchoChars[gyouKeyForRandom] ?? [];
+        if (charsInGyou.length === 0) {
+            setRandomTarget(null); // Or select a default
+            return;
+        }
+        const randomD = Math.floor(Math.random() * charsInGyou.length); // d は 0 から (文字数-1) の範囲
+        setRandomTarget({ g: randomG, d: randomD }); // d は number 型
         setStage('line');
         setPressedKeys(new Map());
-    }, []);
-
+    }, [setRandomTarget, setStage, setPressedKeys]); // 依存配列に setRandomTarget などを追加
+ 
     // reset 関数
     const reset = useCallback(() => {
         setStage('line');
@@ -90,7 +114,7 @@ const useYouonKakuchoPractice = ({
 
             // --- リセット条件 ---
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                // 通常モードやインデックス変更時はステージなどをリセット
+                console.log(`[YouonKakucho useEffect] Reset condition met. randomModeChangedToFalse=${randomModeChangedToFalse}, isRandomMode=${isRandomMode}, isInitialMount.current=${isInitialMount.current}, indicesChanged=${indicesChanged}. Setting stage to 'line'. Current gIdx=${gIdx}, dIdx=${dIdx}`);
                 setStage('line');
                 setPressedKeys(new Map());
                 setRandomTarget(null);
@@ -99,11 +123,11 @@ const useYouonKakuchoPractice = ({
                 isInitialMount.current = false;
             // --- ランダムターゲット選択条件 (初回のみ or リセット後) ---
             } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
-                 // console.log(`[YouonKakucho useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
-                 generateRandomTarget();
-                 isInitialMount.current = false;
-                 prevGIdxRef.current = gIdx;
-                 prevDIdxRef.current = dIdx;
+                console.log(`[YouonKakucho useEffect] Random mode condition met. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount.current=${isInitialMount.current}, !randomTarget=${!randomTarget}. Generating random target.`);
+                generateRandomTarget();
+                isInitialMount.current = false;
+                prevGIdxRef.current = gIdx;
+                prevDIdxRef.current = dIdx;
             }
         }
 
@@ -111,15 +135,16 @@ const useYouonKakuchoPractice = ({
         prevIsActiveRef.current = isActive;
         prevIsRandomModeRef.current = isRandomMode;
 
-    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, generateRandomTarget, currentFixedDIdx]);
+    }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, generateRandomTarget]);
 
 
-    const handleInput = useCallback((info: PracticeInputInfo): { isExpected: boolean; shouldGoToNext: boolean } => {
+    const handleInput = useCallback((info: PracticeInputInfo): PracticeInputResult => {
 
         let isExpected = false;
-        let shouldGoToNext = false;
+        let shouldGoToNext: boolean | undefined = undefined; // Initialize to undefined
         const { type, pressCode } = info;
 
+        // console.log(`[YouonKakuchoPractice handleInput] Start. Stage: ${stage}, pressCode: 0x${pressCode.toString(16)}, type: ${type}, Target: ${targetChar}`);
         if (type === 'press') {
             setPressedKeys(prev => new Map(prev).set(pressCode, Date.now()));
             return { isExpected: false, shouldGoToNext: false };
@@ -136,6 +161,7 @@ const useYouonKakuchoPractice = ({
             if (inputGyou === currentGyouKey && expectedGyouCodes.includes(pressCode)) {
                 nextStage = 'youon';
                 isExpected = true;
+                // shouldGoToNext remains undefined as the character is not complete
             } else {
                 nextStage = 'line'; // ミス時はリセット
             }
@@ -143,6 +169,7 @@ const useYouonKakuchoPractice = ({
             if (inputYouon && expectedYouonCodes.includes(pressCode)) {
                 nextStage = 'dan';
                 isExpected = true;
+                // shouldGoToNext remains undefined as the character is not complete
             } else {
                 nextStage = 'line'; // ミス時はリセット
             }
@@ -153,9 +180,16 @@ const useYouonKakuchoPractice = ({
                 nextStage = 'line'; // 完了して次へ
                 if (isRandomMode) {
                     generateRandomTarget();
-                    shouldGoToNext = false; // ランダムモードでは自動で次に進まない
+                    shouldGoToNext = false; // For random mode, this means "don't advance gIdx/dIdx in App.tsx"
                 } else {
-                    shouldGoToNext = true;
+                    // 通常モードの場合、現在の dIdx がその行の最後の練習対象か確認
+                    const charsInCurrentGyou = youonKakuchoChars[currentGyouKey] ?? [];
+                    const isLastCharInGroup = currentDIdx === (charsInCurrentGyou.length - 1);
+                    if (isLastCharInGroup) {
+                        shouldGoToNext = true; // グループの最後の文字なら App.tsx に進行を伝える
+                    } else {
+                        shouldGoToNext = false; // グループの途中なら App.tsx には伝えない
+                    }
                 }
             } else {
                 nextStage = 'line'; // ミス時はリセット
@@ -169,10 +203,11 @@ const useYouonKakuchoPractice = ({
             setStage('line');
         }
 
+        console.log(`[YouonKakuchoPractice handleInput] End. isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext}. Stage was: ${stage}, nextStage determined: ${nextStage ?? stage}. Set new stage to: ${nextStage ?? stage}`);
         return { isExpected, shouldGoToNext };
 
     // currentDIdx も依存配列に追加
-    }, [stage, currentGyouKey, targetDan, expectedGyouCodes, expectedYouonCodes, expectedDanCodes, kb, side, isRandomMode, generateRandomTarget, currentDIdx, setStage]);
+    }, [stage, currentGyouKey, targetDan, expectedGyouCodes, expectedYouonCodes, expectedDanCodes, kb, side, isRandomMode, generateRandomTarget, currentDIdx, setStage, currentChars.length]);
 
     // ヘッダー文字
     const headingChars = useMemo(() => {
@@ -191,23 +226,20 @@ const useYouonKakuchoPractice = ({
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
 
-        // 問題切り替え直後は強制的に 'line' として扱う (通常モードのみ)
-        const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
-        const currentStageForHighlight = indicesJustChanged ? 'line' : stage;
+        // useEffect が stage を適切に 'line' にリセットするため、直接 stage を使用
+        console.log(`[YouonKakuchoPractice getHighlight] Stage for highlight: ${stage}, Key: ${key}, Layout: ${layoutIndex}, currentGyouKey: ${currentGyouKey}, targetDan: ${targetDan}`);
 
-        if (currentStageForHighlight === 'line' && layoutIndex === 2 && key === currentGyouKey) {
+        if (stage === 'line' && layoutIndex === 2 && key === currentGyouKey) {
             return { className: 'bg-blue-100', overrideKey: null };
         }
-        if (currentStageForHighlight === 'youon' && layoutIndex === 2 && key === '拗音') {
+        if (stage === 'youon' && layoutIndex === 2 && key === '拗音') {
             return { className: 'bg-blue-100', overrideKey: null };
         }
-        // targetDan (い段 or え段) をハイライト
-        if (currentStageForHighlight === 'dan' && layoutIndex === 3 && key === targetDan) {
+        if (stage === 'dan' && layoutIndex === 3 && key === targetDan) {
             return { className: 'bg-blue-100', overrideKey: null };
         }
         return noHighlight;
-    // targetDan も依存配列に追加
-    }, [stage, currentGyouKey, targetDan, isRandomMode, gIdx, dIdx]);
+    }, [stage, currentGyouKey, targetDan]);
 
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, idx: number): boolean => {
         if (!isActive) return false; // 非アクティブ時は常に false

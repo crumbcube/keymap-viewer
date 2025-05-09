@@ -42,7 +42,7 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
             ? (side === 'left' ? hid2GyouVLeft_Kana : hid2GyouVRight_Kana)
             : (side === 'left' ? hid2GyouHLeft_Kana : hid2GyouHRight_Kana);
         // 押下コードのみを対象とする (<= 0x14 or 0x10)
-        const maxPressCode = kb === 'tw-20v' ? 0x10 : 0x14;
+        const maxPressCode = kb === 'tw-20v' ? 0x10 : 0x14; // TW-20V は 0x01-0x10, TW-20H は 0x01-0x14
         const entry = Object.entries(gyouMap).find(([codeStr, name]) => name === '拗音' && parseInt(codeStr) <= maxPressCode);
         return entry ? parseInt(entry[0]) : null;
     }, [side, kb]);
@@ -101,12 +101,10 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
                 isInitialMount.current = false;
             }
             // --- ランダムターゲット選択条件 (初回のみ or リセット後) ---
-            // isInitialMount.current の条件を追加して、アクティブになった直後もターゲット選択
             else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
                  // console.log(`[Youon useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
-                 // ランダムモードでは gIdx/dIdx は直接使わないが、記録はしておく
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
             }
@@ -119,7 +117,7 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
 
-    // 通常モード用の現在行・段キー (変更なし)
+    // 通常モード用の現在行・段キー
     const currentGyouKey = useMemo(() => {
         if (!isActive || isRandomMode || gIdx < 0 || gIdx >= youonGyouList.length) return null;
         return youonGyouList[gIdx];
@@ -128,11 +126,11 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
     const currentDanKey = useMemo(() => {
         if (!isActive || isRandomMode || !currentGyouKey || !youonDanMapping[currentGyouKey]) return null;
         const danList = youonDanMapping[currentGyouKey];
-        if (!danList || dIdx < 0 || dIdx >= danList.length) return null; // danList チェック済み
+        if (!danList || dIdx < 0 || dIdx >= danList.length) return null;
         return danList[dIdx];
     }, [isActive, isRandomMode, currentGyouKey, dIdx]);
 
-    // ヘッダー文字 (変更なし)
+    // ヘッダー文字
     const headingChars = useMemo(() => {
         if (!isActive) return [];
         if (isRandomMode) {
@@ -143,66 +141,78 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
         }
     }, [isActive, isRandomMode, randomTarget, currentGyouKey]);
 
-    // 期待キー (変更なし)
+    // 期待キー
     const expectedGyouKey = useMemo(() => (isRandomMode ? randomTarget?.gyouKey : currentGyouKey) ?? null, [isRandomMode, randomTarget, currentGyouKey]);
     const expectedDanKey = useMemo(() => (isRandomMode ? randomTarget?.danKey : currentDanKey) ?? null, [isRandomMode, randomTarget, currentDanKey]);
 
     // handleInput
     const handleInput = useCallback((info: PracticeInputInfo): PracticeInputResult => {
-
-        if (!isActive) {
-            return { isExpected: false, shouldGoToNext: false };
-        }
-        if (!expectedGyouKey || !expectedDanKey || youonKeyCode === null) {
-             return { isExpected: false, shouldGoToNext: false };
+        if (!isActive || !expectedGyouKey || !expectedDanKey || youonKeyCode === null || info.type !== 'release') {
+            return { isExpected: false, shouldGoToNext: undefined };
         }
 
         let isExpected = false;
-        let shouldGoToNext = false;
+        let shouldGoToNext_final: boolean | undefined = undefined;
 
-        if (info.type === 'release') {
-            if (stage === 'gyouInput') {
-                const expectedGyouKeyCodes = Object.entries(hid2Gyou)
-                    .filter(([_, name]) => name === expectedGyouKey)
-                    .map(([codeStr, _]) => parseInt(codeStr));
-                if (expectedGyouKeyCodes.includes(info.pressCode)) {
-                    setStage('youonInput');
-                    isExpected = true;
+        if (stage === 'gyouInput') {
+            const expectedGyouKeyCodes = Object.entries(hid2Gyou)
+                .filter(([_, name]) => name === expectedGyouKey)
+                .map(([codeStr, _]) => parseInt(codeStr));
+            if (expectedGyouKeyCodes.includes(info.pressCode)) {
+                setStage('youonInput');
+                isExpected = true;
+                shouldGoToNext_final = undefined; // 文字入力はまだ完了していない
+            } else {
+                isExpected = false;
+                shouldGoToNext_final = undefined; // 不正解、文字入力は完了していない
+            }
+        } else if (stage === 'youonInput') {
+            if (info.pressCode === youonKeyCode) {
+                setStage('danInput');
+                isExpected = true;
+                shouldGoToNext_final = undefined; // 文字入力はまだ完了していない
+            } else {
+                isExpected = false;
+                setStage('gyouInput'); // 不正解なら行入力からやり直し
+                shouldGoToNext_final = undefined; // 不正解、文字入力は完了していない
+            }
+        } else if (stage === 'danInput') {
+            const expectedDanKeyCodes = Object.entries(hid2Dan)
+                .filter(([_, name]) => name === expectedDanKey)
+                .map(([codeStr, _]) => parseInt(codeStr));
+            if (expectedDanKeyCodes.includes(info.pressCode)) {
+                isExpected = true;
+                setStage('gyouInput'); // 次の文字/ターゲットのためにステージをリセット
+                if (isRandomMode) {
+                    selectNextRandomTarget();
+                    shouldGoToNext_final = false; // App.tsx は gIdx/dIdx を進めない
                 } else {
-                    isExpected = false;
-                }
-            } else if (stage === 'youonInput') {
-                if (info.pressCode === youonKeyCode) {
-                    setStage('danInput');
-                    isExpected = true;
-                } else {
-                    isExpected = false;
-                    setStage('gyouInput');
-                }
-            } else if (stage === 'danInput') {
-                const expectedDanKeyCodes = Object.entries(hid2Dan)
-                    .filter(([_, name]) => name === expectedDanKey)
-                    .map(([codeStr, _]) => parseInt(codeStr));
-                if (expectedDanKeyCodes.includes(info.pressCode)) {
-                    isExpected = true;
-                    if (isRandomMode) {
-                        selectNextRandomTarget();
-                        shouldGoToNext = false;
+                    // 通常モード: 現在の文字がその行の最後かどうかを判定
+                    const currentGyouKeyFromProps = youonGyouList[gIdx]; // props の gIdx を使用
+                    const charsInCurrentGyou = youonGyouChars[currentGyouKeyFromProps];
+                    if (charsInCurrentGyou && dIdx >= charsInCurrentGyou.length - 1) {
+                        shouldGoToNext_final = true; // 行の最後の文字なら App.tsx は gIdx を進める
                     } else {
-                        shouldGoToNext = true;
-                        setStage('gyouInput');
+                        shouldGoToNext_final = false; // 行の途中の文字なら App.tsx は dIdx を進める
                     }
-                } else {
-                    isExpected = false;
-                    setStage('gyouInput');
                 }
+            } else {
+                isExpected = false;
+                setStage('gyouInput'); // 不正解なら行入力からやり直し
+                shouldGoToNext_final = undefined; // 不正解、文字入力は完了していない
             }
         }
 
-        return { isExpected, shouldGoToNext };
+        // 不正解で、かつ現在のステージが最初の入力ステージでない場合、最初の入力ステージに戻す
+        if (!isExpected && stage !== 'gyouInput') {
+             setStage('gyouInput');
+        }
+        // console.log(`[YouonPractice handleInput] Returning: isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext_final}, currentStage=${stage}`);
+        return { isExpected, shouldGoToNext: shouldGoToNext_final };
     }, [
         isActive, stage, expectedGyouKey, expectedDanKey, youonKeyCode,
-        hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage
+        hid2Gyou, hid2Dan, isRandomMode, selectNextRandomTarget, setStage,
+        gIdx, dIdx // props の gIdx, dIdx を依存配列に追加
     ]);
 
     const getHighlightClassName = useCallback((key: string, layoutIndex: number): PracticeHighlightResult => {
@@ -215,8 +225,6 @@ export default function useYouonPractice({ gIdx, dIdx, isActive, side, kb, isRan
         }
 
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
-
-        // インデックスが変わった直後は、実際の stage state によらず 'gyouInput' として扱う
         const currentStageForHighlight = indicesJustChanged ? 'gyouInput' : stage;
 
         let expectedKeyName: string | null = null;

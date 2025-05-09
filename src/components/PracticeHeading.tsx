@@ -11,6 +11,7 @@ interface PracticeHeadingProps {
   isFinished?: boolean; // 追加: チャレンジ終了フラグ
   typedEndIndex?: number; // 追加: 短文入力の進捗
   status?: PracticeStatus; // 追加: 練習の状態
+  currentTargetCharForHighlight?: string | null; // 外来語練習用のハイライト対象文字
 }
 
 const PracticeHeading: React.FC<PracticeHeadingProps> = ({
@@ -22,9 +23,13 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
   isFinished = false, // デフォルトは false
   typedEndIndex = 0, // デフォルトは 0
   status = 'idle', // デフォルトは idle
+  currentTargetCharForHighlight, // propsから受け取る
 }) => {
   // console.log(`[PracticeHeading] Rendering. practice=${practice}, gIdx=${gIdx}, dIdx=${dIdx}, isRandomMode=${isRandomMode}, headingChars=`, headingChars);
   // console.log(`[PracticeHeading] typedEndIndex: ${typedEndIndex}`);
+
+  // isGairaigo をコンポーネントのスコープで定義
+  const isGairaigo = practice === '外来語の発音補助';
 
   const displayChars = useMemo(() => {
     if (isFinished) {
@@ -104,7 +109,18 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
 
     // 通常モードのハイライトロジック
     let currentIndex = -1;
-    const isGairaigo = practice === '外来語の発音補助';
+ 
+    // 外来語モードで、かつ currentTargetCharForHighlight が指定されている場合
+    if (isGairaigo && currentTargetCharForHighlight) {
+      console.log(`[PracticeHeading Gairaigo Highlight] index: ${index}, char: ${displayChars[index]}, target: ${currentTargetCharForHighlight}`);
+      if (displayChars[index] === currentTargetCharForHighlight) {
+        console.log(`[PracticeHeading Gairaigo Highlight] Match char: ${displayChars[index]}`);
+        return 'text-blue-500';
+      }
+      // currentTargetCharForHighlight がある場合は、以下の dIdx ベースのロジックは実行しない
+      console.log(`[PracticeHeading Gairaigo Highlight] No match for index: ${index}`);
+      return '';
+    }
     const isIaGroup = isGairaigo && gIdx === 0;
     const isUaGroup = isGairaigo && gIdx === 1;
     const isTargetKu = isGairaigo && gIdx === 2; // 「くぁ」グループ
@@ -117,17 +133,21 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
     const isTargetVa = isGairaigo && isVaGroup && dIdx === 2;
 
     if (practice === '拗音拡張') {
-        currentIndex = dIdx;
-        // 拗音拡張では dIdx が 1 (ぃ) または 3 (ぇ) のみをハイライト
-        if (dIdx !== 1 && dIdx !== 3) {
-            currentIndex = -1; // それ以外はハイライトしない
-        }
+        // 拗音拡張の場合、dIdx に対応する文字をハイライトする
+        currentIndex = dIdx; 
     } else if (isGairaigo) {
         // 外来語モードのハイライトロジック
         if (isIaGroup) {
-          // dIdx 0, 1, 2, 3, 4 -> index 3 (いぇ)
-          currentIndex = 3;
-          //console.log(`[PracticeHeading IaGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
+          // 「いぁ いぃ いぅ いぇ いぉ」のグループ
+          // dIdx 0 -> "いぁ" (index 0)
+          // dIdx 1 -> "いぃ" (index 1)
+          // dIdx 2 -> "いぅ" (index 2)
+          // dIdx 3 -> "いぇ" (index 3)
+          // dIdx 4 -> "いぉ" (index 4)
+          // ただし、練習対象は「いぇ」のみなので、dIdx が 3 以外の時はハイライトしない、
+          // または、dIdx に応じた文字をハイライトするが、練習フック側で dIdx が 3 に固定される想定。
+          // 現状のApp.tsxの動作ではdIdxが進むため、dIdxをそのままcurrentIndexとして使用する。
+          currentIndex = dIdx;          //console.log(`[PracticeHeading IaGroup] dIdx: ${dIdx}, currentIndex: ${currentIndex}`);
         } else if (isUaGroup) {
           // dIdx 0 (うぁ) -> index 1 (うぃ) をハイライト
           // dIdx 1 (うぃ) -> index 1
@@ -267,7 +287,13 @@ const PracticeHeading: React.FC<PracticeHeadingProps> = ({
         }
 
         return (
-          <span key={index} className={`${paddingClass} py-1 rounded transition-colors duration-150 ${getHighlightClass(index)}`}>
+          <span
+            key={index}
+            className={`${paddingClass} py-1 rounded transition-colors duration-150 ${
+              // 外来語モードで currentTargetCharForHighlight を使用したハイライト
+              getHighlightClass(index) // ハイライトクラスの取得を getHighlightClass に一本化
+            }`}
+          >
             {char}
           </span>
         );

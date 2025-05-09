@@ -228,12 +228,12 @@ const useSeionPractice = ({
     // --- 入力処理 ---
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
         if (!isActive || !targetChar || !expectedGyouKey || !expectedDanKey || inputInfo.type !== 'release') {
-            return { isExpected: false, shouldGoToNext: false };
+            return { isExpected: false, shouldGoToNext: undefined }; // 無効な入力時は App.tsx に dIdx/gIdx を進めさせない
         }
 
         const { pressCode } = inputInfo;
         let isExpected = false;
-        let shouldGoToNext = false;
+        let shouldGoToNext: boolean | undefined = undefined; // 初期値を undefined に変更
         let nextStage: SeionStage | null = null;
 
         const actualGyouKey = hid2Gyou(pressCode, kb, side);
@@ -245,30 +245,42 @@ const useSeionPractice = ({
             if (actualGyouKey === expectedGyouKey) {
                 isExpected = true;
                 nextStage = 'danInput';
+                shouldGoToNext = undefined; // 文字入力はまだ完了していない
             } else {
                 isExpected = false;
                 nextStage = 'gyouInput'; // 不正解でもステージは維持
+                shouldGoToNext = undefined; // 文字入力は完了しておらず、不正解
             }
         } else if (stage === 'danInput') {
             if (actualDanKey === expectedDanKey) {
                 isExpected = true;
-                shouldGoToNext = !isRandomMode; // 通常モードのみ自動で次へ
                 nextStage = 'gyouInput';
                 if (isRandomMode) {
                     calculateTarget(); // 次のランダムターゲットを計算
+                    shouldGoToNext = false; // ランダムモードでは App.tsx は dIdx を進めるが、フック内部で次のターゲットを処理
+                } else {
+                    // 通常モード: 現在の文字がその行の最後かどうかを判定
+                    const currentGyouKeyFromProps = gyouList[initialGIdx]; // props の gIdx を使用
+                    const charsInCurrentGyou = gyouChars[currentGyouKeyFromProps];
+                    if (charsInCurrentGyou && initialDIdx >= charsInCurrentGyou.length - 1) {
+                        shouldGoToNext = true; // 行の最後の文字なら App.tsx は gIdx を進める
+                    } else {
+                        shouldGoToNext = false; // 行の途中の文字なら App.tsx は dIdx を進める
+                    }
                 }
             } else {
                 isExpected = false;
                 nextStage = 'gyouInput'; // 不正解なら行入力からやり直し
+                shouldGoToNext = undefined; // 文字入力は完了しておらず、不正解
             }
         }
 
         if (nextStage && nextStage !== stage) {
-            // console.log(`[Seion handleInput] Setting stage to ${nextStage}`);
             setStage(nextStage);
-        } else if (!isExpected && stage === 'danInput') {
-             // console.log(`[Seion handleInput] Incorrect input in danInput, explicitly resetting to gyouInput`);
-             setStage('gyouInput');
+        } else if (!isExpected && stage === 'danInput' && nextStage !== 'gyouInput') {
+            // danInput で不正解の場合、nextStage は既に 'gyouInput' になっているはず
+            // この条件は冗長かもしれないが、念のため残す
+            setStage('gyouInput');
         }
 
         // console.log(`[Seion handleInput] Result: isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext}, Final Stage=${stage}`);
@@ -276,7 +288,10 @@ const useSeionPractice = ({
     // calculateTarget を依存配列に追加
     }, [isActive, targetChar, stage, expectedGyouKey, expectedDanKey, kb, side, isRandomMode, calculateTarget]);
 
-    // --- リセット処理 ---
+    // 依存配列に initialGIdx, initialDIdx, setStage を追加
+    // }, [isActive, targetChar, stage, expectedGyouKey, expectedDanKey, kb, side, isRandomMode, calculateTarget, initialGIdx, initialDIdx, setStage]);
+
+    // --- リセット処理 (App.tsx から呼ばれる想定) ---
     const reset = useCallback(() => {
         // console.log(`[Seion reset] Called. isActive=${isActive}, isRandomMode=${isRandomMode}`);
         setStage('gyouInput');

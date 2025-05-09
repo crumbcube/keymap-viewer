@@ -86,7 +86,7 @@ const useKigoPractice1 = ({
     useEffect(() => {
         // isActive が false になった最初のタイミングでリセット
         if (!isActive && prevIsActiveRef.current) {
-            // console.log(`[Kigo1 useEffect] Resetting state because isActive became false.`);
+            console.log(`[Kigo1 useEffect] Resetting state because isActive became false.`);
             reset();
         }
 
@@ -110,7 +110,7 @@ const useKigoPractice1 = ({
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
             } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
-                 // console.log(`[Kigo1 useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
+                 console.log(`[Kigo1 useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;

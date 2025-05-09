@@ -43,7 +43,7 @@ export type PracticeMode =
     | '記号の基本練習３' 
     | '拗濁音の練習' 
     | '拗半濁音の練習' 
-    | '拗音拡張' | '' // <<< 空文字列を許容するように追加
+    | '拗音拡張'
     | '外来語の発音補助'
     | 'かな入力１分間トレーニング'
     | '記号入力１分間トレーニング'
@@ -140,18 +140,18 @@ export const hid2GyouHLeft_Kana: Record<number, string> = {
 // 記号練習1 (レイヤー6 長押し) 用のマッピング
 export const hid2GyouHLeft_Kigo1: Record<number, string> = {
     // HID コードは TW-20H Left の仕様に合わせてください (以下は仮)
-    0x07: '{',    // index 6 (仮)
-    0x08: '}',    // index 7 (仮)
-    0x09: '<',    // index 8 (仮)
-    0x0A: '>',    // index 9 (仮)
-    0x0C: "'",    // index 11 (仮)
-    0x0D: '"',    // index 12 (仮)
-    0x0E: '(',    // index 13 (仮)
-    0x0F: ')',    // index 14 (仮)
-    0x11: ':',    // index 16 (仮)
+    0x13: '{',    // index 6 (仮)
+    0x14: '}',    // index 7 (仮)
+    0x07: '<',    // index 8 (仮)
+    0x08: '>',    // index 9 (仮)
+    0x06: "'",    // index 11 (仮)
+    0x0A: '"',    // index 12 (仮)
+    0x0B: '(',    // index 13 (仮)
+    0x0C: ')',    // index 14 (仮)
+    0x0E: ':',    // index 16 (仮)
     0x12: ';',    // index 17 (仮)
-    0x13: '「',   // index 18 (仮)
-    0x14: '」',   // index 19 (仮)
+    0x0F: '「',   // index 18 (仮)
+    0x10: '」',   // index 19 (仮)
 };
 
 export const hid2DanHLeft_Kana: Record<number, string> = {
@@ -229,50 +229,54 @@ export const hid2GyouVRight_Kigo1: Record<number, string> = {
 // (hid2GyouVLeft_Kana は変更なし - 左手は 0x01-0x10 のはず)
 export const hid2GyouVLeft_Kana: Record<number, string> = {
     0x01: 'BS',   0x15: 'BS',   // 離上 = 0x01 + 0x14
-    0x02: '促音', 0x16: '促音', // 離上 = 0x02 + 0x14
+    0x02: '濁音', 0x16: '濁音', // 離上 = 0x02 + 0x14
     0x03: '拗音', 0x17: '拗音', // 離上 = 0x03 + 0x14
-    0x04: '濁音', 0x18: '濁音', // 離上 = 0x04 + 0x14
-    0x05: 'あ行', 0x19: 'あ行', // 離上 = 0x05 + 0x14 (右手と同じと仮定)
-    0x06: 'か行', 0x1A: 'か行', // 離上 = 0x06 + 0x14
-    0x07: 'さ行', 0x1B: 'さ行', // 離上 = 0x07 + 0x14
-    0x08: '変換', 0x1C: '変換', // 離上 = 0x08 + 0x14
-    0x09: 'た行', 0x1D: 'た行', // 離上 = 0x09 + 0x14
-    0x0A: 'な行', 0x1E: 'な行', // 離上 = 0x0A + 0x14
-    0x0B: 'は行', 0x1F: 'は行', // 離上 = 0x0B + 0x14
-    0x0C: '記号', 0x20: '記号', // 離上 = 0x0C + 0x14
-    0x0D: 'ま行', 0x21: 'ま行', // 離上 = 0x0D + 0x14
-    0x0E: 'や行', 0x22: 'や行', // 離上 = 0x0E + 0x14
-    0x0F: 'ら行', 0x23: 'ら行', // 離上 = 0x0F + 0x14
-    0x10: 'わ行', 0x24: 'わ行', // 離上 = 0x10 + 0x14
+    0x04: '促音', 0x18: '促音', // 離上 = 0x04 + 0x14
+    0x05: 'TAB',  0x19: 'TAB', // 離上 = 0x05 + 0x14 (右手と同じと仮定)
+    0x06: 'あ行', 0x1A: 'あ行', // 離上 = 0x06 + 0x14
+    0x07: 'か行', 0x1B: 'か行', // 離上 = 0x07 + 0x14
+    0x08: 'さ行', 0x1C: 'さ行', // 離上 = 0行08 + 0x14
+    0x09: 'SP',   0x1D: 'SP', // 離上 = 0x09 + 0x14
+    0x0A: 'た行', 0x1E: 'た行', // 離上 = 0x0A + 0x14
+    0x0B: 'な行', 0x1F: 'な行', // 離上 = 0x0B + 0x14
+    0x0C: 'は行', 0x20: 'は行', // 離上 = 0x0C + 0x14
+    0x0D: 'ENT',  0x21: 'ENT', // 離上 = 0x0D + 0x14
+    0x0E: 'ま行', 0x22: 'ま行', // 離上 = 0x0E + 0x14
+    0x0F: 'や行', 0x23: 'や行', // 離上 = 0x0F + 0x14
+    0x10: 'ら行', 0x24: 'ら行', // 離上 = 0x10 + 0x14
+    0x11: 'IME',  0x25: 'IME', // 離上 = 0x11 + 0x14
+    0x12: '変換', 0x26: '変換', // 離上 = 0x12 + 0x14
+    0x13: '記号', 0x27: '記号', // 離上 = 0x13 + 0x14
+    0x14: 'わ行', 0x28: 'わ行'   // 離上 = 0x14 + 0x14
 };
 
 // TW-20V Left (4列) - かな入力 (レイヤー2/3) および 記号練習2/3
 // (hid2DanVLeft_Kana は変更なし)
 export const hid2DanVLeft_Kana: Record<number, string> = {
     // 0x05: '拗1',  0x19: '拗1',  // 削除
-    0x06: 'う段', 0x1A: 'う段', // か行 (離上 = 0x06 + 0x14)
+    0x07: 'う段', 0x1B: 'う段', // か行 (離上 = 0x06 + 0x14)
     // 0x07: '拗2',  0x1B: '拗2',  // 削除
-    0x09: 'い段', 0x1D: 'い段', // た行 (離上 = 0x09 + 0x14)
-    0x0A: 'あ段', 0x1E: 'あ段', // な行 (離上 = 0x0A + 0x14)
-    0x0B: 'え段', 0x1F: 'え段', // は行 (離上 = 0x0B + 0x14)
+    0x0A: 'い段', 0x1E: 'い段', // た行 (離上 = 0x09 + 0x14)
+    0x0B: 'あ段', 0x1F: 'あ段', // な行 (離上 = 0x0A + 0x14)
+    0x0C: 'え段', 0x20: 'え段', // は行 (離上 = 0x0B + 0x14)
     // 0x0D: '拗3',  0x21: '拗3',  // 削除
-    0x0E: 'お段', 0x22: 'お段', // や行 (離上 = 0x0E + 0x14)
+    0x0F: 'お段', 0x23: 'お段', // や行 (離上 = 0x0E + 0x14)
     // 0x0F: '拗4',  0x23: '拗4',  // 削除
 };
 
 // TW-20V Left (4列) - 記号練習1 (レイヤー6 長押し)
 // (hid2GyouVLeft_Kigo1 は変更なし)
 export const hid2GyouVLeft_Kigo1: Record<number, string> = {
-    0x05: '{',    // あ行
-    0x06: '}',    // か行
+    0x13: '{',    // あ行
+    0x14: '}',    // か行
     0x07: '<',    // さ行
     0x08: '>',    // 変換
-    0x09: "'",    // た行
+    0x06: "'",    // た行
     0x0A: '"',    // な行
     0x0B: '(',    // は行
     0x0C: ')',    // 記号
-    0x0D: ':',    // ま行
-    0x0E: ';',    // や行
+    0x0E: ':',    // ま行
+    0x12: ';',    // や行
     0x0F: '「',   // ら行
     0x10: '」',   // わ行
 };
@@ -301,7 +305,7 @@ export interface PracticeInputInfo {
 /* 練習フックの入力処理結果 */
 export interface PracticeInputResult {
     isExpected: boolean;
-    shouldGoToNext: boolean;
+    shouldGoToNext?: boolean; // Make optional: true (next group), false (next char in group), undefined (char not complete)
 }
 
 export interface PracticeHighlightResult {
@@ -415,6 +419,7 @@ export interface CharInfoGairaigo {
     // Allow 3 or 4 keys to match GairaigoPracticeTarget
     keys: [string, string, string] | [string, string, string, string]; // 表示上のキー名
     actualSecondKey: string; // 実際の2打目のキー名
+    actualThirdKey?: string; // 実際の3打目のキー名 (オプション)
 }
 export interface CharInfoYouhandakuon {
     type: 'youhandakuon';
@@ -545,6 +550,16 @@ export const allYouhandakuonCharInfos: CharInfoYouhandakuon[] = youhandakuonPrac
         inputDef: group.inputs[index], // inputDef を含める
     }))
 );
+
+// 全拗濁音文字情報
+export const allYoudakuonCharInfos: CharInfoYoudakuon[] = youdakuonPracticeData.flatMap(group =>
+    group.chars.map((char, index) => ({
+        type: 'youdakuon' as const,
+        char: char,
+        inputDef: group.inputs[index],
+    }))
+);
+
 // ------------------------------------
 
 /**

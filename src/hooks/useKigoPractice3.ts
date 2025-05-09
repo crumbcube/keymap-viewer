@@ -31,13 +31,6 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
     const prevIsRandomModeRef = useRef(isRandomMode);
 
     const [randomTarget, setRandomTarget] = useState<CharInfoKigo3 | null>(null);
-    const hid2Gyou = useMemo(() => {
-        if (kb === 'tw-20v') {
-            return side === 'left' ? hid2GyouVLeft_Kana : hid2GyouVRight_Kana;
-        } else { // TW-20H
-            return side === 'left' ? hid2GyouHLeft_Kana : hid2GyouHRight_Kana;
-        }
-    }, [side, kb]);
 
     // 通常モード用
     const currentGroup = useMemo(() => {
@@ -55,20 +48,16 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
     // ランダム/通常モード共通
     const isTargetEqualSign = useMemo(() => {
         if (isRandomMode) return randomTarget?.isEqualSign ?? false;
-        // 通常モード: inputDef が存在し、gyouKey が未定義（または空）の場合に「=」と判断
         return !!currentInputDef && !currentInputDef.gyouKey;
     }, [isRandomMode, randomTarget, currentInputDef]);
 
-    // ▼▼▼ 追加: 現在のターゲット文字を取得する useMemo ▼▼▼
     const currentTargetChar = useMemo(() => {
         if (isRandomMode) return randomTarget?.char ?? null;
         if (!currentGroup?.chars || dIdx < 0 || dIdx >= currentGroup.chars.length) return null;
         return currentGroup.chars[dIdx];
     }, [isRandomMode, randomTarget, currentGroup, dIdx]);
-    // ▲▲▲ 追加完了 ▲▲▲
 
     const expectedGyouKey = useMemo(() => {
-        // 「=」の場合は2打目がないので null
         if (isTargetEqualSign) return null;
         if (isRandomMode) return randomTarget?.gyouKey ?? null;
         return currentInputDef?.gyouKey ?? null;
@@ -89,7 +78,7 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
             const randomIndex = Math.floor(Math.random() * allKigo3CharInfos.length);
             const nextTarget = allKigo3CharInfos[randomIndex];
             setRandomTarget(nextTarget);
-            setStage('kigoInput'); // 常に記号キーから
+            setStage('kigoInput');
             isWaitingForSecondKigo.current = false;
             setShowHighlightAfterWait(true);
         } else {
@@ -114,16 +103,13 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
     }, [setStage, setRandomTarget]);
 
     useEffect(() => {
-        // isActive が false になった最初のタイミングでリセット
         if (!isActive && prevIsActiveRef.current) {
-            // console.log(`[Kigo3 useEffect] Resetting state because isActive became false.`);
             reset();
         }
 
         if (isActive) {
-            // isActive が true になった最初のタイミング、または依存関係の変更時
             if (isActive && !prevIsActiveRef.current) {
-                isInitialMount.current = true; // 強制的に初期マウント扱い
+                isInitialMount.current = true;
             }
 
             const indicesChanged = gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current;
@@ -131,7 +117,6 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
             const randomModeChangedToFalse = !isRandomMode && prevIsRandomModeRef.current;
 
             if (randomModeChangedToFalse || (!isRandomMode && (isInitialMount.current || indicesChanged))) {
-                // 通常モードやインデックス変更時はステージなどをリセット
                 setStage('kigoInput');
                 isWaitingForSecondKigo.current = false;
                 setShowHighlightAfterWait(true);
@@ -144,15 +129,12 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
                 prevDIdxRef.current = dIdx;
                 isInitialMount.current = false;
             } else if (isRandomMode && (randomModeChangedToTrue || isInitialMount.current || !randomTarget)) {
-                 // console.log(`[Kigo3 useEffect] Random mode. randomModeChangedToTrue=${randomModeChangedToTrue}, isInitialMount=${isInitialMount.current}, !randomTarget=${!randomTarget}`);
                  selectNextRandomTarget();
                  isInitialMount.current = false;
                  prevGIdxRef.current = gIdx;
                  prevDIdxRef.current = dIdx;
             }
         }
-
-        // 最後に前回の値を更新
         prevIsActiveRef.current = isActive;
         prevIsRandomModeRef.current = isRandomMode;
 
@@ -164,182 +146,241 @@ const useKigoPractice3 = ({ gIdx, dIdx, isActive, side, kb, isRandomMode, layers
         };
     }, [isActive, isRandomMode, gIdx, dIdx, randomTarget, reset, selectNextRandomTarget]);
 
-    // ▼▼▼ highlightTargetGyouKeyDisplayName の useMemo を削除 ▼▼▼
-    // const highlightTargetGyouKeyDisplayName = useMemo(() => { ... });
-    // ▲▲▲ 削除完了 ▲▲▲
 
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
+        console.log(`[Kigo3 handleInput] Start. Stage: ${stage}, Input pressCode: 0x${inputInfo.pressCode.toString(16)}, TargetChar: ${currentTargetChar}, isTargetEqualSign: ${isTargetEqualSign}, expectedGyouKey: ${expectedGyouKey}`);
 
         if (!isActive) {
-            return { isExpected: false, shouldGoToNext: false };
+            console.log("[Kigo3 handleInput] Not active.");
+            return { isExpected: false, shouldGoToNext: undefined };
         }
-        // 「=」以外の場合のみ expectedGyouKey をチェック
+        if (!currentTargetChar) {
+             console.log("[Kigo3 handleInput] No currentTargetChar.");
+            return { isExpected: false, shouldGoToNext: undefined };
+        }
+        // 「=」以外の場合のみ expectedGyouKey をチェック (currentTargetChar があれば expectedGyouKey も計算されているはずだが念のため)
         if (!isTargetEqualSign && !expectedGyouKey) {
-            return { isExpected: false, shouldGoToNext: false };
+             console.log("[Kigo3 handleInput] Not target '=' and no expectedGyouKey.");
+            return { isExpected: false, shouldGoToNext: undefined };
         }
         if (inputInfo.type !== 'release') {
-            return { isExpected: false, shouldGoToNext: false };
+             console.log("[Kigo3 handleInput] Not release event.");
+            return { isExpected: false, shouldGoToNext: undefined };
         }
 
         const pressCode = inputInfo.pressCode;
         let isExpected = false;
-        let shouldGoToNext = false;
+        let shouldGoToNext_final: boolean | undefined = undefined;
+        let nextStage: KigoPractice3Stage = stage;
 
-        // 「記号」キーの期待されるHIDコードを取得
-        const expectedKigoKeyCodes = Object.entries(hid2Gyou)
-            .filter(([_, name]) => name === '記号')
-            .map(([codeStr, _]) => parseInt(codeStr));
+        const layer8 = layers[8] ?? [];
+        const getLayer8KeyCode = (keyName: string | null): number => {
+            if (!keyName) return -1;
+            const index = layer8.findIndex(key => key.trim() === keyName.trim()); // trim() を追加して空白を無視
+            return index !== -1 ? index + 1 : -1;
+        };
+        const expectedKigoKeyStartCode = getLayer8KeyCode('＝\n記号');
+        console.log(`[Kigo3 handleInput] Expected '＝\\n記号' code: ${expectedKigoKeyStartCode}`);
+
 
         if (isWaitingForSecondKigo.current) { // 2打目待ち状態の場合 (「=」入力)
-            if (expectedKigoKeyCodes.includes(pressCode)) {
+            console.log("[Kigo3 handleInput] isWaitingForSecondKigo.current is true (Target is '=').");
+            if (pressCode === expectedKigoKeyStartCode) { // 「=」の2打目も「＝\n記号」キー
+                console.log("[Kigo3 handleInput] Correct second key for '='.");
                 if (highlightTimeoutRef.current !== null) {
                     clearTimeout(highlightTimeoutRef.current);
                     highlightTimeoutRef.current = null;
                 }
                 isWaitingForSecondKigo.current = false;
                 setShowHighlightAfterWait(true);
-                setStage('kigoInput'); // 次の入力のためにステージを戻す
+                nextStage = 'kigoInput';
                 isExpected = true;
                 if (isRandomMode) {
                     selectNextRandomTarget();
-                    shouldGoToNext = false;
+                    shouldGoToNext_final = false;
                 } else {
-                    shouldGoToNext = true;
+                    const currentGroupData = kigoPractice3Data[gIdx];
+                    const isLastInGroup = currentGroupData ? dIdx === currentGroupData.chars.length - 1 : false;
+                    shouldGoToNext_final = isLastInGroup;
                 }
             } else {
+                console.log("[Kigo3 handleInput] Incorrect second key for '='.");
                 isExpected = false;
-                setStage('kigoInput');
+                nextStage = 'kigoInput';
                 isWaitingForSecondKigo.current = false;
                 setShowHighlightAfterWait(true);
                 if (highlightTimeoutRef.current !== null) {
                     clearTimeout(highlightTimeoutRef.current);
                     highlightTimeoutRef.current = null;
                 }
+                shouldGoToNext_final = undefined;
             }
         } else { // 1打目または通常入力
+            console.log(`[Kigo3 handleInput] isWaitingForSecondKigo.current is false. Current stage: ${stage}`);
             switch (stage) {
-                case 'kigoInput':
-                    if (expectedKigoKeyCodes.includes(pressCode)) {
+                case 'kigoInput': // 1打目待ち (「＝\n記号」キーを待つ)
+                    console.log(`[Kigo3 handleInput kigoInput] Waiting for '＝\\n記号'. pressCode: ${pressCode}, expected: ${expectedKigoKeyStartCode}`);
+                    if (pressCode === expectedKigoKeyStartCode) { // 1打目は「＝\n記号」キー
+                        console.log("[Kigo3 handleInput kigoInput] Correct first key '＝\\n記号'.");
                         if (isTargetEqualSign) {
-                            // 「=」の場合、2打目待ちへ
+                            console.log("[Kigo3 handleInput kigoInput] Target is '='. Transitioning to kigoInputWait.");
                             isWaitingForSecondKigo.current = true;
                             setShowHighlightAfterWait(false);
-                            setStage('kigoInputWait');
-
-                            if (highlightTimeoutRef.current !== null) {
-                                clearTimeout(highlightTimeoutRef.current);
-                            }
+                            nextStage = 'kigoInputWait';
+                            if (highlightTimeoutRef.current !== null) clearTimeout(highlightTimeoutRef.current);
                             highlightTimeoutRef.current = window.setTimeout(() => {
                                 setShowHighlightAfterWait(true);
                                 highlightTimeoutRef.current = null;
                             }, 500);
                             isExpected = true;
+                            shouldGoToNext_final = undefined; // 「=」の入力はまだ完了していない
                         } else {
-                            // 「=」以外の場合、行入力へ
-                            setStage('gyouInput');
+                            console.log("[Kigo3 handleInput kigoInput] Target is NOT '='. Transitioning to gyouInput.");
+                            nextStage = 'gyouInput';
                             isExpected = true;
+                            shouldGoToNext_final = undefined; // 記号入力はまだ完了していない
                         }
                     } else {
+                        console.log("[Kigo3 handleInput kigoInput] Incorrect first key.");
                         isExpected = false;
+                        nextStage = 'kigoInput'; // Stay in kigoInput stage on error
+                        shouldGoToNext_final = undefined;
                     }
                     break;
 
-                case 'gyouInput': // 「＝」以外の記号の2打目
-                    // expectedGyouKey はこの時点で null でないはず (関数の先頭でチェック済み)
-                    const expectedGyouKeyCodes = Object.entries(hid2Gyou)
-                        .filter(([_, name]) => name === expectedGyouKey)
-                        .map(([codeStr, _]) => parseInt(codeStr));
+                case 'gyouInput': // 「＝」以外の記号の2打目 (ターゲット記号そのものを待つ)
+                    // expectedGyouKey はターゲット記号そのものではなく、その記号に対応する「行」の名前 ('あ行'など)
+                    // 2打目で待つのはレイヤー8上のターゲット記号そのもの
+                    const expectedSymbolKeyCode = getLayer8KeyCode(currentTargetChar); // ターゲット記号そのものでキーコードを探す
+                    console.log(`[Kigo3 handleInput gyouInput] Waiting for target symbol '${currentTargetChar}'. pressCode: ${pressCode}, expected: ${expectedSymbolKeyCode}`);
 
-                    if (expectedGyouKeyCodes.includes(pressCode)) {
+                    if (expectedSymbolKeyCode !== -1 && pressCode === expectedSymbolKeyCode) {
+                        console.log("[Kigo3 handleInput gyouInput] Correct second key (target symbol).");
                         isExpected = true;
-                        setStage('kigoInput'); // 次の入力のためにステージを戻す
+                        nextStage = 'kigoInput'; // 完了して次へ (次の文字の1打目待ちへ)
                         if (isRandomMode) {
                             selectNextRandomTarget();
-                            shouldGoToNext = false;
+                            shouldGoToNext_final = false; // App.tsx は gIdx/dIdx を進めない
                         } else {
-                            shouldGoToNext = true;
+                            const currentGroupData = kigoPractice3Data[gIdx];
+                            const isLastInGroup = currentGroupData ? dIdx === currentGroupData.chars.length - 1 : false;
+                            shouldGoToNext_final = isLastInGroup; // グループの最後の文字なら App.tsx は gIdx を進める
                         }
                     } else {
+                        console.log("[Kigo3 handleInput gyouInput] Incorrect second key.");
                         isExpected = false;
-                        setStage('kigoInput');
+                        nextStage = 'kigoInput'; // Reset to the beginning of the sequence on error
+                        shouldGoToNext_final = undefined;
                     }
                     break;
 
-                case 'kigoInputWait': // 2打目待ち中に予期せぬ入力があった場合
+                case 'kigoInputWait': // 2打目待ち中に予期せぬ入力があった場合 (「=」の2打目待ち中に別のキーを押した場合)
+                    console.log("[Kigo3 handleInput kigoInputWait] Unexpected input during wait.");
                     isExpected = false;
-                    setStage('kigoInput');
+                    nextStage = 'kigoInput'; // Reset
                     isWaitingForSecondKigo.current = false;
                     setShowHighlightAfterWait(true);
                     if (highlightTimeoutRef.current !== null) {
                         clearTimeout(highlightTimeoutRef.current);
                         highlightTimeoutRef.current = null;
                     }
+                    shouldGoToNext_final = undefined;
                     break;
             }
         }
 
-        return { isExpected, shouldGoToNext };
+        console.log(`[Kigo3 handleInput] End of logic. isExpected=${isExpected}, shouldGoToNext_final=${shouldGoToNext_final}, nextStage=${nextStage}, currentStage=${stage}`);
+
+        if (nextStage !== stage) {
+            setStage(nextStage);
+        } else if (!isExpected && stage !== 'kigoInput') {
+            // 不正解で、かつ現在のステージが最初の入力ステージでない場合、最初の入力ステージに戻す
+            // (gyouInput や kigoInputWait で間違えた場合)
+            console.log(`[Kigo3 handleInput] Incorrect input in stage ${stage}, resetting to kigoInput.`);
+            setStage('kigoInput');
+            if (isWaitingForSecondKigo.current) { // 「=」の2打目待ちだった場合のリセット処理
+                isWaitingForSecondKigo.current = false;
+                setShowHighlightAfterWait(true);
+                if (highlightTimeoutRef.current !== null) {
+                    clearTimeout(highlightTimeoutRef.current);
+                    highlightTimeoutRef.current = null;
+                }
+            }
+        }
+
+        console.log(`[Kigo3 handleInput] Returning: isExpected=${isExpected}, shouldGoToNext=${shouldGoToNext_final}`);
+        return { isExpected, shouldGoToNext: shouldGoToNext_final };
     }, [
-        isActive, stage, hid2Gyou, isTargetEqualSign, expectedGyouKey,
-        isRandomMode, selectNextRandomTarget, setStage, setShowHighlightAfterWait
+        isActive, stage, layers, isTargetEqualSign, expectedGyouKey, currentTargetChar, // currentTargetChar を依存配列に追加
+        isRandomMode, selectNextRandomTarget, setStage, setShowHighlightAfterWait,
+        gIdx, dIdx // gIdx, dIdx を依存配列に追加
     ]);
 
-    // ▼▼▼ getHighlightClassName を修正 ▼▼▼
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
+        // console.log(`[Kigo3 getHighlight] Start. keyName: ${keyName}, layoutIndex: ${layoutIndex}, stage: ${stage}, targetChar: ${currentTargetChar}, isTargetEqualSign: ${isTargetEqualSign}, showHighlightAfterWait: ${showHighlightAfterWait}`);
+
         if (!isActive) {
+            // console.log("[Kigo3 getHighlight] Not active.");
             return noHighlight;
         }
-        // 「=」以外の場合のみ expectedGyouKey をチェック
+        if (!currentTargetChar) {
+             // console.log("[Kigo3 getHighlight] No currentTargetChar.");
+             return noHighlight;
+        }
+        // 「=」以外の場合のみ expectedGyouKey をチェック (currentTargetChar があれば expectedGyouKey も計算されているはずだが念のため)
         if (!isTargetEqualSign && !expectedGyouKey) {
-             console.warn("getHighlightClassName: expectedGyouKey is null for non-equal sign target");
+             // console.log("[Kigo3 getHighlight] Not target '=' and no expectedGyouKey.");
              return noHighlight;
         }
 
+
         const indicesJustChanged = !isRandomMode && (gIdx !== prevGIdxRef.current || dIdx !== prevDIdxRef.current);
-        const currentStageForHighlight = (indicesJustChanged && stage !== 'kigoInputWait') ? 'kigoInput' : stage;
+        // ステージ判定ロジックをシンプルに。useEffect がステージを正しく管理するはず。
+        // ただし、kigoInputWait ステージのハイライトは showHighlightAfterWait に依存する。
+        const currentStageForHighlight = stage; // indicesJustChanged の判定は不要に
 
         let expectedKeyDisplayName: string | null = null;
-        const targetLayoutIndex = 8;
+        const targetLayoutIndex = 8; // 記号3はレイヤー8のみ
 
-        // --- 「＝\n記号」キーの実際の表示名を取得するロジック (レイヤー8から) ---
-        // const layer8 = layers[targetLayoutIndex] ?? []; // layers[8] を参照 (今回は直接文字列を使うので不要)
-        // '＝\n記号' という表示名で直接検索
         const equalSignKeyName = '＝\n記号';
-        // --- ここまで ---
 
         if (currentStageForHighlight === 'kigoInputWait') {
-            // 「=」の2打目待ち中は equalSignKeyName をハイライト (点滅制御あり)
+            // 「=」の2打目待ち。期待されるのは「＝\n記号」キー。
+            // showHighlightAfterWait が false の間はハイライトしない。
             if (keyName === equalSignKeyName && layoutIndex === targetLayoutIndex) {
+                // console.log(`[Kigo3 getHighlight] Stage kigoInputWait. Key: ${keyName}, Layout: ${layoutIndex}. showHighlightAfterWait: ${showHighlightAfterWait}`);
                 return { className: showHighlightAfterWait ? 'bg-blue-100' : null, overrideKey: null };
             }
             return noHighlight;
         }
 
+        // kigoInputWait 以外のステージ
         if (currentStageForHighlight === 'kigoInput') {
-            // 1打目は常に「＝\n記号」キー
+            // 1打目待ち。期待されるのは「＝\n記号」キー。
             expectedKeyDisplayName = equalSignKeyName;
         } else if (currentStageForHighlight === 'gyouInput') {
-            // 2打目 (「=」以外) は行キーに対応する記号
-            expectedKeyDisplayName = currentTargetChar; // 例: ' ` '
+            // 2打目待ち (「=」以外)。期待されるのはターゲット記号そのもの。
+            expectedKeyDisplayName = currentTargetChar;
         }
 
+        // console.log(`[Kigo3 getHighlight] Stage ${currentStageForHighlight}. Expected key: ${expectedKeyDisplayName}, Target layout: ${targetLayoutIndex}. Received key: ${keyName}, Received layout: ${layoutIndex}`);
+
         if (expectedKeyDisplayName !== null && layoutIndex === targetLayoutIndex && keyName === expectedKeyDisplayName) {
+            // console.log(`[Kigo3 getHighlight] Match! Highlighting key: ${keyName}`);
             return { className: 'bg-blue-100', overrideKey: null };
         }
 
         return noHighlight;
     }, [
         isActive, stage, showHighlightAfterWait, isTargetEqualSign, expectedGyouKey, currentTargetChar,
-        isRandomMode, gIdx, dIdx,
-        layers,
-        // hid2Gyou は不要になったので削除
+        // gIdx, dIdx, isRandomMode は不要に
     ]);
 
-    // isInvalidInputTarget (変更なし)
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
         if (!isActive) return false;
         const targetKeyIndex = pressCode - 1;
+        // 記号3はレイヤー8のみ対象
         const isTarget = layoutIndex === 8 && keyIndex === targetKeyIndex;
         return isTarget;
     }, [isActive]);
