@@ -27,7 +27,6 @@ type ChallengeStage = 'gyouInput' | 'danInput' | 'youonInput' | 'dakuonInput' | 
 
 const COUNTDOWN_SECONDS = 5;
 const TRAINING_DURATION_MS = 60 * 1000; // 1分
-const CHALLENGE_DURATION_SECONDS = 60; // チャレンジ時間（秒）
 
 // --- ランクメッセージ判定関数 ---
 const getRankMessage = (score: number): string => {
@@ -49,19 +48,19 @@ const useKanaChallengePractice = ({
     const [remainingTime, setRemainingTime] = useState<number>(TRAINING_DURATION_MS);
     const [currentTarget, setCurrentTarget] = useState<KanaTarget | null>(null);
     const [challengeStage, setChallengeStage] = useState<ChallengeStage>('gyouInput');
-    const [headingChars, setHeadingChars] = useState<string[]>([]); // ヘッダー表示用 state
-    const [isFinished, setIsFinished] = useState(false); // 終了状態 state
+    const [headingChars, setHeadingChars] = useState<string[]>([]);
+    const [isFinished, setIsFinished] = useState(false);
 
     const countdownTimerRef = useRef<number | null>(null);
     const trainingTimerRef = useRef<number | null>(null);
     const startTimeRef = useRef<number | null>(null);
-    const correctCountRef = useRef(0); // 正解タイプ数 (シーケンス完了数)
-    const missCountRef = useRef(0); // ミスタイプ数
-    const totalCharsTypedRef = useRef(0); // 総打鍵数（キーを押した回数）
-    const completedCharsCountRef = useRef(0); // 正しく入力完了した文字数 (ヘッダー表示文字数)
-    const totalAttemptedRef = useRef(0); // 総試行回数（文字単位）
+    const correctCountRef = useRef(0);
+    const missCountRef = useRef(0);
+    const totalCharsTypedRef = useRef(0);
+    const completedCharsCountRef = useRef(0);
+    const totalAttemptedRef = useRef(0);
     const [challengeResults, setChallengeResults] = useState<ChallengeResult | null>(null);
-    const prevIsActiveRef = useRef(isActive); // isActive の前回の値を保持
+    const prevIsActiveRef = useRef(isActive);
 
 
     const currentFunctionKeyMap = useMemo(() => {
@@ -70,16 +69,13 @@ const useKanaChallengePractice = ({
 
     const allKanaTargets = useMemo(() => {
         const tsuTargets = allSokuonKomojiCharInfos.filter(info => info.isTsu);
-        // TODO: 将来的には半濁音も結合
         return [...allSeionCharInfos, ...allYouonCharInfos, ...allDakuonCharInfos, ...tsuTargets];
     }, []);
 
-    // 次のランダムターゲットを選択
     const selectNextTarget = useCallback(() => {
         if (allKanaTargets.length > 0) {
             const randomIndex = Math.floor(Math.random() * allKanaTargets.length);
             const nextTarget = allKanaTargets[randomIndex];
-            //console.log(">>> Selecting new Kana Challenge target:", nextTarget);
             setCurrentTarget(nextTarget);
             if (nextTarget.type === 'sokuonKomoji' && nextTarget.isTsu) {
                 setChallengeStage('tsuInput');
@@ -91,26 +87,92 @@ const useKanaChallengePractice = ({
         }
     }, [allKanaTargets]);
 
-    // カウントダウン処理
+    const reset = useCallback(() => {
+        console.log('[KanaChallengePractice reset] Resetting state.');
+        setStatus('idle');
+        setIsFinished(false);
+        setCountdownValue(COUNTDOWN_SECONDS); // countdownValue をリセット
+        setRemainingTime(TRAINING_DURATION_MS);
+        setCurrentTarget(null);
+        setChallengeStage('gyouInput');
+        setHeadingChars([]);
+        setChallengeResults(null);
+        startTimeRef.current = null;
+        correctCountRef.current = 0;
+        missCountRef.current = 0;
+        completedCharsCountRef.current = 0;
+        totalCharsTypedRef.current = 0;
+        totalAttemptedRef.current = 0;
+        if (countdownTimerRef.current !== null) clearTimeout(countdownTimerRef.current);
+        if (trainingTimerRef.current !== null) clearInterval(trainingTimerRef.current);
+    }, [setChallengeResults, setHeadingChars]);
+
+    // isActive の変更を監視し、練習の開始/終了を処理
     useEffect(() => {
-        if (isActive && status === 'countdown') {
+        const wasActive = prevIsActiveRef.current;
+        console.log(`[KanaChallengePractice isActive Effect] isActive: ${isActive}, wasActive: ${wasActive}, currentStatus: ${status}`);
+
+        if (isActive && !wasActive) { // 練習がアクティブになった瞬間
+            console.log('[KanaChallengePractice isActive Effect] Practice activated. Current status:', status);
+            // 外部 (usePracticeManagement) から reset が呼ばれ、status が 'idle' になっていることを期待。
+            // カウントダウン開始は、status と countdownValue を監視する別の useEffect に任せる。
+            // この時点では、status が 'idle' であることを確認するだけで、直接 'countdown' にはしない。
+            if (status !== 'idle') {
+                // 予期せず idle でない場合、強制的に reset を呼んで初期化する
+                // (通常は usePracticeManagement の reset で idle になっているはず)
+                console.warn(`[KanaChallengePractice isActive Effect] Activated but status is not idle (${status}). Forcing reset.`);
+                reset();
+            }
+        } else if (!isActive && wasActive) { // 練習が非アクティブになった瞬間
+            console.log('[KanaChallengePractice isActive Effect] Practice deactivated. Calling reset.');
+            reset();
+        }
+        prevIsActiveRef.current = isActive;
+    }, [isActive, status, reset]); // status を依存配列に追加して、活性化時に status が 'idle' でない場合の対処を可能にする
+
+    // カウントダウンおよび練習実行のメインロジック
+    useEffect(() => {
+        console.log(`[KanaChallengePractice MainLogic Effect] isActive: ${isActive}, status: ${status}, countdownValue: ${countdownValue}`);
+
+        if (!isActive) {
+            // 非アクティブなら何もしない (タイマーのクリアは reset や useEffect のクリーンアップで行う)
+            return;
+        }
+
+        if (status === 'idle') {
+            // アクティブで、かつステータスが 'idle' の場合、カウントダウンを開始する
+            console.log(`[KanaChallengePractice MainLogic Effect] Status is idle and active. Setting status to 'countdown'.`);
+            setCountdownValue(COUNTDOWN_SECONDS); // countdownValue を確実に初期値に
+            setStatus('countdown');
+        } else if (status === 'countdown') {
+            // カウントダウン中の処理
             if (countdownValue > 0) {
+                console.log(`[KanaChallengePractice MainLogic Effect] Countdown running. Value: ${countdownValue}`);
                 countdownTimerRef.current = window.setTimeout(() => {
                     setCountdownValue(prev => prev - 1);
                 }, 1000);
-            } else {
+            } else if (countdownValue === 0) {
+                // カウントダウン終了
+                console.log(`[KanaChallengePractice MainLogic Effect] Countdown finished. Setting status to 'running'.`);
+                if (countdownTimerRef.current !== null) { // 念のためタイマーをクリア
+                    clearTimeout(countdownTimerRef.current);
+                    countdownTimerRef.current = null;
+                }
                 setStatus('running');
                 setRemainingTime(TRAINING_DURATION_MS);
                 startTimeRef.current = Date.now();
-                selectNextTarget();
+                if (!currentTarget) { // 最初のターゲットを選択
+                    selectNextTarget();
+                }
             }
         }
+        // status === 'running' や 'finished' の場合のタイマー処理は別の useEffect で行う
+
         return () => {
-            if (countdownTimerRef.current !== null) {
-                clearTimeout(countdownTimerRef.current);
-            }
+            if (countdownTimerRef.current !== null) clearTimeout(countdownTimerRef.current);
         };
-    }, [isActive, status, countdownValue, selectNextTarget]);
+    }, [isActive, status, countdownValue, currentTarget, selectNextTarget, setStatus, setCountdownValue, setRemainingTime]);
+
 
     // トレーニング時間計測 & 終了処理
     useEffect(() => {
@@ -121,35 +183,31 @@ const useKanaChallengePractice = ({
                 setRemainingTime(newRemaining);
                 if (newRemaining === 0) {
                     setStatus('finished');
-                    setIsFinished(true); // 終了状態をセット
-                    if (trainingTimerRef.current) clearInterval(trainingTimerRef.current); // タイマー停止
+                    setIsFinished(true);
+                    if (trainingTimerRef.current) clearInterval(trainingTimerRef.current);
 
-                    const correct = correctCountRef.current; // 正解シーケンス完了数
+                    const correct = correctCountRef.current;
                     const miss = missCountRef.current;
-                    const totalTypedChars = totalCharsTypedRef.current; // 実際にタイプしたキーの総数
-                    // 正答率の計算式を (総入力キー数 - ミスタイプ数) / 総入力キー数 に変更
-                    const accuracy = totalTypedChars > 0 ? Math.max(0, (totalTypedChars - miss) / totalTypedChars) : 0; // 0未満にならないように
-
-                    // 新しいスコア計算 (例: 正解シーケンス数 * 精度 * 20)
+                    const totalTypedChars = totalCharsTypedRef.current;
+                    const accuracy = totalTypedChars > 0 ? Math.max(0, (totalTypedChars - miss) / totalTypedChars) : 0;
                     const score = Math.round(correct * accuracy * 20);
-                    // 入力が全くなかった場合はランクメッセージを空にする
                     const rankMessage = totalTypedChars > 0 ? getRankMessage(score) : '';
                     const results: ChallengeResult = {
-                        totalQuestions: correct, // 問題数 = 正解シーケンス完了数
-                        correctCharsCount: completedCharsCountRef.current, // 正解文字数 (ヘッダー表示文字数)
-                        totalCharsTyped: totalTypedChars, // 実際にタイプした総キー数
-                        correctCount: correct, // 正解シーケンス完了数
-                        missCount: miss, // ミスタイプ数
-                        accuracy: accuracy, // (総入力キー数 - ミスタイプ数) / 総入力キー数
+                        totalQuestions: correct,
+                        correctCharsCount: completedCharsCountRef.current,
+                        totalCharsTyped: totalTypedChars,
+                        correctCount: correct,
+                        missCount: miss,
+                        accuracy: accuracy,
                         score: score,
                         rankMessage: rankMessage,
                     };
-                    setChallengeResults(results); // 計算結果を state にセット
-                    setHeadingChars([]); // ヘッダーはクリア（結果は App.tsx で表示するため）
+                    setChallengeResults(results);
+                    setHeadingChars([]);
                 }
             }, 100);
         } else if (status === 'finished' && trainingTimerRef.current) {
-             clearInterval(trainingTimerRef.current); // 終了したら確実に止める
+             clearInterval(trainingTimerRef.current);
         }
         return () => {
             if (trainingTimerRef.current !== null) {
@@ -172,44 +230,8 @@ const useKanaChallengePractice = ({
     }, [status, countdownValue, currentTarget]);
 
 
-    // リセット処理
-    const reset = useCallback(() => {
-        setStatus('idle');
-        setIsFinished(false); // 終了状態もリセット
-        setCountdownValue(COUNTDOWN_SECONDS);
-        setRemainingTime(TRAINING_DURATION_MS);
-        setCurrentTarget(null);
-        setChallengeStage('gyouInput');
-        setHeadingChars([]); // ヘッダーもクリア
-        setChallengeResults(null); // 結果もリセット
-        startTimeRef.current = null;
-        correctCountRef.current = 0; // 正解シーケンス完了数リセット
-        missCountRef.current = 0;
-        completedCharsCountRef.current = 0; // 正しく入力完了した文字数リセット
-        totalCharsTypedRef.current = 0;
-        totalAttemptedRef.current = 0;
-        if (countdownTimerRef.current !== null) clearTimeout(countdownTimerRef.current);
-        if (trainingTimerRef.current !== null) clearInterval(trainingTimerRef.current);
-        //console.log("Resetting Kana Challenge Practice");
-    }, [setChallengeResults, setHeadingChars]);
-
-    // アクティブになったらカウントダウン開始
-    useEffect(() => {
-        // isActive が false になった最初のタイミングでリセット
-        if (!isActive && prevIsActiveRef.current) {
-            // console.log(`[KanaChallenge useEffect] Resetting state because isActive became false.`);
-            reset();
-        } else if (isActive && status === 'idle') { // isActive が true で status が idle の場合のみカウントダウン開始
-            setStatus('countdown');
-            setCountdownValue(COUNTDOWN_SECONDS);
-        }
-        prevIsActiveRef.current = isActive; // 最後に前回の値を更新
-    }, [isActive, status, reset]);
-
-
     // 入力処理
     const handleInput = useCallback((inputInfo: PracticeInputInfo): PracticeInputResult => {
-        // isFinished をチェック
         if (status !== 'running' || !currentTarget || isFinished) {
             return { isExpected: false, shouldGoToNext: false };
         }
@@ -222,11 +244,9 @@ const useKanaChallengePractice = ({
         let nextStage: ChallengeStage | null = null;
         let shouldIncrementAttempt = false;
 
-        //console.log(`[KanaChallenge] Input: 0x${pressCode.toString(16)} for target: ${currentTarget.char} (${currentTarget.type}), Stage: ${challengeStage}`);
-        totalCharsTypedRef.current += 1; // タイプ数をカウント
+        totalCharsTypedRef.current += 1;
 
         if (currentTarget.type === 'seion') {
-            // --- 清音の入力判定 ---
             const expectedGyouKey = currentTarget.gyouKey;
             const expectedDanKey = currentTarget.danKey;
             const actualGyouKey = hid2Gyou(pressCode, kb, side);
@@ -240,20 +260,19 @@ const useKanaChallengePractice = ({
                     nextStage = 'gyouInput';
                 }
             } else if (challengeStage === 'danInput') {
-                shouldIncrementAttempt = true; // danInput で試行回数をカウント
+                shouldIncrementAttempt = true;
                 if (actualDanKey === expectedDanKey) {
                     isExpected = true;
                     correctCountRef.current += 1;
-                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算
+                    completedCharsCountRef.current += currentTarget.char.length;
                     selectNextTarget();
-                    nextStage = null;
+                    nextStage = null; // ターゲット選択後にステージはリセットされる
                 } else {
                     missCountRef.current += 1;
                     nextStage = 'gyouInput';
                 }
             }
         } else if (currentTarget.type === 'youon') {
-            // --- 拗音の入力判定 ---
             const expectedGyouKey = currentTarget.gyouKey;
             const expectedDanKey = currentTarget.danKey;
             const actualGyouKey = hid2Gyou(pressCode, kb, side);
@@ -273,16 +292,16 @@ const useKanaChallengePractice = ({
                     isExpected = true;
                     nextStage = 'danInput';
                 } else {
-                    shouldIncrementAttempt = true; // youonInput でミス
+                    shouldIncrementAttempt = true;
                     missCountRef.current += 1;
                     nextStage = 'gyouInput';
                 }
             } else if (challengeStage === 'danInput') {
-                shouldIncrementAttempt = true; // danInput で試行回数をカウント
+                shouldIncrementAttempt = true;
                 if (actualDanKey === expectedDanKey) {
                     isExpected = true;
                     correctCountRef.current += 1;
-                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算
+                    completedCharsCountRef.current += currentTarget.char.length;
                     selectNextTarget();
                     nextStage = null;
                 } else {
@@ -291,7 +310,6 @@ const useKanaChallengePractice = ({
                 }
             }
         } else if (currentTarget.type === 'dakuon') {
-            // --- 濁音の入力判定 ---
             const expectedGyouKey = currentTarget.gyouKey;
             const expectedDanKey = currentTarget.danKey;
             const actualGyouKey = hid2Gyou(pressCode, kb, side);
@@ -302,25 +320,25 @@ const useKanaChallengePractice = ({
             if (challengeStage === 'gyouInput') {
                 if (actualGyouKey === expectedGyouKey) {
                     isExpected = true;
-                    nextStage = 'dakuonInput'; // 次は濁音ステージへ
+                    nextStage = 'dakuonInput';
                 } else {
                     nextStage = 'gyouInput';
                 }
             } else if (challengeStage === 'dakuonInput') {
                 if (pressCode === expectedDakuonKeyCode) {
                     isExpected = true;
-                    nextStage = 'danInput'; // 次は段ステージへ
+                    nextStage = 'danInput';
                 } else {
-                    shouldIncrementAttempt = true; // dakuonInput でミス
+                    shouldIncrementAttempt = true;
                     missCountRef.current += 1;
                     nextStage = 'gyouInput';
                 }
             } else if (challengeStage === 'danInput') {
-                shouldIncrementAttempt = true; // danInput で試行回数をカウント
+                shouldIncrementAttempt = true;
                 if (actualDanKey === expectedDanKey) {
                     isExpected = true;
                     correctCountRef.current += 1;
-                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算
+                    completedCharsCountRef.current += currentTarget.char.length;
                     selectNextTarget();
                     nextStage = null;
                 } else {
@@ -329,50 +347,42 @@ const useKanaChallengePractice = ({
                 }
             }
         } else if (currentTarget.type === 'sokuonKomoji' && currentTarget.isTsu) {
-            // --- 促音「っ」の入力判定 ---
             const tsuKeyCodeEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '促音');
             const expectedTsuKeyCode = tsuKeyCodeEntry ? parseInt(tsuKeyCodeEntry[0]) + 1 : -1;
 
             if (challengeStage === 'tsuInput') {
-                shouldIncrementAttempt = true; // 1タイプで試行回数をカウント
+                shouldIncrementAttempt = true;
                 if (pressCode === expectedTsuKeyCode) {
                     isExpected = true;
                     correctCountRef.current += 1;
-                    completedCharsCountRef.current += currentTarget.char.length; // 文字数を加算 (1文字)
+                    completedCharsCountRef.current += currentTarget.char.length;
                     selectNextTarget();
-                    nextStage = null; // ステージは selectNextTarget でリセットされる
+                    nextStage = null;
                 } else {
                     missCountRef.current += 1;
-                    nextStage = 'tsuInput'; // ステージはそのまま
+                    nextStage = 'tsuInput';
                 }
             }
         }
 
-        // 共通処理
         if (shouldIncrementAttempt) {
             totalAttemptedRef.current += 1;
         }
 
         if (nextStage && nextStage !== challengeStage) {
-            //console.log(`[KanaChallenge] Setting stage from ${challengeStage} to ${nextStage}`);
             setChallengeStage(nextStage);
-        } else if (!isExpected && challengeStage !== 'gyouInput' && challengeStage !== 'tsuInput' && nextStage !== null) { // 促音以外で不正解の場合
-            // console.log(`[KanaChallenge] Incorrect input, resetting stage to gyouInput`);
+        } else if (!isExpected && challengeStage !== 'gyouInput' && challengeStage !== 'tsuInput' && nextStage !== null) {
              setChallengeStage('gyouInput');
         } else if (!isExpected && challengeStage === 'tsuInput') {
-             // 促音で不正解の場合はステージをリセットしない（再度 tsuInput を待つ）
-            // console.log(`[KanaChallenge] Incorrect input for tsu, staying in tsuInput stage`);
+            // No stage change
         }
 
-
-        //console.log(`[KanaChallenge] End - isExpected: ${isExpected}, Final Stage: ${nextStage ?? challengeStage}`);
         return { isExpected, shouldGoToNext: false };
     }, [status, currentTarget, challengeStage, kb, side, selectNextTarget, currentFunctionKeyMap, isFinished, setChallengeStage]);
 
     // ハイライト処理
     const getHighlightClassName = useCallback((keyName: string, layoutIndex: number): PracticeHighlightResult => {
         const noHighlight: PracticeHighlightResult = { className: null, overrideKey: null };
-        // isFinished をチェック
         if (status !== 'running' || !currentTarget || isFinished) {
             return noHighlight;
         }
@@ -381,7 +391,6 @@ const useKanaChallengePractice = ({
         let targetLayoutIndex: number | null = null;
 
         if (currentTarget.type === 'seion') {
-            // --- 清音のハイライト ---
             if (challengeStage === 'gyouInput') {
                 expectedKeyName = currentTarget.gyouKey;
                 targetLayoutIndex = 2;
@@ -390,7 +399,6 @@ const useKanaChallengePractice = ({
                 targetLayoutIndex = 3;
             }
         } else if (currentTarget.type === 'youon') {
-            // --- 拗音のハイライト ---
             const youonKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '拗音');
             const youonDisplayName = youonKeyEntry ? currentFunctionKeyMap[parseInt(youonKeyEntry[0])] : '拗音';
 
@@ -405,7 +413,6 @@ const useKanaChallengePractice = ({
                 targetLayoutIndex = 3;
             }
         } else if (currentTarget.type === 'dakuon') {
-            // --- 濁音のハイライト ---
             const dakuonKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '濁音');
             const dakuonDisplayName = dakuonKeyEntry ? currentFunctionKeyMap[parseInt(dakuonKeyEntry[0])] : '濁音';
 
@@ -413,18 +420,17 @@ const useKanaChallengePractice = ({
                 expectedKeyName = currentTarget.gyouKey;
                 targetLayoutIndex = 2;
             } else if (challengeStage === 'dakuonInput') {
-                expectedKeyName = dakuonDisplayName; // 濁音キーの表示名
-                targetLayoutIndex = 2; // かなスタートレイヤーにあると仮定
+                expectedKeyName = dakuonDisplayName;
+                targetLayoutIndex = 2;
             } else if (challengeStage === 'danInput') {
                 expectedKeyName = currentTarget.danKey;
                 targetLayoutIndex = 3;
             }
         } else if (currentTarget.type === 'sokuonKomoji' && currentTarget.isTsu) {
-            // --- 促音「っ」のハイライト ---
             if (challengeStage === 'tsuInput') {
                 const tsuKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '促音');
                 expectedKeyName = tsuKeyEntry ? currentFunctionKeyMap[parseInt(tsuKeyEntry[0])] : '促音';
-                targetLayoutIndex = 2; // かなスタートレイヤーにあると仮定
+                targetLayoutIndex = 2;
             }
         }
 
@@ -437,14 +443,12 @@ const useKanaChallengePractice = ({
 
     // 不正入力ターゲット判定
     const isInvalidInputTarget = useCallback((pressCode: number, layoutIndex: number, keyIndex: number): boolean => {
-        // isFinished をチェック
         if (status !== 'running' || !currentTarget || isFinished) return false;
 
         let expectedKeyName: string | null = null;
         let expectedLayoutIndex: number | null = null;
 
         if (currentTarget.type === 'seion') {
-             // --- 清音の判定 ---
             if (challengeStage === 'gyouInput') {
                 expectedKeyName = currentTarget.gyouKey;
                 expectedLayoutIndex = 2;
@@ -453,7 +457,6 @@ const useKanaChallengePractice = ({
                 expectedLayoutIndex = 3;
             }
         } else if (currentTarget.type === 'youon') {
-             // --- 拗音の判定 ---
             const youonKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '拗音');
             const youonDisplayName = youonKeyEntry ? currentFunctionKeyMap[parseInt(youonKeyEntry[0])] : '拗音';
 
@@ -468,7 +471,6 @@ const useKanaChallengePractice = ({
                 expectedLayoutIndex = 3;
             }
         } else if (currentTarget.type === 'dakuon') {
-             // --- 濁音の判定 ---
             const dakuonKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '濁音');
             const dakuonDisplayName = dakuonKeyEntry ? currentFunctionKeyMap[parseInt(dakuonKeyEntry[0])] : '濁音';
 
@@ -483,7 +485,6 @@ const useKanaChallengePractice = ({
                 expectedLayoutIndex = 3;
             }
         } else if (currentTarget.type === 'sokuonKomoji' && currentTarget.isTsu) {
-             // --- 促音「っ」の判定 ---
              if (challengeStage === 'tsuInput') {
                  const tsuKeyEntry = Object.entries(currentFunctionKeyMap).find(([_, name]) => name === '促音');
                  expectedKeyName = tsuKeyEntry ? currentFunctionKeyMap[parseInt(tsuKeyEntry[0])] : '促音';
@@ -493,11 +494,8 @@ const useKanaChallengePractice = ({
 
         if (expectedKeyName !== null && expectedLayoutIndex !== null) {
             const targetKeyIndex = pressCode - 1;
-            // 期待されるキーコードを取得
             const expectedCodes = getHidKeyCodes(expectedKeyName, layers, kb, side);
-            // 期待されるキーコードに含まれていれば不正入力ではない
             if (expectedCodes.includes(pressCode)) return false;
-            // 期待されるレイヤーで、かつ押されたキーのインデックスが一致する場合のみ不正入力ターゲット
             return layoutIndex === expectedLayoutIndex && keyIndex === targetKeyIndex;
         }
 
@@ -505,17 +503,16 @@ const useKanaChallengePractice = ({
     }, [status, currentTarget, challengeStage, currentFunctionKeyMap, isFinished, layers, kb, side]);
 
     const practiceResult = useMemo(() => {
-        //console.log('[useKanaChallengePractice useMemo] Recalculating result object. currentTarget:', currentTarget, 'status:', status);
         return {
-            currentTarget: currentTarget ?? undefined, // currentTarget を含める (null の場合は undefined に)
-            getHighlight: () => ({ start: null, end: null }), // チャレンジモードではハイライト不要なので仮実装
+            currentTarget: currentTarget ?? undefined,
+            getHighlight: () => ({ start: null, end: null }),
             headingChars,
             handleInput,
             getHighlightClassName,
             reset,
             isInvalidInputTarget,
-            challengeResults, // 計算結果を返す
-            status, // status を返す
+            challengeResults,
+            status,
             countdownValue,
         };
     }, [currentTarget, headingChars, handleInput, getHighlightClassName, reset, isInvalidInputTarget, challengeResults, status, countdownValue]);

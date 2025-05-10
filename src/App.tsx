@@ -11,24 +11,12 @@ import {
     dakuonGyouList,
     dakuonGyouChars,
     handakuonGyouList,
-    handakuonGyouChars,
-    sokuonKomojiData,
-    kigoPractice1Data,
-    kigoPractice2Data,
-    kigoPractice3Data,
-    youdakuonPracticeData,
-    youhandakuonPracticeData,
-    functionKeyMaps,
-    youonKakuchoChars,
-    gairaigoPracticeData,
     basicPracticeMenuItems, // PracticeMenu で使うためインポート
     stepUpPracticeMenuItems, // PracticeMenu で使うためインポート
     challengeMenuItems, // PracticeMenu で使うためインポート
-    gyouChars, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
     youonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
     dakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
     handakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
-    seionPracticeData, // practiceDataMap で使用
     youdakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
     youhandakuonDanMapping, // calculateNextIndices で使用 (現在は未使用だが、将来的に使う可能性のため残す)
 } from './data/keymapData';
@@ -38,8 +26,9 @@ import {
     PracticeInputInfo,
     KeyboardSide,
     CharInfoGairaigo, // currentTarget の型チェック用
-    KeyboardModel,
-    PracticeStatus // PracticeHeading に渡すためインポート
+    KeyboardModel, // PracticeHeading に渡すためインポート
+    PracticeStatus, // PracticeHeading に渡すためインポート
+    isChallengeMode // isChallengeMode を usePracticeCommons からインポート
 } from './hooks/usePracticeCommons';
 import { useUrlAndKeyboardSetup } from './hooks/useUrlAndKeyboardSetup'; // 作成したフックをインポート
 
@@ -48,31 +37,8 @@ import { useUrlAndKeyboardSetup } from './hooks/useUrlAndKeyboardSetup'; // 作�
 import AppLayout from './components/AppLayout'; // AppLayout をインポート
 import { usePracticeManagement } from './hooks/usePracticeManagement'; // 新しいフックをインポート
 import { useAppInteractions } from './hooks/useAppInteractions'; // 新しいフックをインポート
+import { useAppCoreState } from './hooks/useAppCoreState'; // 新しいフックをインポート
 
-// practiceDataMap の定義は App.tsx に残す (usePracticeManagement に渡すため)
-const practiceDataMap: Record<string, any[]> = {
-    '清音の基本練習': seionPracticeData,
-    '拗音の基本練習': youonGyouList.map((gyou: string) => youonGyouChars[gyou]),
-    '濁音の基本練習': dakuonGyouList.map((gyou: string) => dakuonGyouChars[gyou]),
-    '半濁音の基本練習': [handakuonGyouChars['は行']],
-    '小文字(促音)の基本練習': sokuonKomojiData,
-    '記号の基本練習１': kigoPractice1Data,
-    '記号の基本練習２': kigoPractice2Data,
-    '記号の基本練習３': kigoPractice3Data,
-    '拗濁音の練習': youdakuonPracticeData,
-    '拗半濁音の練習': youhandakuonPracticeData,
-    '拗音拡張': youonGyouList.map((gyou: string) => youonKakuchoChars[gyou]),
-    '外来語の発音補助': gairaigoPracticeData,
-    // チャレンジモードのデータは各フックが内部で持つか、別途管理される想定
-    // practiceDataMap は主に通常練習モードの headingChars や calculateNextIndices で使用
-};
-
-
-// ユーティリティ関数: チャレンジモードかどうかを判定
-const isChallengeMode = (mode: PracticeMode | ''): boolean => { // Allow ''
-    if (!mode) return false; // If mode is '', it's not a challenge mode
-    return mode === 'かな入力１分間トレーニング' || mode === '記号入力１分間トレーニング' || mode === '短文入力３分間トレーニング';
-};
 
 export default function App() {
     // --- URLとキーボード設定の初期化 (useUrlAndKeyboardSetup フックを使用) ---
@@ -81,16 +47,24 @@ export default function App() {
         initialFw, initialSn, initialShowTrainingButton
     } = useUrlAndKeyboardSetup();
 
-    /* UI 状態 */
-    const [layers, setLayers] = useState<string[][]>(initialLayers);
-    const [title, setTitle] = useState(initialTitle);
-    const [fw, setFW] = useState<string | null>(initialFw);
-    const [sn, setSN] = useState<string | null>(initialSn);
-    const [cols, setCols] = useState(initialCols);
-    const [training, setTraining] = useState(false);
-    const [showTrainingButton, setShowTrainingButton] = useState(initialShowTrainingButton);
-    const [side, setSide] = useState<KeyboardSide>(initialSide);
-    const [kb, setKb] = useState<KeyboardModel>(initialKb);
+    // --- App Core State Hook ---
+    const {
+        layers, // setLayers is available if needed
+        title,  // setTitle is available if needed
+        fw,     // setFW is available if needed
+        sn,     // setSN is available if needed
+        cols,   // setCols is available if needed
+        training, setTraining,
+        showTrainingButton, // setShowTrainingButton is available if needed
+        side,   // setSide is available if needed
+        kb,     // setKb is available if needed
+        fixedWidth,
+        currentFunctionKeyMap,
+    } = useAppCoreState({
+        initialKb, initialSide, initialLayers, initialTitle, initialCols,
+        initialFw, initialSn, initialShowTrainingButton
+    });
+
 
     // --- App Interactions Hook ---
     const {
@@ -118,10 +92,8 @@ export default function App() {
         kb,
         showKeyLabels,
         training,
-        practiceDataMap, // Defined in App.tsx
         sampleJson,      // Imported in App.tsx from keymapData
         layerNames,      // Imported in App.tsx from keymapData
-        isChallengeModeFn: isChallengeMode, // Pass the utility function
     });
 
     const {
@@ -152,15 +124,6 @@ export default function App() {
     useEffect(() => {
         activePracticeRef.current = activePractice;
     }, [activePractice]);    
-
-    // キーボード表示の固定幅
-    const keyWidthRem = 5.5;
-    const fixedWidthNum = cols * keyWidthRem;
-    const fixedWidth = `${fixedWidthNum}rem`;
-
-    const currentFunctionKeyMap = useMemo(() => {
-        return functionKeyMaps[kb as keyof typeof functionKeyMaps]?.[side as keyof typeof functionKeyMaps[keyof typeof functionKeyMaps]] ?? {};
-    }, [kb, side]);
 
     // --- 不正入力処理 ---
     const handleInvalidInput = useCallback((pressCode: number) => {
@@ -344,15 +307,6 @@ export default function App() {
         // activePracticeRef.current?.reset?.(); // Hook's useEffect for isRandomMode will handle this
      }, [setIsRandomMode, isRandomMode]); // practiceRef は ref なので依存配列に不要
 
-    // ボタンのスタイル
-    const buttonStyle: React.CSSProperties = {
-        marginBottom: '0.5rem',
-        padding: '5px 10px',
-        display: 'block',
-        minWidth: '120px',
-        textAlign: 'center',
-     };
-
     const isChallengeModeActive = isChallengeMode(practice);
 
     // コンポーネント全体のJSX
@@ -384,7 +338,6 @@ export default function App() {
             onToggleShowKeyLabels={() => setShowKeyLabels(prev => !prev)}
             onToggleRandomMode={toggleRandomMode}
             onPracticeSelect={handlePracticeSelect}
-            buttonStyle={buttonStyle}
         />
     );
 }

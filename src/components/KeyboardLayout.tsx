@@ -2,7 +2,7 @@
 import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { PracticeMode, PracticeHookResult, PracticeHighlightResult } from '../hooks/usePracticeCommons';
-import { kigoMapping2, kigoMapping3 } from '../data/keymapData';
+// import { kigoMapping2, kigoMapping3 } from '../data/keymapData'; // kigoMappingは直接使わなくなったためコメントアウト
 import { getKeyStyle, isLargeSymbol } from '../utils/styleUtils';
 
 interface KeyboardLayoutProps {
@@ -18,8 +18,58 @@ interface KeyboardLayoutProps {
   currentFunctionKeyMap: Record<number, string>;
   training: boolean;
   className?: string;
-  // clearInvalidHighlight?: () => void; // App.tsx側で管理するため不要
 }
+
+// --- キーラベル取得ヘルパー関数群 ---
+const getKeyLabelForKigo1Practice = (originalKey: string, funcKeyLabel: string | undefined, layoutIndex: number, isEmptyKey: boolean): string => {
+    if (layoutIndex === 6) { // 記号1レイヤー
+        if (isEmptyKey && funcKeyLabel) {
+            return funcKeyLabel;
+        }
+    } else if (layoutIndex === 2) { // かなスタートレイヤーは非表示
+         return '____';
+    }
+    return originalKey;
+};
+
+const getKeyLabelForKigo2Practice = (originalKey: string, funcKeyLabel: string | undefined, layoutIndex: number): string => {
+    if (layoutIndex === 7) {
+        if (funcKeyLabel) { // 機能キー
+            return funcKeyLabel;
+        }
+        // 記号キーはそのまま表示
+    } else if (layoutIndex === 2) { // かなスタートレイヤーは非表示
+        return '____';
+    }
+    return originalKey;
+};
+
+const getKeyLabelForKigo3Practice = (originalKey: string, funcKeyLabel: string | undefined, layoutIndex: number): string => {
+    if (layoutIndex === 8) {
+        if (funcKeyLabel) { // 機能キー
+            return funcKeyLabel;
+        }
+        // 記号キーはそのまま表示
+    } else if (layoutIndex === 2) { // かなスタートレイヤーは非表示
+        return '____';
+    }
+    return originalKey;
+};
+
+const getKeyLabelForKanaPractice = (originalKey: string, funcKeyLabel: string | undefined, layoutIndex: number): string => {
+    if (layoutIndex === 3) { // かなエンドレイヤー
+        // 拗音キーは非表示 (データ側で ____ に変更済みのため、この条件分岐は実質不要だが残しておく)
+        if (['拗1', '拗2', '拗3', '拗4'].includes(originalKey)) { // 半角数字で比較
+            return '____';
+        }
+    } else if (layoutIndex === 2) { // かなスタートレイヤー (上記以外)
+         if (funcKeyLabel) {
+             return funcKeyLabel;
+         }
+    }
+    return originalKey;
+};
+
 
 const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
   layerData,
@@ -34,7 +84,6 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
   currentFunctionKeyMap,
   training,
   className = '',
-  // clearInvalidHighlight, // App.tsx側で管理するため不要
 }) => {
     // キー描画ロジック (renderKey)
     const renderKey = useCallback((key: string, idx: number) => {
@@ -53,45 +102,59 @@ const KeyboardLayout: React.FC<KeyboardLayoutProps> = ({
             }
         }
 
-        // 練習モードON時のラベル加工 (kigoMapping など)
+        // 練習モードON時のラベル加工
         if (training && showKeyLabels) {
             const funcKeyLabel = currentFunctionKeyMap[idx];
 
-            if (practice === '記号の基本練習１') {
-                if (layoutIndex === 6) { // 記号1レイヤー
-                    if (isEmptyKey && funcKeyLabel) {
+            switch (practice) {
+                case '記号の基本練習１':
+                    k = getKeyLabelForKigo1Practice(originalKey, funcKeyLabel, layoutIndex, isEmptyKey);
+                    break;
+                case '記号の基本練習２':
+                    k = getKeyLabelForKigo2Practice(originalKey, funcKeyLabel, layoutIndex);
+                    break;
+                case '記号の基本練習３':
+                    k = getKeyLabelForKigo3Practice(originalKey, funcKeyLabel, layoutIndex);
+                    break;
+                // 他のかな練習モードも同様に getKeyLabelForKanaPractice を使うか、
+                // より詳細な分岐が必要なら専用のヘルパー関数を作成
+                case '清音の基本練習':
+                case '拗音の基本練習':
+                case '濁音の基本練習':
+                case '半濁音の基本練習':
+                case '小文字(促音)の基本練習':
+                case '拗濁音の練習':
+                case '拗半濁音の練習':
+                case '拗音拡張':
+                case '外来語の発音補助':
+                case 'かな入力１分間トレーニング': // チャレンジモードも含む
+                    k = getKeyLabelForKanaPractice(originalKey, funcKeyLabel, layoutIndex);
+                    break;
+                case '記号入力１分間トレーニング':
+                    // 記号チャレンジの場合、レイヤーによって表示を変える必要があるかもしれない
+                    // 例えば、ターゲットレイヤーのみ表示するなど。
+                    // ここでは、記号の基本練習と同様のロジックを適用するか、
+                    // activePractice.displayLayers を参照して表示を制御する
+                    if (activePractice?.displayLayers && activePractice.targetLayerIndex === layoutIndex) {
+                        // ターゲットレイヤーの表示ロジック (必要なら funcKeyLabel も考慮)
+                        // k = originalKey; // または funcKeyLabel を使うなど
+                    } else if (activePractice?.displayLayers && activePractice.targetLayerIndex !== layoutIndex) {
+                        // k = '____'; // ターゲット外のレイヤーは非表示など
+                    } else {
+                        // displayLayers がない場合のデフォルト (記号練習2,3に似た処理)
+                        if (funcKeyLabel) k = funcKeyLabel;
+                    }
+                    break;
+                case '短文入力３分間トレーニング':
+                    // 短文練習ではキーボード表示は通常行わないが、もし表示する場合のラベル
+                    k = '____'; // 基本的に非表示
+                    break;
+                default:
+                    // その他の練習モードや練習モード未選択時
+                    if (funcKeyLabel) {
                         k = funcKeyLabel;
                     }
-                } else if (layoutIndex === 2) { // かなスタートレイヤーは非表示
-                     k = '____';
-                }
-            } else if (practice === '記号の基本練習２') {
-                if (layoutIndex === 7) {
-                    if (funcKeyLabel) { // 機能キー
-                        k = funcKeyLabel;
-                    }
-                    // 記号キーはそのまま表示 (kigoMapping2 は使わない)
-                } else if (layoutIndex === 2) { // かなスタートレイヤーは非表示
-                    k = '____';
-                }
-            } else if (practice === '記号の基本練習３') {
-                if (layoutIndex === 8) {
-                    if (funcKeyLabel) { // 機能キー
-                        k = funcKeyLabel;
-                    }
-                    // 記号キーはそのまま表示 (kigoMapping3 は使わない)
-                } else if (layoutIndex === 2) { // かなスタートレイヤーは非表示
-                    k = '____';
-                }
-            } else if (layoutIndex === 3) { // かなエンドレイヤー
-                // 拗音キーは非表示 (データ側で ____ に変更済みのため、この条件分岐は実質不要だが残しておく)
-                if (['拗1', '拗2', '拗3', '拗4'].includes(originalKey)) { // 半角数字で比較
-                    k = '____';
-                }
-            } else if (layoutIndex === 2) { // かなスタートレイヤー (上記以外)
-                 if (funcKeyLabel) {
-                     k = funcKeyLabel;
-                 }
+                    break;
             }
         }
 

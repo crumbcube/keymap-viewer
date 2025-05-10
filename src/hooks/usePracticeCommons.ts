@@ -55,7 +55,7 @@ export type KeyboardSide = 'left' | 'right';
 /* キーボードモデルの型定義 */
 export type KeyboardModel = 'tw-20h' | 'tw-20v';
 
-export type PracticeStage = 'line' | 'youon' | 'dan' | 'middle' | 'kigo' | 'longPressWait' | 'longPressCheck' | 'gyouInput' | 'dakuonInput' | 'handakuonInput' | 'dakuonInput1' | 'dakuonInput2' | 'kigoInput' | 'kigoInputWait' | 'tsuInput' | 'key1' | 'key2' | 'key3' | 'key4' | 'waitAfterFirstDakuon'; // Add 'key4'
+export type PracticeStage = 'line' | 'youon' | 'dan' | 'middle' | 'kigo' | 'longPressWait' | 'longPressCheck' | 'gyouInput' | 'dakuonInput' | 'handakuonInput' | 'dakuonInput1' | 'dakuonInput2' | 'kigoInput' | 'kigoInputWait' | 'tsuInput' | 'key1' | 'key2' | 'key3' | 'key4' | 'waitAfterFirstDakuon';
 
 
 /* --- TW-20H マッピング --- */
@@ -266,66 +266,66 @@ export interface PracticeHookProps {
     layers: string[][];
     kb: KeyboardModel;
     isRandomMode?: boolean;
-    showKeyLabels: boolean; // Add showKeyLabels
-    onAdvance?: () => void; // <<< App.tsx から進行を伝えるコールバックを受け取る
+    showKeyLabels: boolean;
+    onAdvance?: () => void;
 }
 
 /* 練習フックの入力情報 */
 export interface PracticeInputInfo {
     type: 'press' | 'release';
     timestamp: number;
-    pressCode: number; // 押下時のHIDコード (0x01 ~ maxStartLayoutKeyCode)
+    pressCode: number;
 }
 
 /* 練習フックの入力処理結果 */
 export interface PracticeInputResult {
     isExpected: boolean;
-    shouldGoToNext?: boolean; // Make optional: true (next group), false (next char in group), undefined (char not complete)
+    shouldGoToNext?: boolean;
 }
 
 export interface PracticeHighlightResult {
-    className: string | null; // ハイライト用クラス名 (例: 'bg-blue-100')
-    overrideKey: string | null; // 上書き表示するキー名 (null なら上書きしない)
+    className: string | null;
+    overrideKey: string | null;
 }
 
 export interface ChallengeResult {
-    totalQuestions: number; // 問題数（クリアした数）
-    totalCharsTyped: number; // 総入力文字数
-    correctCharsCount?: number; // 正しく入力完了した文字数（かな/短文）
-    correctCount: number; // 正解タイプ数
-    missCount: number; // ミスタイプ数
-    accuracy: number; // 正答率 (0-1)
-    score: number; // 計算後のスコア
-    rankMessage: string; // ランクメッセージ
+    totalQuestions: number;
+    totalCharsTyped: number;
+    correctCharsCount?: number;
+    correctCount: number;
+    missCount: number;
+    accuracy: number;
+    score: number;
+    rankMessage: string;
 }
 
 type PracticeTargetObject = CharInfoSeion | CharInfoYouon | CharInfoDakuon | CharInfoSokuonKomoji | CharInfoKigo1 | CharInfoKigo2 | CharInfoKigo3 | CharInfoGairaigo | CharInfoYouhandakuon | CharInfoYoudakuon;
 
-export type PracticeStatus = 'idle' | 'countdown' | 'running' | 'finished'; // 練習の状態
+export type PracticeStatus = 'idle' | 'countdown' | 'running' | 'finished';
 
 /* 練習フックの共通戻り値型 */
 export interface PracticeHookResult {
-    headingChars: string[]; // 見出しに表示する文字配列
-    targetChar?: string; // 現在のターゲット文字 (オプション)
+    headingChars: string[];
+    targetChar?: string;
     getHighlightClassName: (key: string, layoutIndex: number) => PracticeHighlightResult;
     getHighlight?: () => HighlightInfo;
     getProgressInfo?: () => TanbunProgressInfo;
     handleInput: (info: PracticeInputInfo) => PracticeInputResult;
     reset?: () => void;
     isInvalidInputTarget: (pressCode: number, layoutIndex: number, keyIndex: number) => boolean;
-    status?: PracticeStatus; // 練習の現在の状態 (チャレンジモード用)
-    countdownValue?: number; // カウントダウンの残り秒数 (チャレンジモード用)
-    challengeResults?: ChallengeResult | null; // Ensure this line exists and is correct
+    status?: PracticeStatus;
+    countdownValue?: number;
+    challengeResults?: ChallengeResult | null;
     targetLayerIndex?: number | null;
-    displayLayers?: string[][]; // 記号チャレンジ用
+    displayLayers?: string[][];
     currentTarget?: string | PracticeTargetObject | undefined;
     typedEndIndex?: number;
 }
 
 /* getHighlight の戻り値 */
 export interface HighlightInfo {
-    start: string | null; // スタートキー名 (例: 'あ行')
-    end: string | null;   // エンドキー名 (例: 'あ段')
+    start: string | null;
+    end: string | null;
 }
 
 export interface TanbunHighlightInfo {
@@ -388,15 +388,14 @@ export interface CharInfoKigo3 {
 export interface CharInfoGairaigo {
     type: 'gairaigo';
     char: string;
-    // Allow 3 or 4 keys to match GairaigoPracticeTarget
-    keys: [string, string, string] | [string, string, string, string]; // 表示上のキー名
-    actualSecondKey: string; // 実際の2打目のキー名
-    actualThirdKey?: string; // 実際の3打目のキー名 (オプション)
+    keys: [string, string, string] | [string, string, string, string];
+    actualSecondKey: string;
+    actualThirdKey?: string;
 }
 export interface CharInfoYouhandakuon {
     type: 'youhandakuon';
     char: string;
-    inputDef: YouhandakuonInputDef; // 入力定義を含める
+    inputDef: YouhandakuonInputDef;
 }
 export interface CharInfoYoudakuon {
     type: 'youdakuon';
@@ -408,18 +407,16 @@ export interface CharInfoYoudakuon {
 // 全清音文字情報
 export const allSeionCharInfos: CharInfoSeion[] = gyouList.flatMap(gyou =>
   danOrder[gyou]?.map((charInDanOrder, index) => {
-    // gyouChars から実際の文字を取得 (danOrder と gyouChars の整合性が前提)
     const actualChar = gyouChars[gyou]?.[index];
     let danKey: string | undefined;
     if (gyou === 'や行') {
-        if (index === 0) danKey = 'あ段'; // や
-        else if (index === 1) danKey = 'う段'; // ゆ
-        else if (index === 2) danKey = 'お段'; // よ
+        if (index === 0) danKey = 'あ段';
+        else if (index === 1) danKey = 'う段';
+        else if (index === 2) danKey = 'お段';
     } else {
-        danKey = danList[index]; // や行以外は danOrder のインデックスで danList から取得
+        danKey = danList[index];
     }
 
-    // danKey と actualChar が取得できた場合のみオブジェクトを生成
     if (danKey && actualChar) {
       return {
         type: 'seion' as const,
@@ -428,8 +425,8 @@ export const allSeionCharInfos: CharInfoSeion[] = gyouList.flatMap(gyou =>
         danKey: danKey,
       };
     }
-    return null; // 不整合がある場合は null を返す
-  }).filter((info): info is CharInfoSeion => info !== null) ?? [] // null を除去
+    return null;
+  }).filter((info): info is CharInfoSeion => info !== null) ?? []
 );
 
 // 全拗音文字情報
@@ -439,7 +436,7 @@ export const allYouonCharInfos: CharInfoYouon[] = youonGyouList.flatMap((gyou: s
     char: youonGyouChars[gyou]?.[index] ?? '?',
     gyouKey: gyou,
     danKey: dan,
-  })).filter((info): info is CharInfoYouon => info.char !== '?') ?? [] // Type guard for filter
+  })).filter((info): info is CharInfoYouon => info.char !== '?') ?? []
 );
 
 // 全濁音文字情報
@@ -449,7 +446,7 @@ export const allDakuonCharInfos: CharInfoDakuon[] = dakuonGyouList.flatMap((gyou
     char: dakuonGyouChars[gyou]?.[index] ?? '?',
     gyouKey: gyou,
     danKey: dan,
-  })).filter((info): info is CharInfoDakuon => info.char !== '?') ?? [] // Type guard for filter
+  })).filter((info): info is CharInfoDakuon => info.char !== '?') ?? []
 );
 
 // 全半濁音文字情報
@@ -458,7 +455,7 @@ export const allHandakuonCharInfos: CharInfoHandakuon[] = handakuonDanMapping['�
     char: handakuonGyouChars['は行']?.[index] ?? '?',
     gyouKey: 'は行' as const,
     danKey: dan,
-})).filter((info): info is CharInfoHandakuon => info.char !== '?') ?? []; // Type guard for filter
+})).filter((info): info is CharInfoHandakuon => info.char !== '?') ?? [];
 
 // 全小文字・促音情報
 export const allSokuonKomojiCharInfos: CharInfoSokuonKomoji[] = sokuonKomojiData.flatMap(group =>
@@ -497,7 +494,7 @@ export const allKigo2CharInfos: CharInfoKigo2[] = kigoPractice2Data.flatMap(grou
 // 全記号3情報
 export const allKigo3CharInfos: CharInfoKigo3[] = kigoPractice3Data.flatMap(group =>
     group.chars.map((char, index) => {
-        const isEqualSign = char === '=';
+        const isEqualSign = char === '='; // Note: kigoPractice3Data.ts の '＝' (全角) と合わせる
         return {
             type: 'kigo3' as const,
             char: char,
@@ -512,13 +509,14 @@ export const allGairaigoCharInfos: CharInfoGairaigo[] = gairaigoPracticeData.fla
         char: target.char,
         keys: target.keys,
         actualSecondKey: target.actualSecondKey,
+        actualThirdKey: target.actualThirdKey, // actualThirdKey も含める
     }))
 );
 export const allYouhandakuonCharInfos: CharInfoYouhandakuon[] = youhandakuonPracticeData.flatMap(group =>
     group.chars.map((char, index) => ({
         type: 'youhandakuon' as const,
         char: char,
-        inputDef: group.inputs[index], // inputDef を含める
+        inputDef: group.inputs[index],
     }))
 );
 
@@ -544,21 +542,25 @@ export const allYoudakuonCharInfos: CharInfoYoudakuon[] = youdakuonPracticeData.
 export const getHidKeyCodes = (keyName: string, layers: string[][], kb: KeyboardModel, side: KeyboardSide): number[] => {
     if (!keyName) return [];
     const codes: number[] = [];
-    const funcMap = functionKeyMaps[kb]?.[side] ?? {};
+    // Function key map for the current keyboard and side
+    const currentFuncMap = functionKeyMaps[kb]?.[side] ?? {};
 
     layers.forEach((layer, layerIndex) => {
         layer.forEach((key, keyIndex) => {
             const currentKeyName = (key ?? '').trim();
-            const hidCode = keyIndex + 1;
+            const hidCode = keyIndex + 1; // 1-based HID code
 
-            // 機能キーのマッピングを優先する場合 (練習モードでの表示名と一致させる)
+            // Determine the effective key name, considering function key mappings
             let effectiveKeyName = currentKeyName;
-            if (layerIndex === 2 || layerIndex === 3 || layerIndex === 6) { // かな関連レイヤー、記号長押し
-                 if (funcMap[keyIndex]) {
-                     effectiveKeyName = funcMap[keyIndex];
+            // Apply function key mapping for relevant layers (e.g., kana layers, symbol long-press layer)
+            // Adjust layer indices as per your application's logic
+            if (layerIndex === 2 || layerIndex === 3 || layerIndex === 6 || layerIndex === 7 || layerIndex === 8) {
+                 if (currentFuncMap[keyIndex]) { // Check if a function key mapping exists for this key index
+                     effectiveKeyName = currentFuncMap[keyIndex];
                  }
             }
-            // 拗音キーは '拗音' または '拗1'～'拗4' を同一視する (必要なら)
+
+            // Special handling for '拗音' or other specific keys if needed
             if (keyName === '拗音' && effectiveKeyName === '拗音') {
                  codes.push(hidCode);
             } else if (effectiveKeyName === keyName) {
@@ -566,7 +568,7 @@ export const getHidKeyCodes = (keyName: string, layers: string[][], kb: Keyboard
             }
         });
     });
-    return Array.from(new Set(codes));
+    return Array.from(new Set(codes)); // Return unique codes
 };
 
 
@@ -586,10 +588,10 @@ export const hid2Dan = (hidCode: number, kb: KeyboardModel, side: KeyboardSide):
     }
 };
 
-const hid2YouonVRight_Kana: Record<number, string> = { /*0x05: '拗1', 0x07: '拗2', 0x0D: '拗3', 0x0F: '拗4',*/ 0x02: '拗音' };
-const hid2YouonVLeft_Kana: Record<number, string> = { /*0x05: '拗1', 0x07: '拗2', 0x0D: '拗3', 0x0F: '拗4',*/ 0x03: '拗音' };
-const hid2YouonHRight_Kana: Record<number, string> = { /*0x07: '拗1', 0x09: '拗2', 0x11: '拗3', 0x13: '拗4',*/ 0x03: '拗音' };
-const hid2YouonHLeft_Kana: Record<number, string> = { /*0x07: '拗1', 0x09: '拗2', 0x11: '拗3', 0x13: '拗4',*/ 0x03: '拗音' };
+const hid2YouonVRight_Kana: Record<number, string> = { 0x02: '拗音' };
+const hid2YouonVLeft_Kana: Record<number, string> = { 0x03: '拗音' };
+const hid2YouonHRight_Kana: Record<number, string> = { 0x03: '拗音' };
+const hid2YouonHLeft_Kana: Record<number, string> = { 0x03: '拗音' };
 
 export const hid2Youon = (hidCode: number, kb: KeyboardModel, side: KeyboardSide): string | undefined => {
      if (kb === 'tw-20v') {
@@ -627,4 +629,10 @@ export {
     youhandakuonDanMapping,
     youhandakuonPracticeData,
     gairaigoPracticeData,
+};
+
+// ユーティリティ関数: チャレンジモードかどうかを判定
+export const isChallengeMode = (mode: PracticeMode | ''): boolean => {
+    if (!mode) return false; // mode が '' の場合はチャレンジモードではない
+    return mode === 'かな入力１分間トレーニング' || mode === '記号入力１分間トレーニング' || mode === '短文入力３分間トレーニング';
 };

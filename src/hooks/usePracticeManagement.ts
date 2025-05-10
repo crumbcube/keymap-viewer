@@ -6,8 +6,9 @@ import {
     KeyboardSide,
     KeyboardModel,
     CharInfoGairaigo,
-    PracticeInputInfo, // Though not directly used, good for context if we expand
-    PracticeStatus
+    PracticeInputInfo,
+    PracticeStatus,
+    isChallengeMode // isChallengeMode をインポート
 } from './usePracticeCommons';
 
 // Import individual practice hooks
@@ -27,21 +28,7 @@ import useKanaChallengePractice from './useKanaChallengePractice';
 import useKigoChallengePractice from './useKigoChallengePractice';
 import useTanbunChallengePractice from './useTanbunChallengePractice';
 
-// Data imports (could be passed as props if they vary more, but for now direct import is fine for some)
-import {
-    layerNames as defaultLayerNames, // Renamed to avoid conflict if passed as prop
-    // For practiceDataMap construction if done internally, or for type reference
-    seionPracticeData,
-    youonGyouList, youonGyouChars,
-    dakuonGyouList, dakuonGyouChars,
-    handakuonGyouChars,
-    sokuonKomojiData,
-    kigoPractice1Data, kigoPractice2Data, kigoPractice3Data,
-    youdakuonPracticeData, youhandakuonPracticeData,
-    youonKakuchoChars, gairaigoPracticeData
-} from '../data/keymapData';
-
-
+import { practiceDataMap } from '../data/practiceDataMaps'; // practiceDataMap をインポート
 interface UsePracticeManagementProps {
     initialPracticeMode: PracticeMode | '';
     initialGIdx: number;
@@ -52,10 +39,8 @@ interface UsePracticeManagementProps {
     kb: KeyboardModel;    // For commonHookProps and keyboardLayersForDisplay
     showKeyLabels: boolean; // For commonHookProps
     training: boolean;    // For displayLayerIndices & keyboardLayersForDisplay
-    practiceDataMap: Record<string, any[]>; // Passed from App.tsx
     sampleJson: any; // Passed from App.tsx (keymapData)
     layerNames: Record<number, string>; // Passed from App.tsx
-    isChallengeModeFn: (mode: PracticeMode | '') => boolean; // Passed from App.tsx
 }
 
 interface UsePracticeManagementReturn {
@@ -81,10 +66,8 @@ export const usePracticeManagement = ({
     kb,
     showKeyLabels,
     training,
-    practiceDataMap,
     sampleJson,
     layerNames,
-    isChallengeModeFn,
 }: UsePracticeManagementProps): UsePracticeManagementReturn => {
     const [practice, setPractice] = useState<PracticeMode | ''>(initialPracticeMode);
     const [gIdx, setGIdx] = useState<number>(initialGIdx);
@@ -106,8 +89,8 @@ export const usePracticeManagement = ({
         const dataForMode = practiceDataMap[currentPracticeMode];
 
         if (currentPracticeMode === '外来語の発音補助') {
-            // gairaigoPracticeData is used here, ensure it's available or passed if practiceDataMap doesn't fully cover it
-            const gairaigoData = practiceDataMap[currentPracticeMode] || gairaigoPracticeData; // Fallback if needed
+            // gairaigoPracticeData は practiceDataMap から取得される
+            const gairaigoData = practiceDataMap[currentPracticeMode];
             const currentGairaigoGroup = gairaigoData[currentGIdx];
             if (currentGairaigoGroup && currentDIdx >= currentGairaigoGroup.targets.length - 1) {
                 nextGIdx = currentGIdx + 1;
@@ -151,14 +134,14 @@ export const usePracticeManagement = ({
         }
 
         if (nextGIdx >= dataForMode.length) {
-            if (isChallengeModeFn(currentPracticeMode)) {
+            if (isChallengeMode(currentPracticeMode)) {
                 // Challenge mode finished, gIdx/dIdx might stay at end or reset based on specific challenge logic
             } else {
                 nextGIdx = 0; // Loop back for normal practice
             }
         }
         return { nextGIdx, nextDIdx };
-    }, [practiceDataMap, isChallengeModeFn]);
+    }, [practiceDataMap]);
 
     const nextStage = useCallback(() => {
         if (!practice) return;
@@ -216,13 +199,19 @@ export const usePracticeManagement = ({
             default: return null;
         }
     }, [practice, seionPractice, youonPractice, dakuonPractice, handakuonPractice, sokuonKomojiPractice, kigoPractice1, kigoPractice2, kigoPractice3, youdakuonPractice, youhandakuonPractice, youonKakuchoPractice, gairaigoPractice, kanaChallengePractice, kigoChallengePractice, tanbunChallengePractice]);
+    // console.log(`[PracticeManagement useMemo activePractice] Mode: ${practice}, Calculated activePractice.status: ${activePractice?.status}, activePractice.countdownValue: ${activePractice?.countdownValue}`);
+
+    useEffect(() => {
+        console.log(`[PracticeManagement] Active practice changed. Mode: ${practice}, Hook Status: ${activePractice?.status}, Countdown: ${activePractice?.countdownValue}`);
+    }, [practice, activePractice]);
+
 
     const handlePracticeSelect = useCallback((item: PracticeMode) => {
-        activePractice?.reset?.(); // Reset current before switching
+        // activePractice?.reset?.(); // Reset current before switching - This will be handled by the useEffect below based on 'practice' state change
         setPractice(item);
         setGIdx(0);
         // dIdx initial value adjustments based on practice mode
-        if (isChallengeModeFn(item)) {
+        if (isChallengeMode(item)) {
             setDIdx(0);
         } else if (item === '拗音拡張') {
             setDIdx(1);
@@ -232,29 +221,37 @@ export const usePracticeManagement = ({
             setDIdx(0);
         }
         // The new activePractice will be determined by the memo, and its reset (if needed on first load) should be handled by its own logic or an effect.
-    }, [activePractice, setPractice, setGIdx, setDIdx, isChallengeModeFn]);
+    }, [setPractice, setGIdx, setDIdx]); // Removed activePractice from dependencies as it's not used for reset here
 
     // Effect to reset active practice when isRandomMode changes (for non-challenge modes)
     useEffect(() => {
-        if (!isChallengeModeFn(practice)) {
+        if (!isChallengeMode(practice)) {
             activePractice?.reset?.();
         }
-    }, [isRandomMode, practice, activePractice, isChallengeModeFn]);
+    }, [isRandomMode, practice, activePractice]);
     
     // Effect to reset active practice when it changes (e.g. due to practice mode selection)
     // This ensures the newly selected practice starts fresh.
+    // The practice mode string 'practice' is a more stable dependency than 'activePractice' object itself.
     useEffect(() => {
-        activePractice?.reset?.();
-    }, [activePractice]);
+        // チャレンジモードでない場合、または activePractice が存在する場合のみ reset を呼ぶ
+        if (activePractice && !isChallengeMode(practice)) {
+            console.log(`[PracticeManagement practice-useEffect] Practice changed to: ${practice} (Non-Challenge). BEFORE calling activePractice.reset(). Current activePractice status: ${activePractice?.status}, countdown: ${activePractice?.countdownValue}`);
+            activePractice.reset?.();
+            console.log(`[PracticeManagement practice-useEffect] AFTER calling activePractice.reset() for ${practice}.`);
+        } else if (isChallengeMode(practice)) {
+            console.log(`[PracticeManagement practice-useEffect] Practice changed to: ${practice} (Challenge Mode). Reset will be handled by the challenge hook itself based on isActive.`);
+        }
+    }, [practice]); // Changed dependency from activePractice to practice
 
 
     const isChallengeFinished = useMemo(() => {
-        return isChallengeModeFn(practice) && !!activePractice?.challengeResults;
-    }, [practice, activePractice, isChallengeModeFn]);
+        return isChallengeMode(practice) && !!activePractice?.challengeResults;
+    }, [practice, activePractice]);
 
     const headingChars = useMemo(() => {
         if (!training || !practice || !activePractice) return [];
-        if (isChallengeModeFn(practice) || (isRandomMode && practice !== '外来語の発音補助')) {
+        if (isChallengeMode(practice) || (isRandomMode && practice !== '外来語の発音補助')) {
             return activePractice.headingChars ?? [];
         }
         const dataForMode = practiceDataMap[practice];
@@ -268,7 +265,7 @@ export const usePracticeManagement = ({
             }
         }
         return [];
-    }, [training, practice, gIdx, isRandomMode, activePractice, practiceDataMap, isChallengeModeFn]);
+    }, [training, practice, gIdx, isRandomMode, activePractice, practiceDataMap]);
 
     const displayLayerIndices = useMemo(() => {
         if (training) {
@@ -278,7 +275,7 @@ export const usePracticeManagement = ({
             if (practice === '記号の基本練習１') return [6];
             if (practice === '記号の基本練習２') return [7];
             if (practice === '記号の基本練習３') return [8];
-            if (practice && !isChallengeModeFn(practice)) {
+            if (practice && !isChallengeMode(practice)) {
                 return [2, 3];
             }
             if (practice === 'かな入力１分間トレーニング') {
@@ -290,7 +287,7 @@ export const usePracticeManagement = ({
             return [];
         }
         return [];
-    }, [training, practice, activePractice?.targetLayerIndex, isChallengeModeFn]);
+    }, [training, practice, activePractice?.targetLayerIndex]);
 
     const keyboardLayersForDisplay = useMemo(() => {
         const baseLayers = sampleJson[kb]?.[side]?.layers ?? [];

@@ -27,16 +27,13 @@ interface AppLayoutProps {
     cols: number;
     fixedWidth: string;
     lastInvalidKeyCode: number | null;
-    currentFunctionKeyMap: Record<string, string>;
+    currentFunctionKeyMap: Record<number, string>;
 
     // Handlers
     onToggleTraining: () => void;
     onToggleShowKeyLabels: () => void;
     onToggleRandomMode: () => void;
     onPracticeSelect: (item: PracticeMode) => void;
-
-    // Style
-    buttonStyle: React.CSSProperties;
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({
@@ -66,8 +63,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     onToggleShowKeyLabels,
     onToggleRandomMode,
     onPracticeSelect,
-    buttonStyle,
 }) => {
+    // ボタンのスタイルをコンポーネント内で定義
+    const buttonStyle: React.CSSProperties = {
+        marginBottom: '0.5rem',
+        padding: '5px 10px',
+        display: 'block',
+        minWidth: '120px',
+        textAlign: 'center',
+    };
     return (
         <div className='p-4 pt-20'>
             {/* ボタンエリア */}
