@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/keymap-viewer/static/css/main.2478648c.css",
-    "main.js": "/keymap-viewer/static/js/main.45744a6b.js",
+    "main.js": "/keymap-viewer/static/js/main.195eb65a.js",
     "index.html": "/keymap-viewer/index.html",
     "main.2478648c.css.map": "/keymap-viewer/static/css/main.2478648c.css.map",
-    "main.45744a6b.js.map": "/keymap-viewer/static/js/main.45744a6b.js.map"
+    "main.195eb65a.js.map": "/keymap-viewer/static/js/main.195eb65a.js.map"
   },
   "entrypoints": [
     "static/css/main.2478648c.css",
-    "static/js/main.45744a6b.js"
+    "static/js/main.195eb65a.js"
   ]
 }
